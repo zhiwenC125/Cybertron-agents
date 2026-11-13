@@ -1,40 +1,87 @@
 # Cybertron 安装与发布方案
 
-## 当前可用范围（2026-11-14）
+## 安装双路径
 
-七个开发阶段的**最小闭环基线**已到达：前六阶段按各自离线或指定测试空间条件验收；第七阶段的 STM32 最小 App 经人工批准后完成真机烧录、SRAM 心跳和原固件逐字节回滚。完整 OTA App、ESP32-S3、隔离构建接入角色工具、宿主审批回执与 DeepSeek Harness 插件仍在开发。真机结果是特定设备的验收证据，不属于安装包运行时。
+Cybertron 的 13 个角色本质是 OpenCode 的 Markdown 配置（`.opencode/agents/*.md`）加一个 `/cybertron` 命令。安装 = 把这些文件放进 OpenCode 会扫描的目录。提供两条路径：
 
-本仓库现在可在 **OpenCode V2** 中加载 13 个角色，当前验证版本为 `opencode v2.3.0`。`opencode2 debug config` 已读取项目配置，`opencode2 debug agents` 已列出全部 13 个 Cybertron 角色；全部角色的模型 ID 均在本机模型目录中。配置加载不等于真实模型调用或九步自动接力：本仓库的真实执行器目前只接入第 1 步的 `thirteenth` 角色，其余流程仍以离线模拟和局部宿主权限测试为主。
+| 路径 | 命令 | 适合 |
+| --- | --- | --- |
+| npm CLI | `npx cybertron-agents init` | 装有 Node.js 的开发者 |
+| GitHub Shell | `sh install.sh`（先下载、可审阅） | 零依赖 / 极客用户 |
 
-## 现在可以复现的项目内使用
+两条路径共享同一份 payload（`registry.py` 导出的 13 个 Markdown + `/cybertron` 命令），安装行为一致。
 
-先安装 Python 3.9+ 和 [OpenCode V2](https://opencode.ai/docs/)。使用者自行在 OpenCode 中连接 DeepSeek；凭证不由 Cybertron 安装脚本收集，也不得写入仓库。以下命令只加载配置和运行本地测试，不调用模型：
+## 共同安全原则
+
+1. **可审阅**：先下载脚本，读一眼再执行；不鼓励 `curl ... | sh` 盲跑。
+2. **固定版本**：npm 用 `cybertron-agents@<version>`，shell 用 `--version <tag>`。
+3. **校验**：shell 支持 `--sha256`；npm 依赖 registry 的 integrity。
+4. **先预览后写入**：默认 dry-run，只有 `--apply` 才落盘。
+5. **幂等 + 备份**：目标已存在且内容不同时，先写 `.bak` 再覆盖。
+6. **不收集凭证**：不读取、不写入任何模型或飞书密钥。
+
+## 路径一：npm CLI
 
 ```bash
-git clone https://github.com/zhiwenC125/Cybertron-agents.git
-cd Cybertron-agents
-python3 -m unittest discover -s tests -q
-opencode2 debug config
-opencode2 debug agents
+# 预览（默认 dry-run，不写任何文件）
+npx cybertron-agents@0.1.0 init --dry-run
+
+# 装到当前项目
+npx cybertron-agents@0.1.0 init --apply --project .
+
+# 装到全局（所有项目可见）
+npx cybertron-agents@0.1.0 init --apply --global
 ```
 
-在仓库目录运行 `opencode2` 可进入交互界面并看到默认 `prima` 角色；发送提示后会调用配置的模型。`python3 -m cybertron.opencode_run "你的需求"` 是当前第 1 步真实执行入口，同样会调用模型。**不要把 `opencode2 debug config` 或单元测试的通过，解释为完整多角色自动开发已可用。** 本机已迁移到 `deepseek/deepseek-flash` 与 `deepseek/deepseek-v4-pro`；在新电脑上仍需用 `opencode2 models` 检查该版本的模型目录和账号权限。模型调用可能产生费用。
+- `--project DIR`：安装到 `DIR/.opencode/agents` 与 `DIR/.opencode/commands`。
+- `--global`：安装到 `${XDG_CONFIG_HOME:-~/.config}/opencode/agents|commands`。
+- 目标缺少 `opencode.jsonc` 时写入最小配置（`default_agent: "prima"`）；已有配置则保守合并，不改动你的其他字段。
+- 默认 dry-run；`--apply` 才写盘。
 
-飞书是可选功能。默认配置不启用 MCP；要使用阶段 6 的 Wiki 网关，使用者必须自行准备自建应用、测试空间、环境变量和知识库管理员权限。真实 Wiki 写入只在明确指定的测试空间执行，详见 [阶段 6](stages/06-feishu.md)。
+## 路径二：GitHub Shell
 
-## 下一步封装成一条安装命令
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhiwenC125/Cybertron-agents/main/install.sh -o install.sh
+sh install.sh --dry-run            # 先看要改哪些文件
+sh install.sh --apply --project .  # 确认后安装
+```
 
-1. **固定发布边界**：给稳定基线打版本标签（建议 `v0.1.0`），在发布说明中列出 OpenCode V2 与 Python 支持版本、当前只接入第 1 步的限制，以及阶段 7 的真机验收范围。仓库中的 `local_backups/`、凭证和本机构建产物不进入发布包。
-2. **Python 包与命令行**：增加 `pyproject.toml`，用 `pipx` 或 `uv tool` 安装 `cybertron-agents` 命令。提供 `cybertron init --target /path/to/project --dry-run` 和显式 `--apply`，从 `registry.py` 导出项目级 `opencode.jsonc` 与 `.opencode/agents/`。默认不启用飞书，不改用户全局 OpenCode 配置；目标文件已存在时显示差异并要求明确覆盖，先备份再写入。加入 `cybertron doctor` 检查 Python、OpenCode 版本、模型目录、配置一致性和可选凭证是否存在，但不打印密钥。
-3. **可审核安装入口**：发布版使用固定 tag/提交和校验值；在 GitHub Releases 提供 wheel/sdist 与 SHA-256。文档推荐 `pipx install cybertron-agents==<version>`（发布到包索引后）或固定 tag 的 Git URL。避免将远端脚本直接通过 `curl | sh` 执行。安装命令只安装文件，项目初始化由使用者单独执行并预览变更。
-4. **多平台验收**：CI 在 macOS、Linux、Windows 检查包构建、13 角色导出、Markdown/JSON 权限一致性、OpenCode 配置解析和 `doctor`。当前 `stage5_verify` 使用 macOS `sandbox-exec`，跨平台版本需要各系统的隔离后端；未完成前只承诺配置可加载，不承诺测试/构建 Shell 的宿主隔离。
-5. **后续接力与 Harness**：先实现 OpenCode 中的九步宿主执行、结构化 QA 证据和不可伪造的人工审批回执，再将同一 `registry.py` 契约映射到 `.dsh/cordis-cybertron-plugin.mjs`。DeepSeek Harness 目前只有静态预设 JSON，应作为独立实验包和验收矩阵，避免把预设误当成可运行插件。
+固定版本与校验：
 
-推荐的最终用户流程是：安装固定版本 → `cybertron doctor` → 在目标项目运行 `cybertron init --dry-run` → 审核后 `--apply` → `opencode2 debug agents` → 自行连接模型并开始使用。项目级安装便于回滚与版本锁定，也不会把 Cybertron 权限扩散到用户的所有项目。
+```bash
+sh install.sh --apply --version v0.1.0 --sha256 <归档文件的 SHA-256>
+```
+
+- 在本地 clone 内运行时直接读取仓库 `.opencode/`。
+- 通过 curl 下载运行时，自动拉取对应版本的 GitHub 归档，解压后安装。
+- `--global` 与 `--project DIR` 语义同 npm 路径。
+
+## 关于 pipx（它不是 npm）
+
+- `pipx` 是 **Python** 生态工具：从 PyPI 安装 Python CLI，放进隔离 venv。
+- `npm` 是 **Node** 生态：从 registry.npmjs.org 安装 Node 包。
+- 二者互不相干，`pipx install` 不是 npm 的安装方式。
+- 本仓库当前的双路径是 Node + Shell，不需要 Python，也不使用 pipx。
+- 只有将来把 `cybertron` 做成「Python 引擎 + CLI」时，`pipx install cybertron-agents==<version>` 才会成为**第三条独立路径**，需要新增 `pyproject.toml`，与 npm 无关。
+
+## 安装后使用
+
+```bash
+opencode2 debug agents          # 确认 13 个角色已加载
+opencode                        # 默认 prima；Tab / Shift+Tab 切换
+/cybertron 帮我做 STM32F4 电机控制固件
+```
+
+## 发布前检查
+
+- `npm pack --dry-run` 确认包内只有 CLI、payload、`install.sh`，不含 Python 测试与本机备份。
+- 在干净目录分别跑 `init --dry-run` 和 `--apply`，用 `opencode2 debug agents` 确认 13 个角色出现。
+- 打 tag（建议 `v0.1.0`），在 GitHub Release 附归档与 `install.sh` 的 SHA-256。
+- `local_backups/`、凭证、本机构建产物不进入发布包。
 
 ## 参考
 
-- [OpenCode V2 安装](https://opencode.ai/docs/)
-- [OpenCode 项目配置位置与优先级](https://opencode.ai/docs/config)
+- [OpenCode 安装](https://opencode.ai/docs/)
+- [OpenCode 配置位置与优先级](https://opencode.ai/docs/config)
 - [OpenCode 智能体文件](https://opencode.ai/docs/agents)
-- [DeepSeek 模型更新](https://api-docs.deepseek.com/news/news260424/)
+- [npm files 字段](https://docs.npmjs.com/cli/configuring-npm/package-json#files)

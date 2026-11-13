@@ -10,3 +10,5 @@ stage7_fixture/stm32_minimal/build/
 !.env.example
 *.pem
 *.key
+node_modules/
+payload/

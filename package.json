@@ -1,0 +1,32 @@
+{
+  "name": "cybertron-agents",
+  "version": "0.1.0",
+  "description": "Install the 13 Cybertron Primes agents and the /cybertron command into OpenCode",
+  "type": "module",
+  "bin": {
+    "cybertron": "bin/cybertron.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "payload",
+    "install.sh"
+  ],
+  "scripts": {
+    "prepack": "node scripts/build-payload.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "opencode",
+    "agents",
+    "cybertron",
+    "multi-agent"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhiwenC125/Cybertron-agents.git"
+  },
+  "license": "MIT"
+}
