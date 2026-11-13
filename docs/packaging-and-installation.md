@@ -1,12 +1,23 @@
 # Cybertron 安装与发布方案
 
+## 当前发布状态（2026-11-14）
+
+| 渠道 | 版本 | 地址 |
+| --- | --- | --- |
+| npm | `cybertron-agents@0.1.0` | https://www.npmjs.com/package/cybertron-agents |
+| PyPI | `cybertron-agents 0.1.0` | https://pypi.org/project/cybertron-agents/0.1.0/ |
+| GitHub tag | `v0.1.0`（提交 `8188a7a`） | https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.1.0 |
+| `install.sh` SHA-256 | `f236333aeb4c157c6373ccd8641bf79cc0c29eb7c200541432ac4534df65c331` | 见 Release 说明 |
+
+> 版本状态：`v0.1.0` 对应已发布的 npm/PyPI 产物。仓库 `main` 在 `v0.1.0` 之后还包含两项未发布修复：`project.license` 改为 SPDX 字符串并打包 `LICENSE`、`cybertron doctor` 不再联网下载 payload。这两项计划随 `0.1.1` 发布。
+
 ## 三条安装路径
 
 Cybertron 的 13 个角色本质是 OpenCode 的 Markdown 配置（`.opencode/agents/*.md`）加一个 `/cybertron` 命令。安装 = 把这些文件放进 OpenCode 会扫描的目录。提供三条路径，共享同一份 payload：
 
 | 路径 | 命令 | 适合 |
 | --- | --- | --- |
-| npm CLI | `npx cybertron-agents init` | 装有 Node.js 的开发者 |
+| npm CLI | `npx -y cybertron-agents@0.1.0 init` | 装有 Node.js 的开发者 |
 | GitHub Shell | `sh install.sh`（先下载、可审阅） | 零依赖 / 极客用户 |
 | pipx | `pipx install cybertron-agents`，再 `cybertron init` | 装有 Python 3.9+ 的用户 |
 
@@ -22,11 +33,12 @@ Cybertron 的 13 个角色本质是 OpenCode 的 Markdown 配置（`.opencode/ag
 ## 路径一：npm CLI
 
 ```bash
-npx cybertron-agents@0.1.0 init --dry-run           # 预览
-npx cybertron-agents@0.1.0 init --apply --project . # 装到当前项目
-npx cybertron-agents@0.1.0 init --apply --global    # 装到全局
+npx -y cybertron-agents@0.1.0 init --dry-run           # 预览
+npx -y cybertron-agents@0.1.0 init --apply --project . # 装到当前项目
+npx -y cybertron-agents@0.1.0 init --apply --global    # 装到全局
 ```
 
+- **不要在本仓库目录内运行 `npx`**：npm 会向上命中本地同名 `package.json`，从而不安装 registry 包，报 `cybertron: command not found`。请在你自己的项目目录运行。
 - `--project DIR`：安装到 `DIR/.opencode/agents` 与 `DIR/.opencode/commands`。
 - `--global`：安装到 `${XDG_CONFIG_HOME:-~/.config}/opencode/agents|commands`。
 - 目标缺少 `opencode.jsonc` 时写入最小配置（`default_agent: "prima"`）；已有配置则保守合并，不改动你的其他字段。
@@ -62,8 +74,8 @@ cybertron doctor
 
 - 与 npm/shell 共用同一份 payload：在本地开发目录下优先用仓库 `.opencode/`；安装到 site-packages 后则下载 GitHub 归档，或用 `--payload DIR` 指定本地目录。
 - 固定版本：`pipx install cybertron-agents==<version>`。
-- 尚未发布到 PyPI 时，可从仓库安装：`pipx install .`。
-- `cybertron doctor` 检查角色数量、命令与配置是否存在，不打印任何密钥。
+- 从源码安装（开发用）：`pipx install .`。
+- `cybertron doctor` 只做本地检查（角色数量、命令、配置），不联网下载 payload，也不打印任何密钥。
 
 ## 关于 pipx 的常见误解
 
@@ -85,8 +97,12 @@ opencode                        # 默认 prima；Tab / Shift+Tab 切换
 - npm：`npm publish` 需要维护者账号（发布前本地可用 `npx ./cybertron-agents-0.1.0.tgz init --dry-run` 验证）。
 - pipx：`python -m build` 生成 wheel/sdist，再 `twine upload` 到 PyPI；发布前可用 `pipx install .` 验证。
 - 在干净目录分别跑三条路径的 `--dry-run` 与 `--apply`，用 `opencode2 debug agents` 确认 13 个角色出现。
-- 打 tag（建议 `v0.1.0`），在 GitHub Release 附归档与 `install.sh` 的 SHA-256。
+- 打 tag（`v0.1.0` 已完成），在 GitHub Release 附归档与 `install.sh` 的 SHA-256；下一版为 `0.1.1`。
 - `local_backups/`、凭证、本机构建产物不进入发布包。
+
+## 许可证
+
+MIT，见仓库根目录 [`LICENSE`](../LICENSE)。
 
 ## 参考
 
