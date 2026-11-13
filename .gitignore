@@ -12,3 +12,7 @@ stage7_fixture/stm32_minimal/build/
 *.key
 node_modules/
 payload/
+build/
+dist/
+*.egg-info/
+.tmp-*

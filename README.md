@@ -40,6 +40,16 @@ python3 -m cybertron.opencode_run "请澄清 STM32F4 电机控制任务还缺少
 
 阶段 6 的离线测试包含在单元测试中。真实飞书测试使用自建应用身份：在本机设置 `FEISHU_APP_ID`、`FEISHU_APP_SECRET` 和测试空间的 `FEISHU_WIKI_SPACE_ID`，依次运行 `python3 -m cybertron.stage6_verify --check-env`、`--check-auth` 和 `--live`；最后一项会在该空间创建并保留一篇测试文档、追加正文并回读验证。完整步骤见[阶段 6 文档](docs/stages/06-feishu.md)。不要把 App Secret 或租户令牌提交到仓库或贴进聊天。
 
+## 安装到 OpenCode
+
+三条安装路径共享同一份 payload，默认 dry-run，`--apply` 才写入：
+
+- npm：`npx cybertron-agents@0.1.0 init --dry-run`（发布后）
+- shell：`sh install.sh --dry-run --project .`
+- pipx：`pipx install .` 后 `cybertron init --dry-run`
+
+详见[安装与发布方案](docs/packaging-and-installation.md)。
+
 ## 模块
 
 | 模块 | 职责 |
@@ -56,6 +66,7 @@ python3 -m cybertron.opencode_run "请澄清 STM32F4 电机控制任务还缺少
 | `isolated_runner.py` | macOS 沙箱内运行单元测试并生成 QA 证据 |
 | `deployment.py` | 第七阶段固件、设备、擦写与回滚契约及无硬件仿真 |
 | `exporters.py` | 双宿主静态配置导出 |
+| `installer.py` | npm / shell / pipx 三条安装路径的 Python 入口 |
 | `selfcheck.py` | 命令行自检 |
 
 ## 当前边界与下一步
