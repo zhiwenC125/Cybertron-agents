@@ -1,0 +1,18 @@
+{
+  "stage": 7,
+  "date_local": "2026-11-14",
+  "source": "local python3 -m cybertron.stage7_probe",
+  "operation": "read_only_usb_registry_inventory",
+  "stlink_usb_probe": {
+    "present": true,
+    "vendor_id": 1155,
+    "product_id": 14152,
+    "product": "STM32 STLink"
+  },
+  "stm32_target_identified_over_swd": false,
+  "esp32_native_usb_identified": false,
+  "unidentified_usb_serial_candidates": 1,
+  "required_mcu_toolchains_on_path": false,
+  "device_opened": false,
+  "firmware_written": false
+}

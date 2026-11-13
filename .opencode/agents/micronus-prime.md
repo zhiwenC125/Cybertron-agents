@@ -1,7 +1,7 @@
 ---
 description: "[微米天 · Micronus Prime] 专职L1代码规范与静态分析审查官：运行 ruff/clang-tidy/cppcheck 审查编码规范、类型安全、MISRA-C基础规则与注释完备性。"
 mode: subagent
-model: deepseek/deepseek-chat
+model: deepseek/deepseek-flash
 steps: 8
 color: "#0284c7"
 permissions:

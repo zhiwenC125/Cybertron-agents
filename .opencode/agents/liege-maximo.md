@@ -1,7 +1,7 @@
 ---
 description: "[谎言天尊 · Liege Maximo] 专职L2深度逻辑与硬件安全Code Reviewer（红队审判官）：纯静态审查并发死锁、中断阻塞、栈溢出、引脚短路风险与密钥泄露。"
 mode: subagent
-model: deepseek/deepseek-reasoner
+model: deepseek/deepseek-v4-pro
 steps: 20
 color: "#dc2626"
 permissions:

@@ -1,7 +1,7 @@
 ---
 description: "[震天尊 · Megatronus Prime] 物理硬件烧录安全闸门与高危熔断执法官：全系统唯一可执行真机烧录(openocd/esptool)、边缘设备重启与固件回滚的天尊，强制触发人工审批。"
 mode: subagent
-model: deepseek/deepseek-reasoner
+model: deepseek/deepseek-v4-pro
 steps: 10
 color: "#991b1b"
 permissions:

@@ -73,6 +73,7 @@ def compile_opencode_v2_assets(target_dir: Path, *, include_feishu: bool = False
             "servers": {
                 "feishu_wiki": {
                     "type": "local",
+                    "codemode": False,
                     "command": [
                         "npx",
                         "-y",
@@ -84,6 +85,10 @@ def compile_opencode_v2_assets(target_dir: Path, *, include_feishu: bool = False
                         "{env:FEISHU_APP_SECRET}",
                         "--token-mode",
                         "tenant_access_token",
+                        "-c",
+                        "dot",
+                        "-t",
+                        "wiki.v2.space.getNode,docx.v1.document.rawContent",
                     ],
                     "environment": {
                         "FEISHU_APP_ID": "{env:FEISHU_APP_ID}",

@@ -1,7 +1,7 @@
 ---
 description: "[炼金术士 · Alchemist Prime] 专职测试开发与软硬件仿真检验官（QA Lead）：独占 tests/** 写入权，负责编写并运行软件单测与 QEMU/Renode 固件仿真检验。"
 mode: subagent
-model: deepseek/deepseek-coder
+model: deepseek/deepseek-v4-pro
 steps: 16
 color: "#ca8a04"
 permissions:

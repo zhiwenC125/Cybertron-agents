@@ -1,7 +1,7 @@
 ---
 description: "[锐天骁 · Onyx Prime] 静态代码与硬件BSP拓扑侦察猎手：专注于当前工作树AST符号、设备树与跨文件调用链定位，不碰Git历史与终端。"
 mode: subagent
-model: deepseek/deepseek-chat
+model: deepseek/deepseek-flash
 steps: 8
 color: "#d97706"
 permissions:

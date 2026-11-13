@@ -5,7 +5,7 @@
     "prima": {
       "description": "[先觉天] 塞伯坦首席研发编排官：唯一拥有 subagent 派发权的主控大脑，按软硬一体 SDLC 七大阶段调度其余12位天尊。",
       "mode": "primary",
-      "model": "deepseek/deepseek-reasoner",
+      "model": "deepseek/deepseek-v4-pro",
       "steps": 28,
       "color": "#2563eb",
       "permissions": [
@@ -94,7 +94,7 @@
     "alpha-trion": {
       "description": "[钛师傅] 专职技术文档撰写官与飞书知识库总管：负责项目全部文档编写及飞书Wiki双向同步，并执行长上下文原子压缩。",
       "mode": "subagent",
-      "model": "deepseek/deepseek-chat",
+      "model": "deepseek/deepseek-flash",
       "steps": 15,
       "color": "#7c3aed",
       "permissions": [
@@ -129,36 +129,21 @@
           "effect": "allow"
         },
         {
-          "action": "feishu_wiki_search*",
+          "action": "feishu_wiki_wiki_v2_space_getNode",
           "resource": "*",
           "effect": "allow"
         },
         {
-          "action": "feishu_wiki_get*",
+          "action": "feishu_wiki_docx_v1_document_rawContent",
           "resource": "*",
           "effect": "allow"
-        },
-        {
-          "action": "feishu_wiki_create*",
-          "resource": "*",
-          "effect": "allow"
-        },
-        {
-          "action": "feishu_wiki_update*",
-          "resource": "*",
-          "effect": "allow"
-        },
-        {
-          "action": "feishu_wiki_delete*",
-          "resource": "*",
-          "effect": "deny"
         }
       ]
     },
     "onyx-prime": {
       "description": "[锐天骁] 静态代码与硬件BSP拓扑侦察猎手：专注于当前工作树AST符号、设备树与跨文件调用链定位，不碰Git历史与终端。",
       "mode": "subagent",
-      "model": "deepseek/deepseek-chat",
+      "model": "deepseek/deepseek-flash",
       "steps": 8,
       "color": "#d97706",
       "permissions": [
@@ -187,7 +172,7 @@
     "vector-prime": {
       "description": "[维克多] Git版本演进与固件基线考古官：使用固定形式的只读 Git 命令，专注回归溯源。",
       "mode": "subagent",
-      "model": "deepseek/deepseek-chat",
+      "model": "deepseek/deepseek-flash",
       "steps": 10,
       "color": "#059669",
       "permissions": [
@@ -236,7 +221,7 @@
     "quintus-prime": {
       "description": "[昆图斯] 软硬件系统架构师与脚手架孵化器：负责创建工程目录、依赖配置以及软件接口与硬件HAL头文件空骨架。",
       "mode": "subagent",
-      "model": "deepseek/deepseek-chat",
+      "model": "deepseek/deepseek-flash",
       "steps": 12,
       "color": "#16a34a",
       "permissions": [
@@ -320,7 +305,7 @@
     "solus-prime": {
       "description": "[赛天骄] 核心软件与嵌入式固件锻造师：唯一负责编写新增业务逻辑、MCU/边缘设备外设驱动与修复功能Bug的主力编码天尊。",
       "mode": "subagent",
-      "model": "deepseek/deepseek-coder",
+      "model": "deepseek/deepseek-v4-pro",
       "steps": 18,
       "color": "#ea580c",
       "permissions": [
@@ -384,7 +369,7 @@
     "amalgamous": {
       "description": "[幻化天] 代码重构与跨硬件平台移植专家：在不改变外部功能语义的前提下执行代码解耦、嵌入式内存优化与跨芯片架构移植。",
       "mode": "subagent",
-      "model": "deepseek/deepseek-coder",
+      "model": "deepseek/deepseek-v4-pro",
       "steps": 15,
       "color": "#0891b2",
       "permissions": [
@@ -428,7 +413,7 @@
     "micronus-prime": {
       "description": "[微米天] 专职L1代码规范与静态分析审查官：运行 ruff/clang-tidy/cppcheck 审查编码规范、类型安全、MISRA-C基础规则与注释完备性。",
       "mode": "subagent",
-      "model": "deepseek/deepseek-chat",
+      "model": "deepseek/deepseek-flash",
       "steps": 8,
       "color": "#0284c7",
       "permissions": [
@@ -447,7 +432,7 @@
     "liege-maximo": {
       "description": "[谎言天尊] 专职L2深度逻辑与硬件安全Code Reviewer（红队审判官）：纯静态审查并发死锁、中断阻塞、栈溢出、引脚短路风险与密钥泄露。",
       "mode": "subagent",
-      "model": "deepseek/deepseek-reasoner",
+      "model": "deepseek/deepseek-v4-pro",
       "steps": 20,
       "color": "#dc2626",
       "permissions": [
@@ -526,7 +511,7 @@
     "alchemist": {
       "description": "[炼金术士] 专职测试开发与软硬件仿真检验官（QA Lead）：独占 tests/** 写入权，负责编写并运行软件单测与 QEMU/Renode 固件仿真检验。",
       "mode": "subagent",
-      "model": "deepseek/deepseek-coder",
+      "model": "deepseek/deepseek-v4-pro",
       "steps": 16,
       "color": "#ca8a04",
       "permissions": [
@@ -560,7 +545,7 @@
     "nexus-prime": {
       "description": "[合体天] 软硬件交叉编译、容器打包与硬件部署准备官：负责CMake/设备树/Docker配置、运行交叉编译生成固件并探测目标硬件端口。",
       "mode": "subagent",
-      "model": "deepseek/deepseek-chat",
+      "model": "deepseek/deepseek-flash",
       "steps": 14,
       "color": "#4f46e5",
       "permissions": [
@@ -634,7 +619,7 @@
     "megatronus": {
       "description": "[震天尊] 物理硬件烧录安全闸门与高危熔断执法官：全系统唯一可执行真机烧录(openocd/esptool)、边缘设备重启与固件回滚的天尊，强制触发人工审批。",
       "mode": "subagent",
-      "model": "deepseek/deepseek-reasoner",
+      "model": "deepseek/deepseek-v4-pro",
       "steps": 10,
       "color": "#991b1b",
       "permissions": [
@@ -683,7 +668,7 @@
     "thirteenth": {
       "description": "[第十三天尊] 产品需求澄清与最终验收交付官：对外连接人类开发者，负责立项前软硬件规格澄清与结项后端到端预览及成果交付。",
       "mode": "all",
-      "model": "deepseek/deepseek-chat",
+      "model": "deepseek/deepseek-flash",
       "steps": 12,
       "color": "#10b981",
       "permissions": [

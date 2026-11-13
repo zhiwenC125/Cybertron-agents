@@ -1,7 +1,7 @@
 ---
 description: "[昆图斯 · Quintus Prime] 软硬件系统架构师与脚手架孵化器：负责创建工程目录、依赖配置以及软件接口与硬件HAL头文件空骨架。"
 mode: subagent
-model: deepseek/deepseek-chat
+model: deepseek/deepseek-flash
 steps: 12
 color: "#16a34a"
 permissions:

@@ -1,0 +1,47 @@
+{
+  "stage": 7,
+  "kind": "stm32_offline_build",
+  "source_repository": "LOCAL_OTA_REPOSITORY",
+  "source_head": "bb436ffcfd4b12974e69fb724a41193ef461b22f",
+  "source_tree_clean": false,
+  "toolchain": "Arm GNU Toolchain 15.3.Rel2, arm-none-eabi-gcc 15.3.1",
+  "build_system": "CMake 4.2.3 + Ninja 1.13.2",
+  "physical_device_access": false,
+  "app": {
+    "configure_passed": true,
+    "build_passed": true,
+    "artifact": "LOCAL_OTA_REPOSITORY/build/stage7-artifacts/app/STM32_AIoT_Project.bin",
+    "sha256": "f92ca607ec70eb306687378775e68233d919d6f0ee9b00b3ff4979bc92db4120",
+    "bytes": 29988,
+    "partition_start": "0x08002000",
+    "partition_bytes": 56320,
+    "initial_stack_pointer": "0x20005000",
+    "reset_vector": "0x080032ED",
+    "fits_partition": true
+  },
+  "bootloader": {
+    "configure_passed": true,
+    "build_passed": true,
+    "artifact": "LOCAL_OTA_REPOSITORY/build/stage7-artifacts/bootloader/STM32_Bootloader.bin",
+    "sha256": "ea91bd6c7388d3c2b9bb336b591beeac8240ef4a0683290e8d4ed9dbd0a2589c",
+    "bytes": 6168,
+    "partition_start": "0x08000000",
+    "partition_bytes": 8192,
+    "initial_stack_pointer": "0x20005000",
+    "reset_vector": "0x080007A5",
+    "fits_partition": true
+  },
+  "ota_flag_partition": {
+    "start": "0x0800FC00",
+    "bytes": 1024,
+    "overlapped_by_build_artifacts": false
+  },
+  "link_warnings": [
+    "ELF LOAD segment has RWX permissions for both images",
+    "Bootloader libc_nano reports unimplemented _close, _lseek, _read, and _write stubs"
+  ],
+  "device_identity_verified": false,
+  "current_device_firmware_backup": false,
+  "flash_authorized": false,
+  "public_redaction_note": "Local filesystem paths and ST-LINK serial were replaced with placeholders before publishing; original evidence remains in the gitignored local_backups directory."
+}

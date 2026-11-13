@@ -1,7 +1,7 @@
 ---
 description: "[维克多 · Vector Prime] Git版本演进与固件基线考古官：使用固定形式的只读 Git 命令，专注回归溯源。"
 mode: subagent
-model: deepseek/deepseek-chat
+model: deepseek/deepseek-flash
 steps: 10
 color: "#059669"
 permissions:

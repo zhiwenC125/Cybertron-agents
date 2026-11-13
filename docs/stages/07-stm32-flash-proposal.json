@@ -1,0 +1,46 @@
+{
+  "plan_digest": "ee70d814c807dc08f03a0967ced44556d109ee55a2ae5201f8d62ac564f206d5",
+  "target": {
+    "device_id": "ST-LINK:<LOCAL_STLINK_SERIAL>/STM32F1xx_MD:0x410",
+    "board": "STM32F103C8T6 (user-reported; SWD confirms STM32F1xx_MD)",
+    "connection": "ST-LINK V2 SWD; observed 3295 mV",
+    "flash_start": 134217728,
+    "flash_end": 134283264
+  },
+  "firmware": {
+    "path": "PROJECT_ROOT/stage7_fixture/stm32_minimal/build/heartbeat.bin",
+    "sha256": "62554f5a0043bc92d2cfc6456e0ab116348324a1b699af62891532559e00476d",
+    "size_bytes": 100
+  },
+  "erase_range": {
+    "start": 134225920,
+    "end_exclusive": 134282240
+  },
+  "rollback": {
+    "path": "PROJECT_ROOT/local_backups/stm32f1_2026-11-14_original_app.bin",
+    "sha256": "bfa1af7bac39eb065979b8c05cb8f79ffae7260751ad3f06a019b309eebcd852",
+    "size_bytes": 56320
+  },
+  "rollback_procedure": "Erase only 0x08002000..0x0800FBFF (55 KiB), write the original 55 KiB App slice, read back all 55 KiB, and compare SHA-256 bfa1af7bac39eb065979b8c05cb8f79ffae7260751ad3f06a019b309eebcd852; retain full 64 KiB pre-flash backup separately.",
+  "heartbeat_marker": "SRAM[0x20000000] == 0xC7B70001 and SRAM[0x20000004] increases between two SWD reads",
+  "requires_human_approval": true,
+  "stage": 7,
+  "kind": "stm32_stlink_minimal_fixture_flash_proposal",
+  "approval_state": "approved_in_chat_2026-11-14",
+  "physical_write_performed": true,
+  "execution_receipt": "docs/stages/07-stm32-minimal-live-acceptance.json",
+  "bootloader_range_preserved": {
+    "start": "0x08000000",
+    "end_exclusive": "0x08002000"
+  },
+  "ota_flag_range_preserved": {
+    "start": "0x0800FC00",
+    "end_exclusive": "0x08010000"
+  },
+  "external_w25q32_access": "none by fixture",
+  "external_w25q32_connection": "Now attached; current firmware SRAM indicates JEDEC 0xEF4016 and 4 MB capacity. Fixture does not access it.",
+  "app_fixture_bytes": 100,
+  "post_flash_readback": "Read back full 55 KiB App region; compare first 100 bytes to fixture and remainder to erased 0xFF; then check SRAM marker and changing counter.",
+  "post_restore_readback": "Read back full 55 KiB App region and compare SHA-256 with original App slice.",
+  "public_redaction_note": "Local filesystem paths and ST-LINK serial were replaced with placeholders before publishing; original evidence remains in the gitignored local_backups directory."
+}

@@ -1,0 +1,23 @@
+{
+  "stage": 7,
+  "kind": "stm32_w25q32_connection_check",
+  "date_local": "2026-11-14",
+  "target": "ST-LINK:<LOCAL_STLINK_SERIAL>/STM32F1xx_MD:0x410",
+  "probe_command": "st-info --probe --hot-plug",
+  "target_flash_bytes": 65536,
+  "target_voltage_mv": 3293,
+  "sram_read_command": "st-flash --hot-plug read <file> 0x20000000 0x5000",
+  "repeated_field_read_command": "st-flash --hot-plug read <file> 0x20000828 0x10",
+  "inferred_driver_structure_address": "0x20000828",
+  "driver_structure_layout_source": "LOCAL_OTA_REPOSITORY/Hardware/W25Qxx/w25qxx.h",
+  "jedec_id": "0xEF4016",
+  "capacity_bytes": 4194304,
+  "sector_count": 1024,
+  "repeated_read_matched": true,
+  "interpretation": "The current firmware's SRAM contains a structure matching W25Q32 driver fields; this strongly suggests the attached W25Q32 was detected, but it is not an independent SPI transaction receipt.",
+  "external_flash_content_backed_up": false,
+  "internal_flash_write_or_erase_performed": false,
+  "external_flash_write_or_erase_by_probe": false,
+  "flash_approval_granted": false,
+  "public_redaction_note": "Local filesystem paths and ST-LINK serial were replaced with placeholders before publishing; original evidence remains in the gitignored local_backups directory."
+}

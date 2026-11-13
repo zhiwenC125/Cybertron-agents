@@ -1,7 +1,7 @@
 ---
 description: "[合体天 · Nexus Prime] 软硬件交叉编译、容器打包与硬件部署准备官：负责CMake/设备树/Docker配置、运行交叉编译生成固件并探测目标硬件端口。"
 mode: subagent
-model: deepseek/deepseek-chat
+model: deepseek/deepseek-flash
 steps: 14
 color: "#4f46e5"
 permissions:

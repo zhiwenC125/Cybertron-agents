@@ -1,7 +1,7 @@
 ---
 description: "[幻化天 · Amalgamous Prime] 代码重构与跨硬件平台移植专家：在不改变外部功能语义的前提下执行代码解耦、嵌入式内存优化与跨芯片架构移植。"
 mode: subagent
-model: deepseek/deepseek-coder
+model: deepseek/deepseek-v4-pro
 steps: 15
 color: "#0891b2"
 permissions:

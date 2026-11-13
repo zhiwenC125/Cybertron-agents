@@ -1,7 +1,7 @@
 ---
 description: "[先觉天 · Prima Prime] 塞伯坦首席研发编排官：唯一拥有 subagent 派发权的主控大脑，按软硬一体 SDLC 七大阶段调度其余12位天尊。"
 mode: primary
-model: deepseek/deepseek-reasoner
+model: deepseek/deepseek-v4-pro
 steps: 28
 color: "#2563eb"
 permissions:

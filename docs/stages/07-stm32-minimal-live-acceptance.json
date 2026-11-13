@@ -1,0 +1,58 @@
+{
+  "stage": 7,
+  "kind": "stm32_minimal_physical_flash_and_rollback",
+  "date_local": "2026-11-14",
+  "approval": {
+    "source": "explicit user reply in this chat",
+    "approved_plan_digest": "ee70d814c807dc08f03a0967ced44556d109ee55a2ae5201f8d62ac564f206d5",
+    "approved_scope": "ST-LINK <LOCAL_STLINK_SERIAL>, STM32F1xx_MD chip ID 0x410, App 0x08002000..0x0800FBFF, 100-byte fixture, original App restoration and reset"
+  },
+  "target": {
+    "stlink_serial": "<LOCAL_STLINK_SERIAL>",
+    "chip_id": "0x410",
+    "flash_bytes": 65536,
+    "page_bytes": 1024,
+    "voltage_mv_before_flash": 3300
+  },
+  "preflight": {
+    "full_flash_bytes": 65536,
+    "full_flash_sha256": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+    "matched_earlier_two_read_backup": true,
+    "fixture_sha256": "62554f5a0043bc92d2cfc6456e0ab116348324a1b699af62891532559e00476d",
+    "rollback_app_sha256": "bfa1af7bac39eb065979b8c05cb8f79ffae7260751ad3f06a019b309eebcd852"
+  },
+  "fixture_flash": {
+    "erase_start": "0x08002000",
+    "erase_end_exclusive": "0x0800FC00",
+    "erase_bytes": 56320,
+    "fixture_write_start": "0x08002000",
+    "fixture_write_bytes": 100,
+    "stlink_write_verification_passed": true,
+    "full_readback_passed": true,
+    "bootloader_unchanged": true,
+    "ota_flag_page_unchanged": true,
+    "remaining_app_erased_to_ff": true,
+    "reset_performed": true,
+    "sram_marker": "0xC7B70001",
+    "sram_counter_sample_1": 16,
+    "sram_counter_sample_2": 27,
+    "heartbeat_passed": true
+  },
+  "rollback": {
+    "erase_start": "0x08002000",
+    "erase_end_exclusive": "0x0800FC00",
+    "original_app_written_bytes": 56320,
+    "stlink_write_verification_passed": true,
+    "full_flash_readback_sha256": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+    "full_flash_byte_for_byte_match_before": true,
+    "reset_to_original_firmware_performed": true,
+    "w25_jedec_in_restored_firmware_sram": "0xEF4016",
+    "w25_capacity_bytes_in_restored_firmware_sram": 4194304,
+    "w25_sector_count_in_restored_firmware_sram": 1024
+  },
+  "external_w25q32_contents_backed_up": false,
+  "full_ota_app_upgrade_tested": false,
+  "esp32_s3_tested": false,
+  "result": "pass_for_stm32_minimal_app_flash_and_internal_flash_rollback",
+  "public_redaction_note": "Local filesystem paths and ST-LINK serial were replaced with placeholders before publishing; original evidence remains in the gitignored local_backups directory."
+}

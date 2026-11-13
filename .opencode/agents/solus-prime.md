@@ -1,7 +1,7 @@
 ---
 description: "[赛天骄 · Solus Prime] 核心软件与嵌入式固件锻造师：唯一负责编写新增业务逻辑、MCU/边缘设备外设驱动与修复功能Bug的主力编码天尊。"
 mode: subagent
-model: deepseek/deepseek-coder
+model: deepseek/deepseek-v4-pro
 steps: 18
 color: "#ea580c"
 permissions:

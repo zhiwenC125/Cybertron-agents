@@ -3,3 +3,10 @@ __pycache__/
 *.py[cod]
 cybertron_workspace_dist/
 opencode_v2_smoke/
+local_backups/
+stage7_fixture/stm32_minimal/build/
+.env
+.env.*
+!.env.example
+*.pem
+*.key

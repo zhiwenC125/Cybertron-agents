@@ -4,13 +4,17 @@
 
 当前项目协作与权限基线见 [AGENTS.md](AGENTS.md)。普通角色的测试、构建和静态检查 Shell 权限暂时关闭；阶段 5 的本地隔离运行器尚未接入 OpenCode 角色工具调用。
 
+**当前状态（2026-11-14）**：七阶段的最小闭环基线已达到。阶段 7 的 STM32 最小 App 已经人工批准真机烧录、读回、观察 SRAM 心跳并恢复原固件；完整 OTA App、ESP32-S3、九步自动接力和宿主审批接口仍在开发。证据见[阶段 7 文档](docs/stages/07-deployment.md)。在其他电脑使用或规划一条命令安装，请先看[安装与发布方案](docs/packaging-and-installation.md)。
+
 各阶段的代码摘录、验收记录与后续实现建议见 [阶段文档目录](docs/stages/01-foundation.md)：[1](docs/stages/01-foundation.md) · [2](docs/stages/02-local-execution.md) · [3](docs/stages/03-opencode-config.md) · [4](docs/stages/04-opencode-executor.md) · [5](docs/stages/05-quality-gates.md) · [6](docs/stages/06-feishu.md) · [7](docs/stages/07-deployment.md)。参考资料新增 [Datawhale Hello Agents](https://datawhalechina.github.io/hello-agents/#/)。
 
-本仓库是 [v5 架构白皮书](design/cybertron_13_primes_architecture.md)的 Python 原型。当前实现包含 13 个角色的静态定义、权限规则、9 步任务账本、飞书令牌客户端，以及 OpenCode V2 / DeepSeek Harness 配置导出。已有一个只读角色的 OpenCode V2 命令行适配器；完整多智能体流程仍在开发中。
+本仓库是 [v5 架构白皮书](design/cybertron_13_primes_architecture.md)的 Python 原型。当前实现包含 13 个角色的静态定义、权限规则、9 步任务账本、飞书 Wiki OpenAPI 网关，以及 OpenCode V2 / DeepSeek Harness 配置导出。已有一个只读角色的 OpenCode V2 命令行适配器；完整多智能体流程仍在开发中。角色模型 ID 以 `cybertron/registry.py` 为准；白皮书中的旧 DeepSeek 模型名保留为当时的设计记录。
 
 ## 运行
 
 需要 Python 3.9 或更新版本，无第三方 Python 依赖。
+
+项目根目录已包含可供 OpenCode V2 加载的 `opencode.jsonc` 与 `.opencode/agents/`。本机 `opencode2` v2.3.0 的 `debug config` 与 `debug agents` 已确认加载 13 个 Cybertron 角色；首次在新电脑使用时请自行连接 DeepSeek，并用 `opencode2 models` 核对 `deepseek/deepseek-flash` 与 `deepseek/deepseek-v4-pro`。以下单元测试、导出和配置检查均不会调用模型；交互提示和第 1 步真实执行会调用模型。
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -34,6 +38,8 @@ python3 -m cybertron.opencode_run "请澄清 STM32F4 电机控制任务还缺少
 
 阶段 5 的离线终端验收运行 `python3 -m unittest discover -s tests -q`、`python3 -m cybertron.stage5_verify` 和 `opencode2 debug config`。第二条命令通过 macOS `sandbox-exec` 核查项目写入、设备读取及网络连接均被拒绝，再将实际单元测试报告作为 `test` 证据写入账本；不会调用模型或飞书。
 
+阶段 6 的离线测试包含在单元测试中。真实飞书测试使用自建应用身份：在本机设置 `FEISHU_APP_ID`、`FEISHU_APP_SECRET` 和测试空间的 `FEISHU_WIKI_SPACE_ID`，依次运行 `python3 -m cybertron.stage6_verify --check-env`、`--check-auth` 和 `--live`；最后一项会在该空间创建并保留一篇测试文档、追加正文并回读验证。完整步骤见[阶段 6 文档](docs/stages/06-feishu.md)。不要把 App Secret 或租户令牌提交到仓库或贴进聊天。
+
 ## 模块
 
 | 模块 | 职责 |
@@ -41,13 +47,14 @@ python3 -m cybertron.opencode_run "请澄清 STM32F4 电机控制任务还缺少
 | `schema.py` | 消息和工具调用数据结构 |
 | `compaction.py` | 上下文首尾压缩 |
 | `policy.py` | 本地权限与循环熔断检查 |
-| `feishu.py` | 飞书租户令牌获取和缓存 |
+| `feishu.py` | 自建应用凭证读取、租户令牌缓存、Wiki 节点及 Docx 正文读写网关 |
 | `registry.py` | 13 个角色配置 |
 | `ledger.py` | SDLC 计划和顺序状态转换 |
 | `execution.py` | 宿主无关的任务、结果和执行器协议 |
 | `dispatch.py` | 派单、结果校验和账本推进 |
 | `simulation.py` | 不产生外部副作用的本地模拟执行器 |
 | `isolated_runner.py` | macOS 沙箱内运行单元测试并生成 QA 证据 |
+| `deployment.py` | 第七阶段固件、设备、擦写与回滚契约及无硬件仿真 |
 | `exporters.py` | 双宿主静态配置导出 |
 | `selfcheck.py` | 命令行自检 |
 
@@ -56,6 +63,6 @@ python3 -m cybertron.opencode_run "请澄清 STM32F4 电机控制任务还缺少
 1. `ledger.py` 与 `dispatch.py` 已实现 L1/L2 拒绝后返回编码、重审及超限阻塞；本地隔离测试能生成 QA 回执。真实 L1/L2 宿主审查和人工烧录授权仍需后续阶段接入。
 2. `policy.py` 是本地策略原型，不能代替宿主层权限和命令解析。生成配置后的真实权限仍需在目标宿主中验证。
 3. DeepSeek Harness 目前只导出预设 JSON，白皮书中的 `.dsh/cordis-cybertron-plugin.mjs` 尚未实现。
-4. 下一阶段处理飞书 Wiki 内容操作；构建脚本隔离接线和真实硬件集成属于阶段 7。
+4. 阶段 6 的 Wiki OpenAPI 读写已由开发者在专用测试空间验收；阶段 7 的 STM32 最小真机烧录及回滚已通过。完整 OTA App、ESP32-S3、外部 Flash 备份和隔离构建仍待开发。
 
-缺少飞书凭证时，令牌客户端默认报错。模拟令牌仅能通过显式传入 `mock_if_unset=True` 用于局部测试。
+缺少飞书 App ID 或 App Secret 时，网关默认报错。模拟租户令牌仅能通过显式传入 `mock_if_unset=True` 用于局部测试，不会进入真实 Wiki 请求。

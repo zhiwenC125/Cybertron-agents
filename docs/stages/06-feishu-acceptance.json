@@ -1,0 +1,33 @@
+{
+  "stage": 6,
+  "date_local": "2026-11-13",
+  "identity": "tenant_access_token",
+  "source": "developer-provided terminal output",
+  "independently_executed_by_assistant": false,
+  "checks": {
+    "check_env": "pass",
+    "check_auth": "pass",
+    "live_create_append_read": "pass",
+    "other_roles_rejected": "offline_test_pass",
+    "mcp_host_permission_evaluation": "pass_27_of_27",
+    "mcp_actual_tool_invocation": "not_tested"
+  },
+  "live_result": {
+    "test_space_configured": true,
+    "node_created": true,
+    "read_after_write_marker_verified": true,
+    "test_document_retained": true
+  },
+  "space_admin_authorization": "developer reports self-built app has Wiki admin access for root node creation; exact grant path not independently verified",
+  "mcp_host_probe": {
+    "date_local": "2026-11-14",
+    "source": "local opencode2 v2.2.7 permission API",
+    "agent_rules_loaded_by": "opencode2 debug agents",
+    "rules_passed_explicitly_to_test_sessions": true,
+    "cases": 27,
+    "passed": 27,
+    "model_called": false,
+    "mcp_or_feishu_called": false
+  },
+  "credentials_or_node_tokens_recorded": false
+}

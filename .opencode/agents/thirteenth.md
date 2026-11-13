@@ -1,7 +1,7 @@
 ---
 description: "[第十三天尊 · The Thirteenth Prime] 产品需求澄清与最终验收交付官：对外连接人类开发者，负责立项前软硬件规格澄清与结项后端到端预览及成果交付。"
 mode: all
-model: deepseek/deepseek-chat
+model: deepseek/deepseek-flash
 steps: 12
 color: "#10b981"
 permissions:

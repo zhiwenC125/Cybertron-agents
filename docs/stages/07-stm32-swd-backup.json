@@ -1,0 +1,35 @@
+{
+  "stage": 7,
+  "kind": "stm32_swd_identification_and_backup",
+  "date_local": "2026-11-14",
+  "tool": "stlink 1.9.0",
+  "probe": {
+    "command": "st-info --probe",
+    "stlink_version": "V2J37S7",
+    "stlink_serial": "<LOCAL_STLINK_SERIAL>",
+    "chip_id": "0x410",
+    "device_family": "STM32F1xx_MD",
+    "flash_bytes": 65536,
+    "flash_page_bytes": 1024,
+    "sram_bytes": 20480,
+    "target_voltage_mv": 3295,
+    "target_reset_observed_in_tool_log": true
+  },
+  "backup": {
+    "command": "st-flash --hot-plug read <file> 0x08000000 0x10000",
+    "first_file": "PROJECT_ROOT/local_backups/stm32f1_2026-11-14_before-stage7.bin",
+    "verification_file": "PROJECT_ROOT/local_backups/stm32f1_2026-11-14_before-stage7_verify.bin",
+    "address_start": "0x08000000",
+    "bytes": 65536,
+    "sha256": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+    "two_reads_identical": true,
+    "all_ff": false,
+    "bootloader_vector": "0x080006BD",
+    "app_vector": "0x080031C9",
+    "ota_flag_word": "0x5A5AA5A5"
+  },
+  "scope": "Internal 64 KB Flash only; option bytes and external W25Q32 were not backed up",
+  "write_or_erase_performed": false,
+  "flash_approval_granted": false,
+  "public_redaction_note": "Local filesystem paths and ST-LINK serial were replaced with placeholders before publishing; original evidence remains in the gitignored local_backups directory."
+}
