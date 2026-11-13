@@ -9,7 +9,7 @@
 | GitHub tag | `v0.1.0`（提交 `8188a7a`） | https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.1.0 |
 | `install.sh` SHA-256 | `f236333aeb4c157c6373ccd8641bf79cc0c29eb7c200541432ac4534df65c331` | 见 Release 说明 |
 
-> 版本状态：`v0.1.0` 对应已发布的 npm/PyPI 产物。仓库 `main` 在 `v0.1.0` 之后还包含两项未发布修复：`project.license` 改为 SPDX 字符串并打包 `LICENSE`、`cybertron doctor` 不再联网下载 payload。这两项计划随 `0.1.1` 发布。
+> 版本状态：`v0.1.0` 对应已发布的 npm/PyPI 产物。仓库 `main` 在 `v0.1.0` 之后还包含两项修复：`project.license` 改为 SPDX 字符串并打包 `LICENSE`、`cybertron doctor` 不再联网下载 payload。仓库当前版本已 bump 到 **`0.1.1`（待发布）**；发布前 0.1.0 仍是可用的最新公开版本。
 
 ## 三条安装路径
 

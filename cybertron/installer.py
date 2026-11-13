@@ -43,7 +43,7 @@ def _version() -> str:
 
         return version("cybertron-agents")
     except Exception:
-        return "0.1.0"
+        return "0.1.1"
 
 
 def default_base(global_install: bool, project: str) -> Path:
