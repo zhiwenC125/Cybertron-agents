@@ -19,6 +19,7 @@ from pathlib import Path
 
 REPO = "zhiwenC125/Cybertron-agents"
 DEFAULT_REF = "main"
+KNOWN_AGENT_COUNT = 13
 MINIMAL_CONFIG = (
     '{\n'
     '  "$schema": "https://opencode.ai/config.json",\n'
@@ -61,7 +62,9 @@ def find_payload_dir(base: Path) -> Path:
     raise SystemExit(f"找不到 payload（缺少 agents/）: {base}")
 
 
-def resolve_payload(explicit: str, ref: str, expected_sha256: str) -> Path:
+def resolve_payload(
+    explicit: str, ref: str, expected_sha256: str, allow_download: bool = True
+):
     if explicit:
         return find_payload_dir(Path(explicit).resolve())
 
@@ -74,7 +77,9 @@ def resolve_payload(explicit: str, ref: str, expected_sha256: str) -> Path:
     if (bundled / "agents").is_dir():
         return bundled
 
-    return download_payload(ref, expected_sha256)
+    if allow_download:
+        return download_payload(ref, expected_sha256)
+    return None
 
 
 def _safe_extract(tar: tarfile.TarFile, dest: Path) -> None:
@@ -250,13 +255,21 @@ def run_init(args) -> int:
 
 def run_doctor(args) -> int:
     base = default_base(args.global_, args.project)
-    payload = resolve_payload(args.payload, args.ref, args.sha256)
+    payload = resolve_payload(
+        args.payload, args.ref, args.sha256, allow_download=False
+    )
     agents = list_markdown(base / "agents")
     commands = list_markdown(base / "commands")
-    expected = len(list_markdown(payload / "agents"))
+    if payload is None:
+        expected = KNOWN_AGENT_COUNT
+        source = "内置期望值（未联网下载）"
+    else:
+        expected = len(list_markdown(payload / "agents"))
+        source = f"本地 payload: {payload}"
     config = base / "opencode.jsonc"
 
     print(f"目标: {base}")
+    print(f"角色来源: {source}")
     print(f"已安装角色: {len(agents)}（期望 {expected}）")
     print(f"已安装命令: {len(commands)}")
     print(f"配置: {'存在' if config.exists() else '缺失'}")
