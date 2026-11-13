@@ -3,6 +3,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List
+from .execution import QualityEvidence
 from .compaction import AlphaTrionHeadTailCompaction
 from .feishu import FeishuWikiKnowledgeClient
 from .registry import PrimeAgentSpec, THIRTEEN_PRIMES_REGISTRY
@@ -20,6 +21,7 @@ class LedgerStep:
     status: str = "pending"  # "pending", "in_progress", "completed", "blocked"
     evidence_summary: str = ""
     evidence: List[str] = field(default_factory=list)
+    quality_evidence: List[QualityEvidence] = field(default_factory=list)
     artifacts: List[str] = field(default_factory=list)
     participants: List[str] = field(default_factory=list)
     participant_objectives: Dict[str, str] = field(default_factory=dict)
@@ -74,7 +76,8 @@ class CybertronTaskLedger:
 
     def record_agent_completion(self, step_id: int, agent_id: str,
                                 summary: str, evidence: List[str],
-                                artifacts: List[str]) -> LedgerStep:
+                                artifacts: List[str],
+                                quality_evidence: List[QualityEvidence] | None = None) -> LedgerStep:
         step = self.next_step()
         if step is None or step.step_id != step_id or step.status != "in_progress":
             raise ValueError(f"Step {step_id} is not in progress")
@@ -84,6 +87,7 @@ class CybertronTaskLedger:
             raise ValueError("Agent completion requires a summary and evidence")
         step.completed_agents.append(agent_id)
         step.evidence.extend(evidence)
+        step.quality_evidence.extend(quality_evidence or [])
         step.artifacts.extend(artifacts)
         if step.next_agent() is None:
             step.evidence_summary = summary.strip()
@@ -128,6 +132,7 @@ class CybertronTaskLedger:
             step.status = "pending"
             step.evidence_summary = ""
             step.evidence.clear()
+            step.quality_evidence.clear()
             step.artifacts.clear()
             step.completed_agents.clear()
         coding.feedback = f"{reviewer_id}: {reason.strip()}"

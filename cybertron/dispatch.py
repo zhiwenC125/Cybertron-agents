@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .execution import AgentExecutor, AgentResult, AgentTask, ResultStatus
+from .execution import AgentExecutor, AgentResult, AgentTask, QualityKind, ResultStatus
 from .ledger import CybertronTaskLedger
 from .registry import THIRTEEN_PRIMES_REGISTRY
 
@@ -58,8 +58,20 @@ class PrimaDispatcher:
             if not result.evidence or not all(item.strip() for item in result.evidence):
                 ledger.block_step(step.step_id, "Completion has no evidence")
                 raise ValueError("Completion requires nonempty evidence")
+            gate_kind = {
+                "micronus-prime": QualityKind.REVIEW_L1,
+                "liege-maximo": QualityKind.REVIEW_L2,
+                "alchemist": QualityKind.TEST,
+            }.get(agent_id)
+            if gate_kind is not None and not any(
+                item.kind == gate_kind and item.passed and item.source.strip()
+                for item in result.quality_evidence
+            ):
+                ledger.block_step(step.step_id, f"Missing passing {gate_kind.value} evidence")
+                raise ValueError(f"Missing passing {gate_kind.value} evidence")
             ledger.record_agent_completion(step.step_id, agent_id, result.summary,
-                                           list(result.evidence), list(result.artifacts))
+                                           list(result.evidence), list(result.artifacts),
+                                           list(result.quality_evidence))
         elif result.status in (ResultStatus.BLOCKED, ResultStatus.NEEDS_APPROVAL):
             ledger.block_step(step.step_id, result.summary)
         elif result.status == ResultStatus.REJECTED:

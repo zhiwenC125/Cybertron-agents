@@ -73,7 +73,18 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("read", "AGENTS.md", PermissionEffect.ALLOW),
             PermissionRule("read", "README.md", PermissionEffect.ALLOW),
             PermissionRule("read", "docs/**", PermissionEffect.ALLOW),
-            PermissionRule("subagent", "*", PermissionEffect.ALLOW),
+            PermissionRule("subagent", "thirteenth", PermissionEffect.ALLOW),
+            PermissionRule("subagent", "alpha-trion", PermissionEffect.ALLOW),
+            PermissionRule("subagent", "onyx-prime", PermissionEffect.ALLOW),
+            PermissionRule("subagent", "vector-prime", PermissionEffect.ALLOW),
+            PermissionRule("subagent", "quintus-prime", PermissionEffect.ALLOW),
+            PermissionRule("subagent", "solus-prime", PermissionEffect.ALLOW),
+            PermissionRule("subagent", "amalgamous", PermissionEffect.ALLOW),
+            PermissionRule("subagent", "micronus-prime", PermissionEffect.ALLOW),
+            PermissionRule("subagent", "liege-maximo", PermissionEffect.ALLOW),
+            PermissionRule("subagent", "alchemist", PermissionEffect.ALLOW),
+            PermissionRule("subagent", "nexus-prime", PermissionEffect.ALLOW),
+            PermissionRule("subagent", "megatronus", PermissionEffect.ALLOW),
         ],
     ),
 
@@ -94,7 +105,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         strict_prohibitions="严禁修改任何业务源码（`src/**`, `firmware/**`）或测试代码（`tests/**`）、严禁运行任何终端命令、严禁删除飞书节点",
         input_contract="飞书知识库检索词、`node_token`，或已完成开发/部署的代码与硬件变更摘要",
         output_contract="标准化的本地技术文档（`AGENTS.md`, `README.md`, `docs/hardware_guide.md`, `docs/adr/*.md`）与飞书 Wiki 节点归档链接",
-        feishu_wiki_role="唯一内容读写总管（全系统唯一允许调用 `feishu_wiki_*` 与 `feishu_docx_*` 读写文档正文的天尊）",
+        feishu_wiki_role="飞书 Wiki 内容管理角色；Docx 工具权限待阶段 6 核对实际工具名后授予",
         description="专职技术文档撰写官与飞书知识库总管：负责项目全部文档编写及飞书Wiki双向同步，并执行长上下文原子压缩。",
         system_prompt=(
             "你是钛师傅（Alpha Trion），手持契约之笔的专职技术文档撰写官（Technical Writer）与飞书知识库总管。\n"
@@ -113,7 +124,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("feishu_wiki_get*", "*", PermissionEffect.ALLOW),
             PermissionRule("feishu_wiki_create*", "*", PermissionEffect.ALLOW),
             PermissionRule("feishu_wiki_update*", "*", PermissionEffect.ALLOW),
-            PermissionRule("feishu_docx_*", "*", PermissionEffect.ALLOW),
+            # Feishu docx tool names must be inventoried before stage 6 grants access.
             PermissionRule("feishu_wiki_delete*", "*", PermissionEffect.DENY),
         ],
     ),
@@ -160,26 +171,27 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         model="deepseek/deepseek-chat",
         color="#059669",
         max_steps=10,
-        exclusive_domain="Git 提交时间线考古、固件版本 Tag 基线比对（`git log/blame/diff/tag/show`）与回归缺陷溯源",
+        exclusive_domain="Git 提交时间线考古与固件版本 Tag 基线比对（限固定只读命令）",
         strict_prohibitions="严禁用 `glob/grep` 扫全库静态拓扑（归锐天骁）、严禁修改任何文件、严禁执行 `git reset/push` 等写操作",
         input_contract="目标文件路径、行号范围或待比对的两个固件版本 Tag",
         output_contract="包含 `commit_sha`、作者、版本间 Diff 摘要及回归引入点的时空考古报告",
         feishu_wiki_role="零飞书权限（专注本地 Git 版本历史分析）",
-        description="Git版本演进与固件基线考古官：唯一允许执行只读 git log/blame/diff/tag 命令的天尊，专注回归溯源。",
+        description="Git版本演进与固件基线考古官：使用固定形式的只读 Git 命令，专注回归溯源。",
         system_prompt=(
             "你是维克多（Vector Prime），时空走廊的守护者。\n"
             "【专职职责与正交铁律】：\n"
-            "1. 你专门负责「时间维度」的只读版本考古，仅执行 `git status/log/blame/diff/show/tag` 追溯代码与固件基线演进。\n"
+            "1. 你专门负责「时间维度」的只读版本考古。当前仅允许固定形式的 git status/rev-parse/branch/log/tag/diff 命令；其他命令交由人工扩展白名单。\n"
             "2. 静态全库搜索交由锐天骁（`onyx-prime`），强制回滚交由震天尊（`megatronus`）。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
-            PermissionRule("shell", "git status*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "git log*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "git diff*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "git blame*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "git show*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "git tag*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git status", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git status --short", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git rev-parse HEAD", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git branch --show-current", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git log -5 --oneline", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git tag --list", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git diff --no-ext-diff --stat", PermissionEffect.ALLOW),
         ],
     ),
     PrimeAgentSpec(
@@ -308,28 +320,21 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         color="#0284c7",
         max_steps=8,
         exclusive_domain="专职 L1 代码规范审查官（Style, Type, Docstring & Static Linter Reviewer：`ruff`, `mypy`, `clang-tidy`, `cppcheck`, `cargo clippy`）",
-        strict_prohibitions="严禁修改任何可执行控制流、条件分支或业务逻辑语句（仅允许自动格式化与补全类型/注释，逻辑问题必须写进审查报告打回）",
+        strict_prohibitions="审查期间严禁修改任何源码；格式与注释问题写入报告交由编码角色修复",
         input_contract="赛天骄或幻化天提交的待审代码文件列表",
-        output_contract="《L1 静态分析与代码规范审查报告》及完成格式化/注释补全的代码文件",
+        output_contract="《L1 静态分析与代码规范审查报告》及通过或拒绝结论",
         feishu_wiki_role="零飞书权限（极速本地静态分析与 L1 Code Review）",
         description="专职L1代码规范与静态分析审查官：运行 ruff/clang-tidy/cppcheck 审查编码规范、类型安全、MISRA-C基础规则与注释完备性。",
         system_prompt=(
             "你是微米天（Micronus Prime），专职的第一道代码审查官（L1 Style & Static Analysis Code Reviewer）。\n"
             "【专职职责与正交铁律】：\n"
-            "1. 任何软硬件代码在送交测试前，必须先经过你的 L1 Code Review：运行 `ruff`、`mypy`、`clang-tidy`、`cppcheck` 检验代码规范、未初始化变量、类型安全与注释完整性。\n"
-            "2. 你只能做零控制流变动的格式化与注释补全；一旦发现逻辑错误或静态分析严重告警，立即输出审查报告交由先觉天打回赛天骄修改。"
+            "1. 任何软硬件代码在送交测试前，必须先经过你的 L1 Code Review。当前只读审查源码；ruff/mypy/clang-tidy/cppcheck 需等隔离运行器接入后执行。\n"
+            "2. 你只输出审查报告，不修改源码；格式、注释或逻辑问题交由先觉天打回赛天骄修改。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("read", "*", PermissionEffect.ALLOW),
-            PermissionRule("edit", "src/**", PermissionEffect.ALLOW),
-            PermissionRule("edit", "firmware/**", PermissionEffect.ALLOW),
-            PermissionRule("shell", "ruff *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "black *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "mypy *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "clang-tidy *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "cppcheck *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "cargo clippy*", PermissionEffect.ALLOW),
+            # Linter execution is held until a sandboxed runner is available.
         ],
     ),
     PrimeAgentSpec(
@@ -341,7 +346,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         mode=AgentMode.SUBAGENT,
         model="deepseek/deepseek-reasoner",
         color="#dc2626",
-        max_steps=10,
+        max_steps=20,
         exclusive_domain="专职 L2 深度逻辑、并发死锁、嵌入式硬件安全与红队漏洞 Code Reviewer（LLM-as-Judge，拥有一票否决权）",
         strict_prohibitions="零文件修改权（`edit: deny`）、零终端命令执行权（`shell: deny`），确保审判官与执行者 100% 利益隔离",
         input_contract="通过 L1 审查的软件源码、嵌入式固件代码与硬件引脚配置",
@@ -355,11 +360,23 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "   - 软件层：排查 SQL/命令注入、飞书 AppSecret 硬编码泄露、并发竞态死锁、未捕获异常。\n"
             "   - 硬件与固件层：严查中断服务函数（ISR）阻塞、RTOS 死锁、栈溢出、看门狗缺失、DMA 缓存未对齐以及 GPIO 引脚电平冲突导致硬件烧毁的风险。\n"
             "2. 只要存在任何 CRITICAL 或 HIGH 缺陷，必须给出 `REJECT` 裁决一票否决，阻止进入硬件烧录阶段。"
+            "3. 审查时只使用 read 和 glob 定位文件；不得尝试 grep 或 shell。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
-            PermissionRule("read", "*", PermissionEffect.ALLOW),
-            PermissionRule("grep", "*", PermissionEffect.ALLOW),
+            PermissionRule("read", "src/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "firmware/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "drivers/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "tests/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "cybertron/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "AGENTS.md", PermissionEffect.ALLOW),
+            PermissionRule("read", "README.md", PermissionEffect.ALLOW),
+            PermissionRule("read", "DEVELOPMENT_PLAN.md", PermissionEffect.ALLOW),
+            PermissionRule("read", "design/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "docs/**", PermissionEffect.ALLOW),
+            PermissionRule("read", ".opencode/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "opencode.jsonc", PermissionEffect.ALLOW),
+            PermissionRule("glob", "*", PermissionEffect.ALLOW),
         ],
     ),
 
@@ -386,7 +403,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "你是炼金术士（Alchemist Prime），执掌洞察透镜的专职测试与软硬件检验官（QA & Verification Lead）。\n"
             "【专职职责与正交铁律】：\n"
             "1. 你独占 `tests/**` 的写入权，且对业务与固件代码（`src/**`, `firmware/**`）只有只读权。\n"
-            "2. 你负责编写单元测试、集成测试、通信协议帧边界测试以及基于 `QEMU` / `Renode` 的嵌入式软件在环（SIL）仿真检验脚本，用真实运行的通过率、覆盖率和 Traceback 验证代码质量。"
+            "2. 当前可编写单元测试和仿真脚本，但不能在宿主直接运行 pytest/QEMU/Renode；待隔离运行器接入后再提交真实通过率、覆盖率和 Traceback。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
@@ -394,13 +411,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("edit", "tests/**", PermissionEffect.ALLOW),
             PermissionRule("edit", "src/**", PermissionEffect.DENY),
             PermissionRule("edit", "firmware/**", PermissionEffect.DENY),
-            PermissionRule("shell", "pytest*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "python3 -m pytest*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "python3 -m unittest*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "ctest*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "cargo test*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "qemu-system-*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "renode*", PermissionEffect.ALLOW),
+            # Test scripts can spawn subprocesses; stage 7 will add a sandboxed runner.
         ],
     ),
 
@@ -417,7 +428,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         model="deepseek/deepseek-chat",
         color="#4f46e5",
         max_steps=14,
-        exclusive_domain="软硬件构建配置（`CMakeLists.txt`, `Makefile`, `platformio.ini`, `*.ld`, `*.dts`, `Dockerfile*`, `.github/**`）、交叉编译固件打包、非破坏性硬件端口探测与 MCP 网关配置",
+        exclusive_domain="软硬件构建配置（`CMakeLists.txt`, `Makefile`, `platformio.ini`, `*.ld`, `*.dts`, `Dockerfile*`）、交叉编译固件打包与非破坏性硬件端口探测",
         strict_prohibitions="严禁修改业务或测试源码、严禁读写飞书文档正文、严禁绕过震天尊直接执行擦写物理硬件 Flash 的烧录命令（`upload/write_flash` deny）",
         input_contract="通过全部测试与 Code Review 的软硬件代码库及目标硬件平台规格",
         output_contract="交叉编译生成的固件镜像（`.bin/.hex/.elf/.uf2`）、Flash/RAM 内存占用分析表、探测到的硬件串口/调试器列表及待执行的烧录命令清单",
@@ -426,32 +437,23 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         system_prompt=(
             "你是合体天（Nexus Prime），执掌合体之谜的软硬件构建与部署集成工程师。\n"
             "【专职职责与正交铁律】：\n"
-            "1. 你独占构建与部署配置文件（`CMakeLists.txt`, `Makefile`, `platformio.ini`, `*.ld`, `*.dts`, `Dockerfile*`, `opencode.jsonc`, `.dsh/**`）的写入权。\n"
-            "2. 在硬件部署阶段，你负责调用交叉编译工具链（`cmake`, `make`, `arm-none-eabi-gcc`, `pio run --without-upload`）编译出固件二进制包，使用 `arm-none-eabi-size` 核算 Flash/RAM 占用，并使用只读命令（`lsusb`, `ls /dev/tty*`）探测开发板连接状态，生成烧录指令单移交震天尊执行物理烧录。"
+            "1. 你只维护构建配置文件（`CMakeLists.txt`, `Makefile`, `platformio.ini`, `*.ld`, `*.dts`, `Dockerfile*`）；不得修改 agent 权限配置或 CI 工作流。\n"
+            "2. 当前可维护构建配置并探测只读设备信息；cmake/make/编译命令需等隔离运行器接入后才能执行。生成烧录指令单移交震天尊执行物理烧录。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("read", "*", PermissionEffect.ALLOW),
             PermissionRule("edit", "Dockerfile*", PermissionEffect.ALLOW),
             PermissionRule("edit", "docker-compose*", PermissionEffect.ALLOW),
-            PermissionRule("edit", ".github/**", PermissionEffect.ALLOW),
             PermissionRule("edit", "CMakeLists.txt", PermissionEffect.ALLOW),
             PermissionRule("edit", "Makefile", PermissionEffect.ALLOW),
             PermissionRule("edit", "platformio.ini", PermissionEffect.ALLOW),
             PermissionRule("edit", "**/*.ld", PermissionEffect.ALLOW),
             PermissionRule("edit", "**/*.dts*", PermissionEffect.ALLOW),
-            PermissionRule("edit", "opencode.jsonc", PermissionEffect.ALLOW),
-            PermissionRule("edit", ".dsh/**", PermissionEffect.ALLOW),
-            PermissionRule("shell", "cmake *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "make *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "arm-none-eabi-gcc *", PermissionEffect.ALLOW),
             PermissionRule("shell", "arm-none-eabi-size *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "aarch64-linux-gnu-gcc *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "pio run --without-upload*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "cargo build*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "docker build*", PermissionEffect.ALLOW),
             PermissionRule("shell", "lsusb*", PermissionEffect.ALLOW),
             PermissionRule("shell", "ls /dev/tty*", PermissionEffect.ALLOW),
+            # Build scripts can spawn subprocesses; stage 7 will add a sandboxed runner.
             PermissionRule("feishu_mcp_healthcheck*", "*", PermissionEffect.ALLOW),
         ],
     ),
@@ -474,22 +476,17 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         system_prompt=(
             "你是震天尊（Megatronus Prime），执掌安魂曲火炮的物理硬件烧录闸门与高危熔断执法官。\n"
             "【专职职责与正交铁律】：\n"
-            "1. 任何改变物理硬件状态的动作（通过 `openocd`、`esptool.py`、`st-flash`、`pio run -t upload` 擦写 MCU Flash，或通过 `scp/ssh` 覆盖边缘计算节点服务）均由你唯一掌管，且 100% 强制触发 `ask` 人工审批。\n"
+            "1. 当前只保留 openocd、esptool、st-flash、pio upload 的 ask 权限；ssh/scp 与破坏性 Git/文件命令暂不开放。任何真实硬件擦写须经人工审批。\n"
             "2. 烧录前必须向人类输出《硬件烧录爆炸半径评估单》（目标设备端口、固件大小、擦写地址段、回滚预案）；烧录后必须采集串口启动心跳确认设备未变砖，若启动失败立即刷回黄金备份固件。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("read", "*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "git status*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git status --short", PermissionEffect.ALLOW),
             PermissionRule("shell", "openocd *", PermissionEffect.ASK),
             PermissionRule("shell", "esptool*", PermissionEffect.ASK),
             PermissionRule("shell", "pio run -t upload*", PermissionEffect.ASK),
             PermissionRule("shell", "st-flash*", PermissionEffect.ASK),
-            PermissionRule("shell", "ssh *", PermissionEffect.ASK),
-            PermissionRule("shell", "scp *", PermissionEffect.ASK),
-            PermissionRule("shell", "git reset*", PermissionEffect.ASK),
-            PermissionRule("shell", "git push*", PermissionEffect.ASK),
-            PermissionRule("shell", "rm *", PermissionEffect.ASK),
             PermissionRule("feishu_wiki_delete*", "*", PermissionEffect.ASK),
         ],
     ),
@@ -503,7 +500,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         model="deepseek/deepseek-chat",
         color="#10b981",
         max_steps=12,
-        exclusive_domain="对外人类开发者沟通界面（立项前软硬件规格澄清问卷、结项时 `webfetch` 端到端预览及最终研发交付简报生成）",
+        exclusive_domain="对外人类开发者沟通界面（立项前软硬件规格澄清问卷与最终研发交付简报生成）",
         strict_prohibitions="严禁对内派发 `subagent`（调度归 `prima`）、严禁修改任何文件（`edit: deny`）、严禁运行终端命令（`shell: deny`）",
         input_contract="立项时的软硬件参数歧义点，或全生命周期完工后的 `CybertronTaskLedger`",
         output_contract="面向人类的结构化软硬件需求澄清问卷，或包含代码、Review、测试、硬件烧录结果及飞书 Wiki 链接的最终交付报告",
@@ -520,7 +517,6 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("read", "AGENTS.md", PermissionEffect.ALLOW),
             PermissionRule("read", "README.md", PermissionEffect.ALLOW),
             PermissionRule("read", "docs/**", PermissionEffect.ALLOW),
-            PermissionRule("webfetch", "*", PermissionEffect.ALLOW),
         ],
     ),
 ]

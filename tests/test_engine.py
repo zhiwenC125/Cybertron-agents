@@ -60,11 +60,80 @@ class EngineTests(unittest.TestCase):
         nexus = MegatronusCircuitBreaker(agents["nexus-prime"].permissions)
         megatronus = MegatronusCircuitBreaker(agents["megatronus"].permissions)
         self.assertEqual(nexus.verify_tool_call("shell", "openocd -f board.cfg", "n")[0], PermissionEffect.DENY)
+        self.assertEqual(nexus.verify_tool_call("shell", "make all", "build")[0], PermissionEffect.DENY)
         self.assertEqual(megatronus.verify_tool_call("shell", "openocd -f board.cfg", "m")[0], PermissionEffect.ASK)
         self.assertEqual(
             nexus.verify_tool_call("shell", "cmake .; rm -rf build", "chained")[0],
             PermissionEffect.DENY,
         )
+
+    def test_test_and_lint_commands_are_held_until_sandboxed(self):
+        agents = {agent.agent_id: agent for agent in THIRTEEN_PRIMES_REGISTRY}
+        for agent_id, command in (("alchemist", "pytest -q"),
+                                  ("alchemist", "python3 -m pytest"),
+                                  ("micronus-prime", "ruff check .")):
+            with self.subTest(agent=agent_id, command=command):
+                breaker = MegatronusCircuitBreaker(agents[agent_id].permissions)
+                self.assertEqual(breaker.verify_tool_call("shell", command, command)[0],
+                                 PermissionEffect.DENY)
+
+    def test_agents_cannot_rewrite_their_own_permissions(self):
+        for agent in THIRTEEN_PRIMES_REGISTRY:
+            breaker = MegatronusCircuitBreaker(agent.permissions)
+            for path in ("opencode.jsonc", ".opencode/agents/prima.md",
+                         ".dsh/cordis-cybertron-plugin.mjs", ".github/workflows/ci.yml"):
+                with self.subTest(agent=agent.agent_id, path=path):
+                    self.assertEqual(
+                        breaker.verify_tool_call("edit", path, f"{agent.agent_id}:{path}")[0],
+                        PermissionEffect.DENY,
+                    )
+
+    def test_prima_subagent_access_is_explicit(self):
+        prima = next(agent for agent in THIRTEEN_PRIMES_REGISTRY if agent.agent_id == "prima")
+        breaker = MegatronusCircuitBreaker(prima.permissions)
+        self.assertEqual(breaker.verify_tool_call("subagent", "onyx-prime", "known")[0],
+                         PermissionEffect.ALLOW)
+        self.assertEqual(breaker.verify_tool_call("subagent", "build", "builtin")[0],
+                         PermissionEffect.DENY)
+
+    def test_l2_can_read_project_sources_but_not_env_files(self):
+        liege = next(agent for agent in THIRTEEN_PRIMES_REGISTRY
+                     if agent.agent_id == "liege-maximo")
+        breaker = MegatronusCircuitBreaker(liege.permissions)
+        for path in ("cybertron/registry.py", "opencode.jsonc", "README.md",
+                     "design/cybertron_13_primes_architecture.md"):
+            with self.subTest(path=path):
+                self.assertEqual(breaker.verify_tool_call("read", path, path)[0],
+                                 PermissionEffect.ALLOW)
+        self.assertEqual(breaker.verify_tool_call("read", ".env", "secret")[0],
+                         PermissionEffect.DENY)
+
+    def test_local_policy_rejects_path_traversal_and_symlink_escape(self):
+        agents = {agent.agent_id: agent for agent in THIRTEEN_PRIMES_REGISTRY}
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as external:
+            root = Path(directory)
+            (root / "tests").mkdir()
+            (root / "src").mkdir()
+            outside = Path(external)
+            (root / "tests" / "outside").symlink_to(outside, target_is_directory=True)
+            cases = (
+                ("alchemist", "tests/../cybertron/policy.py"),
+                ("solus-prime", "src/../opencode.jsonc"),
+                ("alpha-trion", "docs/../opencode.jsonc"),
+                ("alchemist", "tests/outside/escape.py"),
+                ("alchemist", "/tmp/escape.py"),
+                ("alchemist", "tests\\..\\opencode.jsonc"),
+            )
+            for agent_id, path in cases:
+                with self.subTest(agent=agent_id, path=path):
+                    breaker = MegatronusCircuitBreaker(agents[agent_id].permissions,
+                                                        workspace_root=root)
+                    self.assertEqual(breaker.verify_tool_call("edit", path, path)[0],
+                                     PermissionEffect.DENY)
+            valid = MegatronusCircuitBreaker(agents["alchemist"].permissions,
+                                             workspace_root=root)
+            self.assertEqual(valid.verify_tool_call("edit", "tests/safe.py", "safe")[0],
+                             PermissionEffect.ALLOW)
 
     def test_feishu_missing_credentials_fail_closed(self):
         config = FeishuWikiGovernanceConfig(

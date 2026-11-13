@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 import fnmatch
+import posixpath
+import re
 import shlex
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Dict, List, Tuple
 
 # MODULE 3: Megatronus Safety Hooks & Hardware/Software RBAC Engine
@@ -25,21 +28,46 @@ class PermissionRule:
 
 class MegatronusCircuitBreaker:
     """
-    Runtime Policy, Physical Hardware Flash Gate & Loop Guard (Megatronus Prime).
-    Enforces Least-Privilege RBAC before any tool executes and intercepts physical hardware flashing
-    or destructive commands with mandatory human confirmation (`ask`).
+    Local policy prototype and loop guard used by tests and self-verification.
+    It does not intercept OpenCode's real tool calls; the exported host rules do that.
+    Callers must supply workspace-relative read/edit paths.
     """
     HIGH_ENTROPY_PATTERNS = (
         "rm -rf", "git push --force", "drop table", "mkfs", "dd if=",
         "openocd ", "esptool", "pio run -t upload", "st-flash",
     )
 
-    def __init__(self, rules: List[PermissionRule], max_identical_calls: int = 3) -> None:
+    def __init__(self, rules: List[PermissionRule], max_identical_calls: int = 3,
+                 workspace_root: Path | None = None) -> None:
         self.rules = rules
         self.max_identical_calls = max_identical_calls
+        self.workspace_root = (workspace_root or Path.cwd()).resolve()
         self._call_signatures: Dict[str, int] = {}
 
+    def _normalize_path(self, resource: str) -> str | None:
+        """Return a safe workspace-relative path, including symlink resolution."""
+        path = resource.replace("\\", "/")
+        if not path or "\x00" in path or path.startswith(("/", "~")) \
+                or re.match(r"^[A-Za-z]:", path):
+            return None
+        if ".." in path.split("/"):
+            return None
+        normalized = posixpath.normpath(path)
+        if normalized in (".", ".."):
+            return None
+        try:
+            resolved = (self.workspace_root / normalized).resolve()
+            resolved.relative_to(self.workspace_root)
+        except (ValueError, OSError, RuntimeError):
+            return None
+        return normalized
+
     def verify_tool_call(self, action: str, resource: str, payload_signature: str) -> Tuple[PermissionEffect, str]:
+        if action in ("read", "edit"):
+            normalized = self._normalize_path(resource)
+            if normalized is None:
+                return PermissionEffect.DENY, f"Unsafe workspace path denied: {resource}"
+            resource = normalized
         # 1. Detect infinite tool call loop
         self._call_signatures[payload_signature] = self._call_signatures.get(payload_signature, 0) + 1
         if self._call_signatures[payload_signature] > self.max_identical_calls:
@@ -51,8 +79,8 @@ class MegatronusCircuitBreaker:
         # 2. Evaluate ordered RBAC rules first (last matching rule wins, matching OpenCode V2 semantics)
         matched_effect = PermissionEffect.DENY
         for rule in self.rules:
-            action_match = rule.action == "*" or fnmatch.fnmatch(action, rule.action)
-            resource_match = rule.resource == "*" or fnmatch.fnmatch(resource, rule.resource)
+            action_match = rule.action == "*" or fnmatch.fnmatchcase(action, rule.action)
+            resource_match = rule.resource == "*" or fnmatch.fnmatchcase(resource, rule.resource)
             if action_match and resource_match:
                 matched_effect = rule.effect
 

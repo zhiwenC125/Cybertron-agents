@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 
 from .dispatch import PrimaDispatcher
-from .execution import AgentResult, AgentTask, ResultStatus
+from .execution import AgentResult, AgentTask, QualityEvidence, QualityKind, ResultStatus
 from .ledger import PrimaPlanOrchestrator
 
 
@@ -26,10 +26,17 @@ class SimulationExecutor:
                 task.step_id, task.agent_id, ResultStatus.NEEDS_APPROVAL,
                 "模拟硬件步骤等待批准；未执行任何烧录命令",
             )
+        gate_kind = {
+            "micronus-prime": QualityKind.REVIEW_L1,
+            "liege-maximo": QualityKind.REVIEW_L2,
+            "alchemist": QualityKind.TEST,
+        }.get(task.agent_id)
         return AgentResult(
             task.step_id, task.agent_id, ResultStatus.COMPLETED,
             f"模拟完成：{task.objective}" + (f"；已处理反馈：{task.feedback}" if task.feedback else ""),
             evidence=(f"simulation://step/{task.step_id}/{task.agent_id}",),
+            quality_evidence=(QualityEvidence(gate_kind, True, "simulation-only"),)
+            if gate_kind else (),
         )
 
 

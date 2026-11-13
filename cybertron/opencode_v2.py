@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 from .exporters import compile_opencode_v2_assets
@@ -21,6 +22,7 @@ def validate_bundle(root: Path) -> list[str]:
     if not isinstance(agents, dict):
         return ["agents must be an object"]
     expected = {prime.agent_id for prime in THIRTEEN_PRIMES_REGISTRY}
+    registry = {prime.agent_id: prime for prime in THIRTEEN_PRIMES_REGISTRY}
     if set(agents) != expected:
         errors.append(f"Agent IDs differ from registry: {sorted(set(agents) ^ expected)}")
     if config.get("default_agent") != "prima":
@@ -36,11 +38,32 @@ def validate_bundle(root: Path) -> list[str]:
             errors.append(f"{agent_id}: missing permissions")
         elif rules[0] != {"action": "*", "resource": "*", "effect": "deny"}:
             errors.append(f"{agent_id}: first permission must deny all")
+        expected_rules = [
+            {"action": rule.action, "resource": rule.resource, "effect": rule.effect.value}
+            for rule in registry[agent_id].permissions
+        ]
+        if rules != expected_rules:
+            errors.append(f"{agent_id}: JSON permissions differ from registry")
+        if entry.get("mode") != registry[agent_id].mode.value \
+                or entry.get("steps") != registry[agent_id].max_steps:
+            errors.append(f"{agent_id}: JSON metadata differs from registry")
         agent_file = root / ".opencode" / "agents" / f"{agent_id}.md"
         try:
             content = agent_file.read_text(encoding="utf-8")
             if not content.startswith("---\n") or "\n---\n" not in content[4:]:
                 errors.append(f"{agent_id}: invalid Markdown frontmatter")
+            else:
+                frontmatter = content.split("\n---\n", 1)[0]
+                matches = re.findall(
+                    r'  - action: "([^"]+)"\n    resource: "([^"]+)"\n    effect: "([^"]+)"',
+                    frontmatter,
+                )
+                markdown_rules = [
+                    {"action": action, "resource": resource, "effect": effect}
+                    for action, resource, effect in matches
+                ]
+                if markdown_rules != rules:
+                    errors.append(f"{agent_id}: Markdown and JSON permissions differ")
         except OSError:
             errors.append(f"{agent_id}: missing Markdown agent file")
     return errors

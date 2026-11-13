@@ -28,7 +28,7 @@ def run_self_verification(output_dir: Path) -> None:
     # 2. Verify Dedicated Two-Tier Code Review (Micronus L1 clang-tidy + Liege Maximo L2 Static Review)
     micronus_breaker = MegatronusCircuitBreaker(orchestrator.primes["micronus-prime"].permissions)
     liege_breaker = MegatronusCircuitBreaker(orchestrator.primes["liege-maximo"].permissions)
-    assert micronus_breaker.verify_tool_call("shell", "clang-tidy firmware/main.c", "c1")[0] == PermissionEffect.ALLOW
+    assert micronus_breaker.verify_tool_call("shell", "clang-tidy firmware/main.c", "c1")[0] == PermissionEffect.DENY
     assert liege_breaker.verify_tool_call("read", "firmware/main.c", "c2")[0] == PermissionEffect.ALLOW
     assert liege_breaker.verify_tool_call("edit", "firmware/main.c", "c3")[0] == PermissionEffect.DENY
     print("[PASS] Dedicated Two-Tier Code Review (Micronus L1 + Liege Maximo L2) verified.")
@@ -36,11 +36,11 @@ def run_self_verification(output_dir: Path) -> None:
     # 3. Verify Hardware Cross-Compilation (Nexus Prime ALLOW) vs Physical Hardware Flashing (Megatronus ASK)
     nexus_breaker = MegatronusCircuitBreaker(orchestrator.primes["nexus-prime"].permissions)
     megatronus_breaker = MegatronusCircuitBreaker(orchestrator.primes["megatronus"].permissions)
-    assert nexus_breaker.verify_tool_call("shell", "arm-none-eabi-gcc -c firmware/main.c", "h1")[0] == PermissionEffect.ALLOW
+    assert nexus_breaker.verify_tool_call("shell", "arm-none-eabi-gcc -c firmware/main.c", "h1")[0] == PermissionEffect.DENY
     assert nexus_breaker.verify_tool_call("shell", "openocd -f interface/stlink.cfg", "h2")[0] == PermissionEffect.DENY
     assert megatronus_breaker.verify_tool_call("shell", "openocd -f interface/stlink.cfg", "h3")[0] == PermissionEffect.ASK
     assert megatronus_breaker.verify_tool_call("shell", "esptool.py write_flash 0x1000 fw.bin", "h4")[0] == PermissionEffect.ASK
-    print("[PASS] Hardware Deployment Separation verified: Nexus Prime (Cross-Compile=ALLOW, Flash=DENY) vs Megatronus (Physical Flash=ASK).")
+    print("[PASS] Hardware Deployment Separation verified: Nexus Prime (Cross-Compile=DENY until sandboxed, Flash=DENY) vs Megatronus (Physical Flash=ASK).")
 
     oc_files = compile_opencode_v2_assets(output_dir)
     dsh_files = compile_deepseek_harness_assets(output_dir)

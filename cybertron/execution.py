@@ -14,6 +14,20 @@ class ResultStatus(str, Enum):
     REJECTED = "rejected"
 
 
+class QualityKind(str, Enum):
+    REVIEW_L1 = "review_l1"
+    REVIEW_L2 = "review_l2"
+    TEST = "test"
+
+
+@dataclass(frozen=True)
+class QualityEvidence:
+    """A typed gate result; source identifies the report or run that produced it."""
+    kind: QualityKind
+    passed: bool
+    source: str
+
+
 @dataclass(frozen=True)
 class AgentTask:
     step_id: int
@@ -34,6 +48,7 @@ class AgentResult:
     summary: str
     evidence: Tuple[str, ...] = ()
     artifacts: Tuple[str, ...] = ()
+    quality_evidence: Tuple[QualityEvidence, ...] = ()
 
 
 class AgentExecutor(Protocol):
