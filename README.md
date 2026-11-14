@@ -69,6 +69,17 @@ sh install.sh --apply --project .
 
 详见[安装与发布方案](docs/packaging-and-installation.md)。`v0.1.1` 的 tag 与 Release 见 [GitHub Release v0.1.1](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.1.1)。
 
+## 飞书知识库（可选）
+
+飞书能力由 `alpha-trion` 独占，**默认不启用**。需要时：
+
+1. 在飞书开放平台创建自建应用，按**应用身份**开通 Wiki / Docx 权限并发布；
+2. 让应用机器人所在的群聊成为目标知识空间管理员；
+3. 设置 `FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_WIKI_SPACE_ID`；
+4. 按需在项目 `opencode.jsonc` 中启用只读 MCP（或从源码用 `--include-feishu` 导出）。
+
+完整步骤、权限 scope、常见错误码与安全边界见[飞书知识库接入指南](docs/feishu-setup.md)；阶段验收记录见[阶段 6 文档](docs/stages/06-feishu.md)。
+
 ## 模块
 
 | 模块 | 职责 |
