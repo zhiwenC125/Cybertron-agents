@@ -2,6 +2,8 @@
 
 当前开发阶段和每阶段验收条件见 [开发计划](DEVELOPMENT_PLAN.md)。
 
+从当前配置包与内存编排过渡到可恢复运行态的实施顺序、验收门槛与交接事项见 [后续开发 Handoff](docs/handoffs/2026-11-14-runtime-architecture.md)。
+
 当前项目协作与权限基线见 [AGENTS.md](AGENTS.md)。普通角色的测试、构建和静态检查 Shell 权限暂时关闭；阶段 5 的本地隔离运行器尚未接入 OpenCode 角色工具调用。
 
 **当前状态（2026-11-14）**：七阶段的最小闭环基线已达到。阶段 7 的 STM32 最小 App 已经人工批准真机烧录、读回、观察 SRAM 心跳并恢复原固件；完整 OTA App、ESP32-S3、九步自动接力和宿主审批接口仍在开发。证据见[阶段 7 文档](docs/stages/07-deployment.md)。在其他电脑使用或规划一条命令安装，请先看[安装与发布方案](docs/packaging-and-installation.md)。
