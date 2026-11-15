@@ -73,6 +73,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("read", "AGENTS.md", PermissionEffect.ALLOW),
             PermissionRule("read", "README.md", PermissionEffect.ALLOW),
             PermissionRule("read", "docs/**", PermissionEffect.ALLOW),
+            PermissionRule("cybertron_run", "*", PermissionEffect.ALLOW),
             PermissionRule("subagent", "thirteenth", PermissionEffect.ALLOW),
             PermissionRule("subagent", "alpha-trion", PermissionEffect.ALLOW),
             PermissionRule("subagent", "onyx-prime", PermissionEffect.ALLOW),
@@ -399,7 +400,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "你是炼金术士（Alchemist Prime），执掌洞察透镜的专职测试与软硬件检验官（QA & Verification Lead）。\n"
             "【专职职责与正交铁律】：\n"
             "1. 你独占 `tests/**` 的写入权，且对业务与固件代码（`src/**`, `firmware/**`）只有只读权。\n"
-            "2. 当前可编写单元测试和仿真脚本，但不能在宿主直接运行 pytest/QEMU/Renode；待隔离运行器接入后再提交真实通过率、覆盖率和 Traceback。"
+            "2. 你编写单元测试和仿真脚本后返回 completed；Cybertron 宿主会在你返回后通过隔离运行器执行测试并核验真实回执。你不能在角色会话中直接运行 pytest/QEMU/Renode，也不能虚构通过率。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),

@@ -9,6 +9,19 @@ from cybertron.opencode_executor import OpenCodeV2Executor
 
 
 class OpenCodeExecutorTests(unittest.TestCase):
+    def test_workflow_accepts_global_opencode_config_without_project_config(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def runner(command, **kwargs):
+                self.assertEqual(kwargs["cwd"], root)
+                return subprocess.CompletedProcess(command, 0, json.dumps({
+                    "type": "text", "part": {"text": json.dumps({
+                        "status": "blocked", "summary": "Need feature details", "evidence": ["request"]})}
+                }), "")
+            result = OpenCodeV2Executor(root, workflow_mode=True, runner=runner).execute(
+                AgentTask(1, "thirteenth", "vague request", "clarify", "request", "questions"))
+            self.assertEqual(result.status, ResultStatus.BLOCKED)
+
     def test_valid_json_event_completes_first_step(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

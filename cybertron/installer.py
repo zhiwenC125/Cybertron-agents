@@ -18,20 +18,19 @@ import urllib.request
 from pathlib import Path
 
 REPO = "zhiwenC125/Cybertron-agents"
-DEFAULT_REF = "v0.1.1"
+DEFAULT_REF = "v0.2.0"
 KNOWN_AGENT_COUNT = 13
 MINIMAL_CONFIG = (
     '{\n'
-    '  "$schema": "https://opencode.ai/config.json",\n'
-    '  "default_agent": "prima"\n'
+    '  "$schema": "https://opencode.ai/config.json"\n'
     '}\n'
 )
 
 CONFIG_LABELS = {
     "would-create": "将写入最小配置",
     "filled-empty": "空配置；请先移走或修复",
-    "has-default": "已有 default_agent",
-    "missing-default": "已有配置缺少 default_agent；请手动设置 prima",
+    "has-default": "已有默认角色，保持不变",
+    "missing-default": "沿用 OpenCode 默认角色",
     "parse-failed": "无法解析，跳过",
     "not-object": "不是对象，跳过",
 }
@@ -43,7 +42,7 @@ def _version() -> str:
 
         return version("cybertron-agents")
     except Exception:
-        return "0.1.1"
+        return "0.2.0"
 
 
 def default_base(global_install: bool, project: str) -> Path:
@@ -126,17 +125,35 @@ def list_markdown(directory: Path) -> list:
 
 
 def plan(payload: Path, base: Path) -> list:
+    if base.is_symlink() or (base / "cybertron-runtime").is_symlink():
+        raise SystemExit("拒绝符号链接安装或运行时目录")
     items = []
     for kind in ("agents", "commands"):
         for src in list_markdown(payload / kind):
             target = base / kind / src.name
-            if target.is_symlink():
+            if target.is_symlink() or target.parent.is_symlink():
                 raise SystemExit(f"拒绝符号链接安装目标: {target}")
             if target.exists():
                 state = "same" if src.read_bytes() == target.read_bytes() else "update"
             else:
                 state = "new"
             items.append((kind, src, target, state))
+    runtime = payload / "cybertron-runtime" / "cybertron"
+    if not runtime.is_dir():
+        runtime = payload.parent / "cybertron"
+    extras = [("plugins", payload / "plugins" / "cybertron.js", base / "plugins" / "cybertron.js")]
+    extras.extend(("runtime", src, base / "cybertron-runtime" / "cybertron" / src.name)
+                  for src in sorted(runtime.glob("*.py")))
+    if not (runtime / "plugin_cli.py").is_file():
+        raise SystemExit("payload 缺少 Cybertron Python 运行时")
+    for kind, src, target in extras:
+        if not src.is_file():
+            raise SystemExit(f"payload 缺少文件: {src}")
+        if target.is_symlink() or target.parent.is_symlink():
+            raise SystemExit(f"拒绝符号链接安装目标: {target}")
+        state = "same" if target.exists() and src.read_bytes() == target.read_bytes() else (
+            "update" if target.exists() else "new")
+        items.append((kind, src, target, state))
     return items
 
 
@@ -274,7 +291,7 @@ def run_init(args) -> int:
 
     action, config_path = ensure_config(base, True)
     print(f"配置: {config_path} -> {CONFIG_LABELS.get(action, action)}")
-    if action in ("filled-empty", "parse-failed", "not-object", "missing-default"):
+    if action in ("filled-empty", "parse-failed", "not-object"):
         print("已有配置无法安全安装；请先修复配置。", file=sys.stderr)
         return 2
 
@@ -295,6 +312,8 @@ def run_doctor(args) -> int:
     )
     agents = list_markdown(base / "agents")
     commands = list_markdown(base / "commands")
+    plugin = base / "plugins" / "cybertron.js"
+    runtime = base / "cybertron-runtime" / "cybertron" / "plugin_cli.py"
     if payload is None:
         expected = KNOWN_AGENT_COUNT
         source = "内置期望值（未联网下载）"
@@ -307,9 +326,11 @@ def run_doctor(args) -> int:
     print(f"角色来源: {source}")
     print(f"已安装角色: {len(agents)}（期望 {expected}）")
     print(f"已安装命令: {len(commands)}")
+    print(f"运行时: {'存在' if plugin.is_file() and runtime.is_file() else '缺失'}")
     print(f"配置: {'存在' if config.exists() else '缺失'}")
     print(f"python: {sys.version.split()[0]}")
-    healthy = len(agents) == expected and len(commands) == 1 and config.is_file()
+    healthy = len(agents) == expected and len(commands) == 1 and config.is_file() \
+        and plugin.is_file() and runtime.is_file()
     if not healthy:
         print("提示: 角色数量不符，运行 cybertron init --apply 重新安装。")
     return 0 if healthy else 1

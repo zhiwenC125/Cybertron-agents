@@ -217,3 +217,39 @@ class PrimaPlanOrchestrator:
                 ),
             ],
         )
+
+    def create_software_ledger(self, user_request: str) -> CybertronTaskLedger:
+        """Nine-stage software route with no Feishu or physical device requirement."""
+        ledger = self.create_full_sdlc_hardware_ledger(user_request)
+        changes = {
+            1: ("核查软件功能、输入输出、目标路径与验收条件；若关键条件缺失则返回 blocked 并向用户提问",
+                "A software request", "Clarified software acceptance criteria"),
+            2: ("仅在本地整理软件需求与约束；无飞书空间时不要调用飞书，也不要把飞书作为完成前提",
+                "Clarified software criteria", "Local software specification"),
+            3: ("侦察本地代码和 Git 基线，建立软件工程骨架；不假设存在设备树或 HAL",
+                "Local specification", "Code map and software module skeleton"),
+            4: ("实现用户要求的软件功能；只修改角色获准的源码路径，不创建无关固件或驱动",
+                "Software skeleton and acceptance criteria", "Implemented software source"),
+            5: ("执行软件 L1 规范审查与 L2 逻辑安全审查；缺少可验证回执时阻塞",
+                "Modified software source", "L1 and L2 review evidence"),
+            6: ("编写软件单元测试并返回 completed；宿主随后自动在隔离运行器中执行并核验回执，角色不要直接运行命令",
+                "Reviewed software", "Test source followed by host-isolated receipt"),
+            7: ("检查软件构建或打包需求；不探测、上电或操作实体设备",
+                "Verified software", "Build or package report"),
+            8: ("软件任务无需物理烧录；仅记录不适用决定，绝不调用硬件工具",
+                "Software-only scope", "No-hardware decision"),
+            9: ("整理本地 README 和使用说明，再由 thirteenth 交付；无飞书空间时不回写飞书",
+                "Software results", "Local documentation and final report"),
+        }
+        for step in ledger.plan:
+            step.objective, step.input_artifact, step.expected_output = changes[step.step_id]
+        ledger.plan[2].participant_objectives = {
+            "onyx-prime": "只读扫描软件代码树，输出文件与行号",
+            "vector-prime": "只读追溯 Git 基线；若无 Git 仓库，明确记录并继续",
+            "quintus-prime": "给出最小软件模块与接口路径设计；此阶段不写文件，源码由下一阶段 solus-prime 创建",
+        }
+        ledger.plan[8].participant_objectives = {
+            "alpha-trion": "整理本地软件文档，不要求飞书回写",
+            "thirteenth": "根据账本与本地文档向用户交付",
+        }
+        return ledger

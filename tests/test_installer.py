@@ -61,13 +61,13 @@ class InstallerCliTest(unittest.TestCase):
         config = json.loads(
             (self.tmp / ".opencode" / "opencode.jsonc").read_text()
         )
-        self.assertEqual(config["default_agent"], "prima")
+        self.assertNotIn("default_agent", config)
 
     def test_apply_is_idempotent(self):
         self.run_cli("init", "--apply", "--project", str(self.tmp))
         result = self.run_cli("init", "--apply", "--project", str(self.tmp))
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("未变 14", result.stdout)
+        self.assertRegex(result.stdout, r"未变 [1-9][0-9]+")
 
     def test_doctor_reports_thirteen(self):
         self.run_cli("init", "--apply", "--project", str(self.tmp))
@@ -94,10 +94,12 @@ class InstallerCliTest(unittest.TestCase):
                     self.assertEqual(installed.returncode, 0, installed.stderr)
                     for (kind, name), content in expected.items():
                         self.assertEqual((project / ".opencode" / kind / name).read_bytes(), content)
-                    self.assertEqual(json.loads((project / ".opencode/opencode.jsonc").read_text())["default_agent"], "prima")
+                    self.assertNotIn("default_agent", json.loads((project / ".opencode/opencode.jsonc").read_text()))
                     repeated = self.run_entry(entry, "--apply")
                     self.assertEqual(repeated.returncode, 0, repeated.stderr)
-                    self.assertIn("未变 14", repeated.stdout)
+                    self.assertRegex(repeated.stdout, r"未变 [1-9][0-9]+")
+                    self.assertTrue((project / ".opencode/plugins/cybertron.js").is_file())
+                    self.assertTrue((project / ".opencode/cybertron-runtime/cybertron/plugin_cli.py").is_file())
                     agent = project / ".opencode/agents/prima.md"
                     agent.write_text("local edit one", encoding="utf-8")
                     self.assertEqual(self.run_entry(entry, "--apply").returncode, 0)
@@ -139,7 +141,13 @@ class InstallerCliTest(unittest.TestCase):
                     shutil.rmtree(config_dir / "commands")
                     config.write_text('{"custom":true}\n')
                     result = self.run_entry(entry, "--apply")
-                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(config.read_text(), '{"custom":true}\n')
+                    self.assertEqual(len(list((config_dir / "agents").glob("*.md"))), 13)
+                    shutil.rmtree(config_dir / "agents")
+                    config.write_text('{broken jsonc\n')
+                    rejected = self.run_entry(entry, "--apply")
+                    self.assertNotEqual(rejected.returncode, 0)
                     self.assertFalse((config_dir / "agents").exists())
                 finally:
                     self.tmp = original

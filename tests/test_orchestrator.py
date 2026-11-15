@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from cybertron.execution import AgentResult, ResultStatus
-from cybertron.hosts import FakeHost, OpenCodeReadOnlyHost
+from cybertron.hosts import FakeHost, OpenCodeReadOnlyHost, OpenCodeWorkflowHost
 from cybertron.orchestrator import HostTurnResult, RunCoordinator
 from cybertron.runstore import RunLocked, RunStore
 
@@ -45,6 +45,16 @@ class RunCoordinatorTests(unittest.TestCase):
         self.assertEqual(len(starts), len(ends))
         self.assertTrue(all(item["payload"]["host_session_id"] for item in starts))
         self.assertEqual(len({item["dispatch_id"] for item in starts}), 13)
+
+    def test_software_route_skips_hardware_with_auditable_event(self):
+        run_id = self.store.create("仅实现 Python 函数", mode="software")["run_id"]
+        state = RunCoordinator(self.store, FakeHost()).run_until_blocked(run_id)
+        self.assertEqual(state["status"], "completed")
+        self.assertEqual(state["workflow_mode"], "software")
+        events = self.store.events(run_id)
+        self.assertEqual(len([event for event in events if event["type"] == "stage.skipped"]), 1)
+        self.assertFalse(any(event["payload"].get("agent_id") == "megatronus"
+                             for event in events if event["type"] == "dispatch.started"))
 
     def test_rejection_reworks_code_and_both_reviews(self):
         host = FakeHost(reject_review_once=True, simulate_hardware_approval=True)
@@ -116,6 +126,11 @@ class RunCoordinatorTests(unittest.TestCase):
         self.assertEqual(state["status"], "blocked")
         self.assertEqual(len([event for event in self.store.events(self.run_id)
                               if event["type"] == "dispatch.started"]), 1)
+
+    def test_workflow_host_never_dispatches_physical_flash_without_approval(self):
+        host = OpenCodeWorkflowHost(self.workspace)
+        self.assertTrue(host.can_execute(self._task(4, "solus-prime")))
+        self.assertFalse(host.can_execute(self._task(8, "megatronus")))
 
     def test_workflow_cli_requires_explicit_real_model_flag(self):
         if os.environ.get("CYBERTRON_SANDBOX"):

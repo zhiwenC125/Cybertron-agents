@@ -1,75 +1,79 @@
 {
-  "schema_version": 1,
-  "stage": "E-offline-slice",
-  "recorded_at_utc": "2026-11-15T02:56:46.616551+00:00",
-  "base_commit": "51a6452c51a7be0222b213c8e79bb0747cf82a0e",
-  "tests": [
+  "schema_version": 2,
+  "stage": "E-opencode-orchestration-software",
+  "recorded_at_utc": "2026-11-15T06:48:57.497586+00:00",
+  "candidate_version": "0.2.0",
+  "published_version": "0.1.1",
+  "test_suite": {
+    "command": "python3 -m unittest discover -s tests -q",
+    "test_count": 101,
+    "exit_code": 0
+  },
+  "stage5_verify": {
+    "exit_code": 0,
+    "qa": "completed"
+  },
+  "engine_selfcheck": {
+    "exit_code": 0
+  },
+  "package_parity": {
+    "npm_sha256": "c0467d64d24c1c933149ebf4ce580e4b5938d0dd58de631d1301b5a6209f6b39",
+    "wheel_sha256": "1f5e64206c402577ec935c567dae9ebb6810c1d8e47818c903d2b9ee0f55763a",
+    "agents": 13,
+    "command": 1,
+    "plugin": 1,
+    "python_runtime": true
+  },
+  "install_smoke": {
+    "npm": "doctor passed",
+    "python_wheel": "doctor passed",
+    "local_shell": "doctor passed",
+    "global_python": "doctor passed"
+  },
+  "live_smoke": [
     {
-      "argv": [
-        "/Library/Developer/CommandLineTools/usr/bin/python3",
-        "-m",
-        "unittest",
-        "discover",
-        "-s",
-        "tests",
-        "-q"
-      ],
-      "exit_code": 0,
-      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stderr_sha256": "ad30f3c52962bdaec51c52face0d89bcf1ce6f838a5cbe7daa528d6a4b6a7474",
-      "summary": "----------------------------------------------------------------------\nRan 97 tests in 3.641s\n\nOK",
-      "test_count": 97
+      "label": "npm_project",
+      "run_id": "abb5c2c3-110c-4b33-a056-af0a5b36407c",
+      "status": "blocked",
+      "stage_id": 1,
+      "event_seq": 4,
+      "tool": "cybertron_run",
+      "opencode_session_id": "ses_e2209f8bdffe0RF0FV8zmcWgyA",
+      "run_sha256": "f06bd64ec1aed3b4985a998fc64ee8d9307d6e509d7d635947b0ada6820865c8",
+      "events_sha256": "01c9f1d41bc34c3abd9ea15bb23d06fe50d582135b16e74ee06b11c7f19f485d",
+      "trace_sha256": "6f24d350fd65f1d8f0553ff20a7b657be824548a9bf48ab432437e171756b8e3"
     },
     {
-      "argv": [
-        "/Library/Developer/CommandLineTools/usr/bin/python3",
-        "-m",
-        "cybertron.stage5_verify"
-      ],
-      "exit_code": 0,
-      "stdout_sha256": "835dc1a7ee2abcdef1c567fd744ac1b94aab5486c6e1903370cc21052c803182",
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "summary": " 'test'>, passed=True, source='sandbox://sha256/559f5045f5c2b6d78369d0c15c6a16083dbbb7839445761a6311b95882ed1247', source_type=<EvidenceSource.SANDBOX: 'sandbox'>, command_or_tool='python -m unittest discover -s tests -q', exit_code=0, observed_at_utc='2026-11-15T02:56:46.501931+00:00', output_sha256='559f5045f5c2b6d78369d0c15c6a16083dbbb7839445761a6311b95882ed1247', verified_by='MacOSSandboxRunner', reference='sandbox://sha256/559f5045f5c2b6d78369d0c15c6a16083dbbb7839445761a6311b95882ed1247'),)"
-    },
-    {
-      "argv": [
-        "/Library/Developer/CommandLineTools/usr/bin/python3",
-        "cybertron_primes_engine.py"
-      ],
-      "exit_code": 0,
-      "stdout_sha256": "6a765936bd6248befc8aa162b8f6660f1da1ed944c0b8e96077a6451e8d87ff4",
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "summary": "on ===\n[PASS] 9-Step Software + Hardware Full-Lifecycle Ledger verified.\n[PASS] Dedicated Documentation & Feishu Wiki Steward (Alpha Trion) verified.\n[PASS] Dedicated Two-Tier Code Review (Micronus L1 + Liege Maximo L2) verified.\n[PASS] Hardware Deployment Separation verified: Nexus Prime (Cross-Compile=DENY until sandboxed, Flash=DENY) vs Megatronus (Physical Flash=ASK).\n[PASS] Exported 14 OpenCode V2 files & 1 DeepSeek Harness files to /Users/alanbanana/Cybertron-Agent/cybertron_workspace_dist"
-    },
-    {
-      "argv": [
-        "/Library/Developer/CommandLineTools/usr/bin/python3",
-        "-m",
-        "cybertron.installer",
-        "workflow",
-        "doctor",
-        "--project",
-        "."
-      ],
-      "exit_code": 0,
-      "stdout_sha256": "409f256174efb1f5604a2d96d2a31ced0fb610d71a4a9770b05ce7cbfcff2fe4",
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "summary": "{\n  \"config_valid\": true,\n  \"errors\": [],\n  \"external_model_called\": false\n}"
-    },
-    {
-      "argv": [
-        "git",
-        "diff",
-        "--check"
-      ],
-      "exit_code": 0,
-      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "summary": ""
+      "label": "global_install",
+      "run_id": "ed4ec9f1-32c7-4870-b219-f0a3f6bdb59a",
+      "status": "blocked",
+      "stage_id": 1,
+      "event_seq": 4,
+      "dispatch_status": "idle",
+      "tool": "cybertron_run",
+      "opencode_session_id": "ses_e2207af7bffegNmIgwDKllH0ir",
+      "run_sha256": "a96f3f1ede24ec926d51365602e5995086cd4e3eacda7c46d12718a49af1637f",
+      "events_sha256": "a28dbb5b6526bcb0208cd7a8e4a2a8eb3127ccc723571a842f3c4aed0b3591b7",
+      "trace_sha256": "1d241566cb2240376f0b89075d20da5636d1fc80cca9e80b13ceaa3c7ba4565e"
     }
   ],
-  "external_model_called": false,
-  "opencode_plugin_load_verified": false,
-  "real_nine_stage_run_verified": false,
-  "hardware_operation": false
+  "tui_build_command": {
+    "verified": true,
+    "agent_after_command": "prima",
+    "stage_1_blocked_as_expected": true,
+    "run_id": "3cbf5ad9-a8f3-4573-b449-5ade1adcb241"
+  },
+  "full_software_run": {
+    "observed_in_temporary_project": true,
+    "run_id": "284814e7-be89-4ecf-8f4c-1f04699277b0",
+    "status": "completed",
+    "stage_count": 9,
+    "role_dispatch_count": 12,
+    "sandbox_unittest_count": 3,
+    "replay_verified": true,
+    "raw_temporary_project_retained": false
+  },
+  "hardware_operation": false,
+  "feishu_write": false,
+  "note": "Public receipt contains hashes and status only; model conversation and temporary project files are not copied."
 }

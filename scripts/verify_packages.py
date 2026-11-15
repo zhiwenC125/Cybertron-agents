@@ -27,7 +27,17 @@ def main() -> None:
         for agent in npm_agents:
             assert archive.read(f"cybertron/payload/agents/{agent}") == (
                 Path(".opencode/agents") / agent).read_bytes()
-    print("npm and Python packages contain the same 13 agents and command")
+        plugin = "plugins/cybertron.js"
+        assert f"payload/{plugin}" in npm_files
+        assert f"cybertron/payload/{plugin}" in wheel_files
+        assert archive.read(f"cybertron/payload/{plugin}") == Path(".opencode/plugins/cybertron.js").read_bytes()
+        runtime = {path.name for path in Path("cybertron").glob("*.py")}
+        for filename in runtime:
+            npm_path = f"payload/cybertron-runtime/cybertron/{filename}"
+            wheel_path = f"cybertron/payload/cybertron-runtime/cybertron/{filename}"
+            assert npm_path in npm_files and wheel_path in wheel_files
+            assert archive.read(wheel_path) == (Path("cybertron") / filename).read_bytes()
+    print("npm and Python packages contain the same agents, command, plugin and runtime")
 
 
 if __name__ == "__main__":

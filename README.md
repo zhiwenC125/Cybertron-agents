@@ -4,13 +4,13 @@
 
 从当前配置包与内存编排过渡到可恢复运行态的实施顺序、验收门槛与交接事项见 [后续开发 Handoff](docs/handoffs/2026-11-14-runtime-architecture.md)。
 
-当前项目协作与权限基线见 [AGENTS.md](AGENTS.md)。普通角色的测试、构建和静态检查 Shell 权限暂时关闭；阶段 5 的本地隔离运行器尚未接入 OpenCode 角色工具调用。
+当前项目协作与权限基线见 [AGENTS.md](AGENTS.md)。普通角色不能直接执行测试、构建和静态检查 Shell 命令；软件测试由 Cybertron 宿主在 macOS 隔离运行器中执行。
 
-**当前状态（2026-11-15）**：七阶段的最小闭环基线已达到。后续 A–D 已完成本地离线验收；E 的持久化九步外层编排通过假宿主验收，真实 OpenCode 全角色接力仍在开发。阶段 7 的 STM32 最小 App 已经人工批准真机烧录、读回、观察 SRAM 心跳并恢复原固件；完整 OTA App、ESP32-S3 和宿主审批接口仍在开发。证据见[阶段 7 文档](docs/stages/07-deployment.md)和[阶段 E 文档](docs/stages/E-opencode-orchestration.md)。在其他电脑使用或规划一条命令安装，请先看[安装与发布方案](docs/packaging-and-installation.md)。
+**当前状态（2026-11-15）**：后续 A–D 已完成；E 的 OpenCode 软件工作流已在临时项目中完成真实九步接力、L1/L2 审查和隔离 QA。纯软件任务会明确跳过物理烧录；硬件任务仍停在具体设备审批边界。`0.2.0` 为待发布候选版，公开 `0.1.1` 不包含 E。证据见[阶段 E 文档](docs/stages/E-opencode-orchestration.md)；发布状态见[安装与发布方案](docs/packaging-and-installation.md)。
 
 各阶段的代码摘录、验收记录与后续实现建议见 [阶段文档目录](docs/stages/01-foundation.md)：[1](docs/stages/01-foundation.md) · [2](docs/stages/02-local-execution.md) · [3](docs/stages/03-opencode-config.md) · [4](docs/stages/04-opencode-executor.md) · [5](docs/stages/05-quality-gates.md) · [6](docs/stages/06-feishu.md) · [7](docs/stages/07-deployment.md)。参考资料新增 [Datawhale Hello Agents](https://datawhalechina.github.io/hello-agents/#/)。
 
-本仓库是 [v5 架构白皮书](design/cybertron_13_primes_architecture.md)的 Python 原型。当前实现包含 13 个角色的静态定义、权限规则、9 步任务账本、飞书 Wiki OpenAPI 网关，以及 OpenCode V2 / DeepSeek Harness 配置导出。已有一个只读角色的 OpenCode V2 命令行适配器；完整多智能体流程仍在开发中。角色模型 ID 以 `cybertron/registry.py` 为准；白皮书中的旧 DeepSeek 模型名保留为当时的设计记录。
+本仓库是 [v5 架构白皮书](design/cybertron_13_primes_architecture.md)的 Python 原型。当前实现包含 13 个角色的静态定义、权限规则、可恢复的九步账本、OpenCode V2 插件和宿主适配器、飞书 Wiki OpenAPI 网关，以及 DeepSeek Harness 配置导出。角色模型 ID 以 `cybertron/registry.py` 为准；白皮书中的旧 DeepSeek 模型名保留为当时的设计记录。
 
 ## 运行
 
@@ -36,7 +36,7 @@ python3 -m cybertron.opencode_run "请澄清 STM32F4 电机控制任务还缺少
 
 阶段 5 的只读接力探针在项目根目录运行：`python3 -m cybertron.opencode_readonly "查看本项目源码与当前 Git 基线"`。项目根目录已生成 `opencode.jsonc` 和 `.opencode/agents/`，让角色能读取真正的项目源码。探针用模拟前置条件跳过步骤 1、2，只真实调用 `onyx-prime` 和 `vector-prime`，不会执行后续写入角色。
 
-阶段 5 保留 `cybertron.opencode_l2_probe` 作为真实宿主审查探针；前置步骤和 L1 是模拟结果。用户已决定不向外部模型发送项目文件，因此它不属于当前离线验收命令。
+阶段 5 保留 `cybertron.opencode_l2_probe` 作为历史单角色探针；后续阶段 E 已获用户授权，可在真实软件流程中向配置的模型发送临时项目文件并验证宿主回执。
 
 阶段 5 的离线终端验收运行 `python3 -m unittest discover -s tests -q`、`python3 -m cybertron.stage5_verify` 和 `opencode2 debug config`。第二条命令通过 macOS `sandbox-exec` 核查项目写入、设备读取及网络连接均被拒绝，再将实际单元测试报告作为 `test` 证据写入账本；不会调用模型或飞书。
 
@@ -44,32 +44,25 @@ python3 -m cybertron.opencode_run "请澄清 STM32F4 电机控制任务还缺少
 
 ## 安装到 OpenCode
 
-三条安装路径共享同一份 payload（13 个角色 + `/cybertron` 命令），默认 dry-run，`--apply` 才写入。当前已发布版本为 **0.1.1**：
+三条安装路径共享同一份 payload（13 个角色、可选 `/cybertron` 命令、OpenCode 插件和 Python 运行时），默认 dry-run，`--apply` 才写入。**公开已发布版本仍为 0.1.1，不包含 E；本分支的 0.2.0 尚待发布。**
 
-源码分支已完成阶段 A 的离线安装基线修复；这些改动尚未发布到公共 `0.1.1` 包，详见[阶段 A 记录](docs/stages/A-installation-baseline.md)。
+在发布前，可从本源码分支安装候选版并试用：
 
 ```bash
-# 1) npm（在你自己的项目目录运行，不要在 Cybertron-Agent 仓库内运行）
-npx -y cybertron-agents@0.1.1 init --dry-run
-npx -y cybertron-agents@0.1.1 init --apply --project .
+# 从源码分支安装到当前项目
+python3 -m cybertron.installer init --dry-run --project /你的项目
+python3 -m cybertron.installer init --apply --project /你的项目
 
-# 2) pipx（Python 生态，与 npm 无关）
-pipx install cybertron-agents==0.1.1
-cybertron init --dry-run
-cybertron init --apply --project .
-
-# 3) GitHub Shell
-curl -fsSL https://raw.githubusercontent.com/zhiwenC125/Cybertron-agents/v0.1.1/install.sh -o install.sh
-bash install.sh --dry-run
-bash install.sh --apply --project .
+# 或安装到当前用户的 OpenCode 全局配置，使所有项目可选择 prima
+python3 -m cybertron.installer init --apply --global
 ```
 
 安装目标：
 
-- `--project DIR`：写入 `DIR/.opencode/agents` 与 `DIR/.opencode/commands`
-- `--global`：写入 `${XDG_CONFIG_HOME:-~/.config}/opencode/agents|commands`
+- `--project DIR`：写入 `DIR/.opencode/` 下的角色、命令、插件及运行时
+- `--global`：写入 `${XDG_CONFIG_HOME:-~/.config}/opencode/` 下的同一组文件
 
-装完在 OpenCode 里：`opencode2 debug agents` 确认 13 个角色；`opencode` 默认 `prima`，`Tab` / `Shift+Tab` 切换。当前 `/cybertron <需求>` 是提示词入口，尚未连接完整 Python 九步编排；此连接属于后续阶段 E。`cybertron doctor` 只做本地检查，不会联网下载。
+安装后在目标项目运行 `opencode2 debug agents`，确认 13 个 Cybertron 角色加载。OpenCode 仍保持原有 Build/Plan 默认行为；用 **Shift+Tab** 选到 `prima`，直接输入自然语言软件需求即可自动创建 run 并接力。也可在 Build 模式输入 `/cybertron <需求>`，命令会选用 `prima` 并触发同一插件工作流。插件使用本机 Python 3.9+；`cybertron doctor` 只做本地检查。
 
 源码分支现在可离线创建并检查持久化 run：
 
@@ -80,7 +73,7 @@ python3 -m cybertron.installer workflow status <上一步的 run_id> --project .
 python3 -m cybertron.installer workflow run <run_id> --project . --host fake
 ```
 
-`fake` 仅模拟九步与证据，默认停在硬件审批前，不能作为真实开发完成的证明。`workflow resume <run_id>` 只恢复账本，不重放宿主调用。`--host opencode-readonly` 只支持少数只读角色，真实调用还要求显式传入 `--allow-external-model`；当前没有执行该调用。`/cybertron` 不会自动创建 run。详情见[阶段 E 记录](docs/stages/E-opencode-orchestration.md)。
+`fake` 仅模拟九步与证据，不能作为真实开发完成的证明。`workflow resume <run_id>` 只恢复账本，不重放宿主调用。手动真实调用使用 `--host opencode --allow-external-model`；在 OpenCode 内通过插件调用时，模型调用由用户选择 `prima` 或 `/cybertron` 触发。详情见[阶段 E 记录](docs/stages/E-opencode-orchestration.md)。
 
 详见[安装与发布方案](docs/packaging-and-installation.md)。`v0.1.1` 的 tag 与 Release 见 [GitHub Release v0.1.1](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.1.1)。
 
@@ -118,7 +111,7 @@ python3 -m cybertron.installer workflow run <run_id> --project . --host fake
 
 ## 当前边界与下一步
 
-1. `ledger.py` 与 `dispatch.py` 已实现 L1/L2 拒绝后返回编码、重审及超限阻塞；本地隔离测试能生成 QA 回执。真实 L1/L2 宿主审查和人工烧录授权仍需后续阶段接入。
+1. `ledger.py` 与 `dispatch.py` 已实现 L1/L2 拒绝后返回编码、重审及超限阻塞；真实软件流程已生成宿主审查证明与隔离 QA 回执。宿主回执证明审查发生及项目文件被读取，不保证模型判断一定正确。
 2. `policy.py` 是本地策略原型，不能代替宿主层权限和命令解析。生成配置后的真实权限仍需在目标宿主中验证。
 3. DeepSeek Harness 目前只导出预设 JSON，白皮书中的 `.dsh/cordis-cybertron-plugin.mjs` 尚未实现。
 4. 阶段 6 的 Wiki OpenAPI 读写已由开发者在专用测试空间验收；阶段 7 的 STM32 最小真机烧录及回滚已通过。完整 OTA App、ESP32-S3、外部 Flash 备份和隔离构建仍待开发。

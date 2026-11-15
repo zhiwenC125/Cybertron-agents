@@ -1,6 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "default_agent": "prima",
   "agents": {
     "prima": {
       "description": "[先觉天] 塞伯坦首席研发编排官：唯一拥有 subagent 派发权的主控大脑，按软硬一体 SDLC 七大阶段调度其余12位天尊。",
@@ -27,6 +26,11 @@
         {
           "action": "read",
           "resource": "docs/**",
+          "effect": "allow"
+        },
+        {
+          "action": "cybertron_run",
+          "resource": "*",
           "effect": "allow"
         },
         {

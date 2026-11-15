@@ -117,13 +117,16 @@ class RunStore:
 
     def _config_digest(self) -> str:
         config = self.workspace / "opencode.jsonc"
+        if not config.is_file():
+            config = self.workspace / ".opencode" / "opencode.jsonc"
         return hashlib.sha256(config.read_bytes()).hexdigest() if config.is_file() else "missing"
 
     @staticmethod
     def _runtime_digest() -> str:
         package = Path(__file__).resolve().parent
         digest = hashlib.sha256()
-        for name in ("dispatch.py", "ledger.py", "registry.py", "runstore.py"):
+        for name in ("dispatch.py", "hosts.py", "ledger.py", "opencode_executor.py",
+                     "orchestrator.py", "plugin_cli.py", "registry.py", "runstore.py"):
             digest.update(name.encode() + b"\0" + (package / name).read_bytes())
         return digest.hexdigest()
 
@@ -226,9 +229,12 @@ class RunStore:
             "ledger": data,
         }
 
-    def create(self, request: str, session_id: str | None = None) -> dict:
+    def create(self, request: str, session_id: str | None = None,
+               *, mode: str = "hardware") -> dict:
         if not request.strip():
             raise ValueError("A nonempty request is required")
+        if mode not in ("hardware", "software"):
+            raise ValueError("Unknown workflow mode")
         if self.root.is_symlink():
             raise RunCorrupt("Unsafe sessions directory")
         existing_session = session_id is not None
@@ -251,6 +257,11 @@ class RunStore:
         run_id = str(uuid.uuid4())
         directory = self.root / session_id / "runs" / run_id
         directory.mkdir(parents=True, exist_ok=False)
+        ignore = self.workspace / ".cybertron" / ".gitignore"
+        if ignore.is_symlink():
+            raise RunCorrupt("Unsafe run ignore file")
+        if not ignore.exists():
+            ignore.write_text("*\n!.gitignore\n", encoding="utf-8")
         metadata = {
             "schema_version": SCHEMA_VERSION,
             "session_id": session_id,
@@ -259,6 +270,7 @@ class RunStore:
             "workspace": str(self.workspace),
             "config_sha256": self._config_digest(),
             "runtime_sha256": self._runtime_digest(),
+            "workflow_mode": mode,
         }
         if not existing_session:
             self._atomic_json(directory.parent.parent / "session.json", {
@@ -268,7 +280,9 @@ class RunStore:
                 "workspace": str(self.workspace),
             })
         self._atomic_json(directory / "run.json", metadata)
-        ledger = PrimaPlanOrchestrator().create_full_sdlc_hardware_ledger(request)
+        planner = PrimaPlanOrchestrator()
+        ledger = (planner.create_software_ledger(request) if mode == "software"
+                  else planner.create_full_sdlc_hardware_ledger(request))
         event = self._event(metadata, 1, "run.created", ledger)
         with self._writer(directory):
             self._append(directory, event)
@@ -338,10 +352,12 @@ class RunStore:
         return {
             "session_id": metadata["session_id"],
             "run_id": run_id,
+            "workflow_mode": metadata.get("workflow_mode", "hardware"),
             "event_seq": seq,
             "status": "completed" if step is None else step.status,
             "stage_id": None if step is None else step.step_id,
             "next_agent": None if step is None else step.next_agent(),
+            "block_reason": step.evidence_summary if step is not None and step.status == "blocked" else None,
             "turn_count": ledger.turn_count,
             "review_retry_count": ledger.review_retry_count,
             "snapshot": self._snapshot_state(directory, seq, ledger),

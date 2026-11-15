@@ -7,7 +7,7 @@ REPO="zhiwenC125/Cybertron-agents"
 MODE="project"
 PROJECT_DIR="."
 APPLY=0
-VERSION="v0.1.1"
+VERSION="v0.2.0"
 EXPECTED_SHA256=""
 DOCTOR=0
 
@@ -23,7 +23,7 @@ Cybertron 安装脚本
   --project DIR         安装到 DIR/.opencode（默认当前目录）
   --apply               真正写入文件（默认只预览）
   --dry-run             只预览（默认）
-  --version REF         指定 tag（默认 v0.1.1）；分支仅用于显式开发测试
+  --version REF         指定 tag（默认 v0.2.0）；分支仅用于显式开发测试
   --sha256 HEX          校验下载归档的 SHA-256
   --doctor              只检查本地安装，不下载或写入
   -h, --help            显示本帮助
@@ -78,7 +78,9 @@ if [ "$DOCTOR" = "1" ]; then
   echo "目标: $BASE"
   echo "已安装角色: ${AGENT_COUNT}（期望 13）"
   echo "已安装命令: ${COMMAND_COUNT}（期望 1）"
-  [ "$AGENT_COUNT" -eq 13 ] && [ "$COMMAND_COUNT" -eq 1 ] && [ -f "$BASE/opencode.jsonc" ]
+  echo "运行时: $BASE/plugins/cybertron.js 与 $BASE/cybertron-runtime/cybertron/plugin_cli.py"
+  [ "$AGENT_COUNT" -eq 13 ] && [ "$COMMAND_COUNT" -eq 1 ] && [ -f "$BASE/opencode.jsonc" ] \
+    && [ -f "$BASE/plugins/cybertron.js" ] && [ -f "$BASE/cybertron-runtime/cybertron/plugin_cli.py" ]
   exit $?
 fi
 
@@ -132,8 +134,26 @@ if [ -L "$BASE" ] || [ -L "$CONFIG" ]; then
   echo "拒绝符号链接安装目录或配置: $BASE" >&2
   exit 2
 fi
-if [ -e "$CONFIG" ] && ! grep -Eq '"default_agent"[[:space:]]*:' "$CONFIG"; then
-  echo "已有配置缺少 default_agent，或无法安全识别；请先手动设置 prima: $CONFIG" >&2
+if [ -e "$CONFIG" ]; then
+  if ! PYTHONPATH="$SRC${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import json
+import sys
+from pathlib import Path
+from cybertron.installer import strip_jsonc
+try:
+    parsed = json.loads(strip_jsonc(Path(sys.argv[1]).read_text(encoding="utf-8")))
+except (json.JSONDecodeError, OSError):
+    raise SystemExit(2)
+if not isinstance(parsed, dict):
+    raise SystemExit(2)
+' "$CONFIG"
+  then
+    echo "已有 OpenCode 配置无法安全解析: $CONFIG" >&2
+    exit 2
+  fi
+fi
+if [ -L "$BASE/cybertron-runtime" ]; then
+  echo "拒绝符号链接运行时目录: $BASE/cybertron-runtime" >&2
   exit 2
 fi
 
@@ -155,14 +175,22 @@ rollback() {
 }
 trap rollback EXIT
 
-for kind in agents commands; do
+for kind in agents commands plugins cybertron-runtime; do
   src_dir="$SRC/.opencode/$kind"
+  target_dir="$BASE/$kind"
+  extension=md
+  if [ "$kind" = "plugins" ]; then extension=js; fi
+  if [ "$kind" = "cybertron-runtime" ]; then
+    src_dir="$SRC/cybertron"
+    target_dir="$BASE/cybertron-runtime/cybertron"
+    extension=py
+  fi
   [ -d "$src_dir" ] || continue
-  if [ -L "$BASE/$kind" ]; then echo "拒绝符号链接安装目录: $BASE/$kind" >&2; exit 2; fi
-  for f in "$src_dir"/*.md; do
+  if [ -L "$target_dir" ]; then echo "拒绝符号链接安装目录: $target_dir" >&2; exit 2; fi
+  for f in "$src_dir"/*."$extension"; do
     [ -e "$f" ] || continue
     name="$(basename "$f")"
-    target="$BASE/$kind/$name"
+    target="$target_dir/$name"
     if [ -L "$target" ]; then echo "拒绝符号链接安装目标: $target" >&2; exit 2; fi
     if [ -e "$target" ]; then
       if cmp -s "$f" "$target"; then
@@ -172,7 +200,7 @@ for kind in agents commands; do
         echo "  ~ $target (保留编号备份后覆盖)"
         UPD=$((UPD + 1))
         if [ "$APPLY" = "1" ]; then
-          mkdir -p "$BASE/$kind"
+          mkdir -p "$target_dir"
           index=1
           while [ -e "$target.bak.$index" ]; do index=$((index + 1)); done
           backup="$target.bak.$index"
@@ -187,7 +215,7 @@ for kind in agents commands; do
       echo "  + $target"
       NEW=$((NEW + 1))
       if [ "$APPLY" = "1" ]; then
-        mkdir -p "$BASE/$kind"
+        mkdir -p "$target_dir"
           CHANGED_TARGETS+=("$target")
           CHANGED_KINDS+=("new")
           CHANGED_BACKUPS+=("")
@@ -200,13 +228,13 @@ done
 if [ -e "$CONFIG" ]; then
   echo "  = $CONFIG (已有配置，保持原字节)"
 else
-  echo "  + $CONFIG (最小配置，默认 prima)"
+  echo "  + $CONFIG (最小配置，沿用 OpenCode 默认角色)"
   if [ "$APPLY" = "1" ]; then
     mkdir -p "$BASE"
     CHANGED_TARGETS+=("$CONFIG")
     CHANGED_KINDS+=("new")
     CHANGED_BACKUPS+=("")
-    printf '{\n  "$schema": "https://opencode.ai/config.json",\n  "default_agent": "prima"\n}\n' > "$CONFIG"
+    printf '{\n  "$schema": "https://opencode.ai/config.json"\n}\n' > "$CONFIG"
   fi
 fi
 

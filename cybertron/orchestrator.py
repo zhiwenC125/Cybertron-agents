@@ -77,6 +77,15 @@ class RunCoordinator:
         step = ledger.next_step()
         if step is None or step.status == "blocked":
             return self.status(run_id)
+        if step.step_id == 8 and step.objective.startswith("软件任务无需物理烧录"):
+            expected_seq = self.store.show(run_id)["event_seq"]
+            def skip_hardware(current) -> None:
+                current.start_step(8)
+                current.complete_step(8, "软件任务不涉及设备或物理烧录", ["scope://software-only"])
+            self.store.transition(run_id, "stage.skipped", skip_hardware, stage_id=8,
+                                  payload={"reason": "software_only_no_device"},
+                                  expected_seq=expected_seq)
+            return self.status(run_id)
         agent_id = step.next_agent()
         if agent_id is None:
             raise RunStoreError("Active stage has no remaining role")

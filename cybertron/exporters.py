@@ -60,7 +60,6 @@ def compile_opencode_v2_assets(target_dir: Path, *, include_feishu: bool = False
 
     opencode_jsonc = {
         "$schema": "https://opencode.ai/config.json",
-        "default_agent": "prima",
         "agents": agents_json_map,
     }
     if include_feishu:

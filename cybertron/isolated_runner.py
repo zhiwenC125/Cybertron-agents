@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -109,10 +110,12 @@ class AlchemistTestExecutor:
         ])
         self._last_report = report
         source = f"sandbox://sha256/{report.digest}"
-        if report.timed_out or report.exit_code != 0:
+        output = report.stderr or report.stdout
+        count = re.search(r"Ran (\d+) tests?", output)
+        if report.timed_out or report.exit_code != 0 or not count or int(count.group(1)) == 0:
             detail = (report.stderr or report.stdout).strip()[-500:]
             return AgentResult(task.step_id, task.agent_id, ResultStatus.BLOCKED,
-                               f"Sandboxed tests failed: {detail}", evidence=(source,))
+                               f"Sandboxed tests failed or ran zero tests: {detail}", evidence=(source,))
         return AgentResult(
             task.step_id, task.agent_id, ResultStatus.COMPLETED,
             "Sandboxed unittest suite passed", evidence=(source,),

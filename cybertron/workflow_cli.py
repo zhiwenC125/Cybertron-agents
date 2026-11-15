@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from .hosts import FakeHost, OpenCodeReadOnlyHost
+from .hosts import FakeHost, OpenCodeReadOnlyHost, OpenCodeWorkflowHost
 from .opencode_v2 import validate_bundle
 from .orchestrator import RunCoordinator
 from .runstore import RunStore, RunStoreError
@@ -19,7 +19,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("value", nargs="?", help="request for create; run ID for other operations")
     parser.add_argument("--project", default=".")
     parser.add_argument("--session", help="existing session slug for create")
-    parser.add_argument("--host", choices=("fake", "opencode-readonly"), default="fake")
+    parser.add_argument("--host", choices=("fake", "opencode-readonly", "opencode"), default="fake")
     parser.add_argument("--allow-external-model", action="store_true",
                         help="explicitly permit real read-only OpenCode model calls")
     parser.add_argument("--simulate-hardware-approval", action="store_true")
@@ -39,10 +39,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.operation == "create":
             result = SessionStore(workspace).create_run(args.session, args.value) if args.session else store.create(args.value)
         else:
-            if args.host == "opencode-readonly":
+            if args.host in ("opencode-readonly", "opencode"):
                 if args.operation in ("step", "run") and not args.allow_external_model:
                     parser.error("Real OpenCode calls require --allow-external-model")
-                host = OpenCodeReadOnlyHost(workspace)
+                host = (OpenCodeWorkflowHost(workspace) if args.host == "opencode"
+                        else OpenCodeReadOnlyHost(workspace))
             else:
                 host = FakeHost(reject_review_once=args.reject_review_once,
                                 simulate_hardware_approval=args.simulate_hardware_approval)

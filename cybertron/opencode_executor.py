@@ -15,27 +15,41 @@ class OpenCodeV2Executor:
                  timeout_seconds: int = 120,
                  model_override: str | None = None,
                  host_session_id: str | None = None,
+                 workflow_mode: bool = False,
                  runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run) -> None:
         self.workspace = workspace
         self.binary = binary
         self.timeout_seconds = timeout_seconds
         self.model_override = model_override
         self.host_session_id = host_session_id
+        self.workflow_mode = workflow_mode
         self.last_host_turn_id: str | None = None
+        self.last_raw_response: str | None = None
+        self.last_tool_events: list[dict] = []
         self.runner = runner
 
     def execute(self, task: AgentTask) -> AgentResult:
         allowed_tasks = {(1, "thirteenth"), (3, "onyx-prime"),
                          (3, "vector-prime"), (5, "liege-maximo")}
-        if (task.step_id, task.agent_id) not in allowed_tasks:
+        if not self.workflow_mode and (task.step_id, task.agent_id) not in allowed_tasks:
             raise ValueError("This adapter currently supports only selected read-only roles")
-        if not (self.workspace / "opencode.jsonc").is_file():
+        if self.workflow_mode and (task.step_id, task.agent_id) == (8, "megatronus"):
+            raise ValueError("Physical flash requires a bound plan and human approval")
+        if not self.workflow_mode and not ((self.workspace / "opencode.jsonc").is_file() or
+                (self.workspace / ".opencode" / "opencode.jsonc").is_file()):
             raise FileNotFoundError("OpenCode V2 bundle is missing opencode.jsonc")
-        if task.step_id == 5 and not (self.workspace / "cybertron" / "registry.py").is_file():
+        if not self.workflow_mode and task.step_id == 5 and not (self.workspace / "cybertron" / "registry.py").is_file():
             return self._blocked(task, "L2 workspace must be the project root containing cybertron/registry.py")
         is_l2 = task.agent_id == "liege-maximo"
-        prompt = (
+        introduction = (
+            "你正在执行 Cybertron 九步研发工作流中的一个角色任务。只使用 OpenCode 宿主授予该角色的工具与路径权限。"
+            "只需完成下方的『当前目标』，不要尝试独自完成整个用户任务；其他阶段的代码、测试、文档和交付由后续角色负责。"
+            "当你的当前目标已完成，就返回 completed；只有当前目标本身无法完成时才返回 blocked。"
+            "不要声称未实际运行的测试、审查或部署已经完成。"
+            if self.workflow_mode else
             "你正在执行一个只读研发任务。可以使用该角色已授权的只读工具，但不要修改文件。"
+        )
+        prompt = introduction + (
             "只返回一个 JSON 对象，字段为 status、summary、evidence。"
             "status 只能是 completed、blocked 或 rejected；evidence 必须是非空字符串数组。"
             "若无法完成目标，请返回 blocked，并在 summary 中说明原因。"
@@ -43,9 +57,10 @@ class OpenCodeV2Executor:
         if is_l2:
             prompt += ("若 L2 审查通过，另返回 quality_evidence 数组，其中对象必须含"
                        "kind=review_l2、passed=true、source=具体审查依据；发现问题时返回 rejected。")
-            prompt += ("当前工作目录必须是项目根目录。请优先读取 opencode.jsonc、"
-                       "cybertron/registry.py、cybertron/exporters.py 和 .opencode/agents/。"
-                       "AGENTS.md 如不存在，记录该事实并继续审查。只使用 read 和 glob。")
+            if not self.workflow_mode:
+                prompt += ("当前工作目录必须是项目根目录。请优先读取 opencode.jsonc、"
+                           "cybertron/registry.py、cybertron/exporters.py 和 .opencode/agents/。"
+                           "AGENTS.md 如不存在，记录该事实并继续审查。只使用 read 和 glob。")
         prompt += (f"\n用户任务：{task.user_request}\n当前目标：{task.objective}"
                    f"\n输入约定：{task.input_artifact}\n已有证据：{list(task.prior_evidence)}")
         command = [self.binary, "run", "--standalone", "--archived", "--agent",
@@ -74,6 +89,10 @@ class OpenCodeV2Executor:
                 continue
             if event.get("type") == "error":
                 return self._blocked(task, "OpenCode emitted an error event")
+            if event.get("type") == "tool_use":
+                part = event.get("part", {})
+                if isinstance(part, dict) and part.get("state", {}).get("status") == "completed":
+                    self.last_tool_events.append(part)
             if event.get("type") == "text":
                 candidate = event.get("messageID") or event.get("part", {}).get("messageID")
                 if isinstance(candidate, str) and candidate:
@@ -84,6 +103,7 @@ class OpenCodeV2Executor:
         if not texts:
             return self._blocked(task, "OpenCode returned no text event")
         raw = "".join(texts).strip()
+        self.last_raw_response = raw
         data = self._extract_json_object(raw)
         if data is None:
             preview = " ".join(raw.split())[:240]

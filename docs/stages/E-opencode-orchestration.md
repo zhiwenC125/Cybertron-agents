@@ -1,26 +1,28 @@
 # 后续阶段 E：OpenCode 外层编排
 
-状态：**离线开发切片通过，阶段完整目标未完成**。本轮没有调用外部模型、飞书或设备。
+状态：**软件路径完成本地开发与真实宿主验收；物理硬件执行仍须专项审批；`0.2.0` 待发布。**
 
-## 已交付
+## 用户入口
 
-- `RunCoordinator` 将九步账本与宿主的单次角色调用分开。每次先持久化 `dispatch.started`，再调用宿主，最后持久化带 `host_session_id`、turn ID 和结果状态的 `dispatch.completed`。同一 run 使用事件序号检查避免并发派单。
-- 调用抛错、进程在派单后中断、宿主身份不符时，状态保持 `outcome_unknown`；`step`、`run`、`resume` 不会自动重试该次调用。用户需核对宿主实际结果后再设计人工消歧流程。
-- 假宿主通过九步、一次 L2 拒绝返工、重启续跑、错误角色阻塞、硬件审批前停下等测试。模拟批准只用于离线状态机测试，不是实际设备授权。
-- OpenCode 适配器仅开放第 1、3、5 步中的既有只读角色。CLI 调用真实模型要求 `--allow-external-model`。模型生成的 L2 文字仍不能作为真实质量门禁回执；第 2 步写文档等角色会阻塞。
-- `workflow create/status/resume/step/run/doctor` 可管理本地 run。`/cybertron` Markdown 入口明确说明只提供提示词，**不会创建持久化 run**。试验性本地插件未能在本机验证加载，未纳入交付，以免干扰现有 OpenCode 使用。
+三种安装器都放入 13 个角色、可选命令、插件和 Python 运行时，保留 OpenCode 的 Build/Plan 默认行为。用户在 TUI 中用 Shift+Tab 选 `prima` 后直接输入软件需求，`prima` 会调用 `cybertron_run`。在 Build 模式运行 `/cybertron <需求>` 也会选择 `prima` 并触发相同工具。本机 TUI 已验证后一入口，OpenCode 会话的 `agent` 字段确认为 `prima`。单独运行 CLI `opencode2 run '/cybertron ...'` 会把斜杠文本当普通提示，不等同于 TUI 命令。
 
-## 开发者与用户怎么用
+插件通过安全分隔的 argv 调用随安装包提供的 Python 运行时；不会让项目目录中的同名 Python 包覆盖运行时代码。用户请求、run ID 和宿主会话的关联保存在本地 `.cybertron/`，其中 `.gitignore` 默认阻止 `git add .` 上传运行记录。每次派单先写 `dispatch.started`，再调用 OpenCode V2；真实 `sessionID`、`messageID` 与结果写入 `dispatch.completed`。未确认结果保持 `outcome_unknown`，不能自动重试。
 
-先运行 `python3 -m cybertron.installer workflow doctor --project .` 核对 13 角色配置，再以 `workflow create "需求" --project .` 创建 run。使用返回的 `run_id` 执行 `workflow status <run_id> --project .`。需要观察离线九步时，用 `workflow run <run_id> --project . --host fake`；输出中的模拟证据不能代替真实测试和审查。OpenCode 中可继续单独使用 13 个已导出的角色，但 `/cybertron` 当前不会替你完成九步接力。
+## 软件九步与证据
 
-## 仍待完成
+- 软件计划保留九步顺序，依次澄清、整理本地需求、侦察与架构、编码、L1/L2 审查、测试、构建检查、无硬件判断、文档交付。纯软件请求不要求飞书或设备；第 8 步使用独立 `stage.skipped` 事件，未伪称震天尊执行烧录。
+- 真实宿主仅执行各角色在 OpenCode 配置中获准的文件工具。普通角色不获得直接测试 Shell。L1/L2 宿主回执关联审查消息、项目读取工具事件及输出摘要；宿主回执证明审查确实发生，不能证明模型判断绝对正确。模型自称 PASS 的字段本身不能越过质量门禁。
+- 测试角色编写 `tests/**` 后，宿主用 macOS `sandbox-exec` 运行 `unittest`，核对退出码和非零测试数。沙箱拒绝网络、项目写入及设备读取；缺少隔离运行器或测试失败则阻塞。
+- 真实软件验收在干净临时项目完成：12 次角色派单、九步账本完成、L1/L2 宿主回执、3 项隔离单元测试通过、重放校验通过。模型调用已按用户新授权执行；没有飞书写入、设备上电或物理烧录。
 
-1. 用真实 OpenCode 只读回合验证会话和 turn ID、权限拒绝、取消与超时事件；这会向外部模型发送任务内容，本轮遵守用户既有边界而未执行。
-2. 将真实宿主的工具、权限及隔离 QA 回执映射为可独立核验的证据，再开放写角色。当前 Python `policy.py` 不能代替 OpenCode 宿主权限。
-3. 实现并验证 `/cybertron` 到 Python 编排器的加载连接、宿主查询与人工消歧，使界面能显示 run ID、下一角色和停滞原因。
-4. 按具体目标、路径和审批范围开放飞书写入、构建及硬件角色；真机操作继续逐次审批。
+## 安装与开发者验收
 
-## 验收证据
+从源码安装候选版：`python3 -m cybertron.installer init --apply --project <目标项目>`，或 `--global` 供所有项目选择 `prima`。npm tarball、Python wheel 和本地 Shell 脚本已分别在干净项目安装，核对角色、插件、运行时及 `doctor`，并各自用真实 OpenCode 会话触发持久化 run。公开 `0.1.1` 尚无此功能；候选版的发布需另行完成。
 
-离线命令、退出码及输出摘要见 [`E-opencode-orchestration-acceptance.json`](E-opencode-orchestration-acceptance.json)。该摘要不能证明真实 OpenCode 九步已运行，也不能代替原始宿主回执。
+2026-11-15 已把本地 `0.2.0` 候选版安装到开发机的全局 OpenCode 配置，原有 `opencode.jsonc` 保持原样。全局 `doctor`、`debug agents` 和一个无项目配置的临时目录中的真实 `prima` 调用均通过。其他项目可直接打开 OpenCode，Shift+Tab 选 `prima` 后输入自然语言；Build 中的 `/cybertron <需求>` 是 TUI 快捷入口。
+
+本地回归命令：`python3 -m unittest discover -s tests -q`、`python3 -m cybertron.stage5_verify`、`python3 cybertron_primes_engine.py`、`opencode2 debug config`。结构化回执见 [`E-opencode-orchestration-acceptance.json`](E-opencode-orchestration-acceptance.json)。公开摘要包含结论与哈希，不复制模型对话或项目文件。
+
+## 保持的边界
+
+硬件计划可以推进到物理操作之前；`megatronus` 的真实派单仍被宿主适配器拒绝，直至具备目标设备、固件摘要、擦写范围、回滚方案和针对该次操作的人工批准。飞书写入只允许 `alpha-trion` 经受空间约束的 Python 网关执行，真实测试仍限专用空间。DeepSeek Harness 第二宿主属于阶段 F。已完成的 run 在运行时或权限配置升级后可能需要显式迁移，旧 run 不会被静默重放。

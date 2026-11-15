@@ -57,8 +57,8 @@ function describe(item) {
 const CONFIG_TEXT = {
   'would-create': '将写入最小配置',
   'filled-empty': '空配置；请先移走或修复',
-  'has-default': '已有 default_agent',
-  'missing-default': '已有配置缺少 default_agent；请手动设置 prima',
+  'has-default': '已有默认角色，保持不变',
+  'missing-default': '沿用 OpenCode 默认角色',
   'parse-failed': '无法解析，跳过',
   'not-object': '不是对象，跳过',
 };
@@ -83,7 +83,7 @@ function runInit(opts) {
 
   const config = ensureConfig(plan.base, true);
   console.log(`配置: ${config.file} -> ${CONFIG_TEXT[config.action] ?? config.action}`);
-  if (['filled-empty', 'parse-failed', 'not-object', 'missing-default'].includes(config.action)) {
+  if (['filled-empty', 'parse-failed', 'not-object'].includes(config.action)) {
     console.error('已有配置无法安全安装；请先修复配置。');
     process.exitCode = 2;
     return;
@@ -104,19 +104,23 @@ function runDoctor(opts) {
   const payload = resolvePayload(pkgRoot);
   const agents = listMarkdown(path.join(base, 'agents'));
   const commands = listMarkdown(path.join(base, 'commands'));
+  const plugin = path.join(base, 'plugins', 'cybertron.js');
+  const runtime = path.join(base, 'cybertron-runtime', 'cybertron', 'plugin_cli.py');
   const config = path.join(base, 'opencode.jsonc');
   const expected = listMarkdown(payload.agents).length;
 
   console.log(`目标: ${base}`);
   console.log(`已安装角色: ${agents.length}（期望 ${expected}）`);
   console.log(`已安装命令: ${commands.length}`);
+  console.log(`运行时: ${existsSync(plugin) && existsSync(runtime) ? '存在' : '缺失'}`);
   console.log(`配置: ${existsSync(config) ? '存在' : '缺失'}`);
   console.log(`node: ${process.version}`);
 
   if (agents.length !== expected) {
     console.log('提示: 角色数量不符，运行 cybertron init --apply 重新安装。');
   }
-  if (agents.length !== expected || commands.length !== 1 || !existsSync(config)) {
+  if (agents.length !== expected || commands.length !== 1 || !existsSync(config)
+      || !existsSync(plugin) || !existsSync(runtime)) {
     process.exitCode = 1;
   }
 }

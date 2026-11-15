@@ -13,4 +13,4 @@
 
 ## 开发验收
 
-运行 `python3 -m unittest discover -s tests -v`、`python3 -m cybertron.stage5_verify` 和 `python3 cybertron_primes_engine.py`。修改角色权限后，重新生成根目录和测试目录的 OpenCode 配置，核查 Markdown 与 JSON 权限一致，再由开发者运行 `opencode2 debug config`。用户已决定不授权向外部模型发送项目文件，因此不运行只读 L2 探针。
+运行 `python3 -m unittest discover -s tests -v`、`python3 -m cybertron.stage5_verify` 和 `python3 cybertron_primes_engine.py`。修改角色权限后，重新生成根目录和测试目录的 OpenCode 配置，核查 Markdown 与 JSON 权限一致，再由开发者运行 `opencode2 debug config`。用户于 2026-11-15 明确允许阶段 E 向外部模型发送项目文件；真实软件接力只在临时项目验收。飞书写入、真机上电、物理烧录和远程部署仍分别遵守上述专项边界。
