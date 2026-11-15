@@ -6,7 +6,7 @@
 
 当前项目协作与权限基线见 [AGENTS.md](AGENTS.md)。普通角色不能直接执行测试、构建和静态检查 Shell 命令；软件测试由 Cybertron 宿主在 macOS 隔离运行器中执行。
 
-**当前状态（2026-11-15）**：后续 A–D 已完成；E 的 OpenCode 软件工作流已在临时项目中完成真实九步接力、L1/L2 审查和隔离 QA。纯软件任务会明确跳过物理烧录；硬件任务仍停在具体设备审批边界。`0.2.0` 为待发布候选版，公开 `0.1.1` 不包含 E。证据见[阶段 E 文档](docs/stages/E-opencode-orchestration.md)；发布状态见[安装与发布方案](docs/packaging-and-installation.md)。
+**当前状态（2026-11-15）**：后续 A–E 和十三角色模型编队已完成；OpenCode 软件工作流在临时项目中通过真实九步接力、L1/L2 审查和隔离 QA。纯软件任务明确跳过物理烧录；硬件任务仍受设备审批边界约束。`0.2.0` 已发布到 npm、PyPI 和 GitHub Release。证据见[阶段 E 文档](docs/stages/E-opencode-orchestration.md)与[发布验收记录](docs/stages/I-release-020.md)。
 
 各阶段的代码摘录、验收记录与后续实现建议见 [阶段文档目录](docs/stages/01-foundation.md)：[1](docs/stages/01-foundation.md) · [2](docs/stages/02-local-execution.md) · [3](docs/stages/03-opencode-config.md) · [4](docs/stages/04-opencode-executor.md) · [5](docs/stages/05-quality-gates.md) · [6](docs/stages/06-feishu.md) · [7](docs/stages/07-deployment.md)。参考资料新增 [Datawhale Hello Agents](https://datawhalechina.github.io/hello-agents/#/)。
 
@@ -44,9 +44,9 @@ python3 -m cybertron.opencode_run "请澄清 STM32F4 电机控制任务还缺少
 
 ## 安装到 OpenCode
 
-三条安装路径共享同一份 payload（13 个角色、可选 `/cybertron` 命令、OpenCode 插件和 Python 运行时），默认 dry-run，`--apply` 才写入。**公开已发布版本仍为 0.1.1，不包含 E；本分支的 0.2.0 尚待发布。**
+三条安装路径共享同一份 payload（13 个角色、可选 `/cybertron` 命令、OpenCode 插件和 Python 运行时），默认 dry-run，`--apply` 才写入。公开版本为 **0.2.0**。
 
-在发布前，可从本源码分支安装候选版并试用：
+可从本源码分支安装，也可使用[三种公开安装方式](docs/packaging-and-installation.md)：
 
 ```bash
 # 从源码分支安装到当前项目
@@ -64,7 +64,7 @@ python3 -m cybertron.installer init --apply --global
 
 安装后在目标项目运行 `opencode2 debug agents`，确认 13 个 Cybertron 角色加载。OpenCode 仍保持原有 Build/Plan 默认行为；用 **Shift+Tab** 选到 `prima`，直接输入自然语言软件需求即可自动创建 run 并接力。也可在 Build 模式输入 `/cybertron <需求>`，命令会选用 `prima` 并触发同一插件工作流。插件使用本机 Python 3.9+；`cybertron doctor` 只做本地检查。
 
-### 配置十三角色模型编队（本地 `0.2.0` 候选版）
+### 配置十三角色模型编队（`0.2.0`）
 
 安装后运行 `cybertron models setup`。默认配置当前用户的全局编队；再次运行同一命令，可以只修改一个角色、调整三档模型，或全部改为同一模型。`cybertron models show` 查看当前生效映射，`cybertron models doctor` 核对 OpenCode 实际加载的角色，`cybertron models rollback` 恢复上一份配置。`--project /path/to/project` 可为公司项目设置独立的完整十三角色编队，覆盖私人全局配置。配置只保存模型 ID，不保存 API Key。
 
@@ -94,7 +94,7 @@ python3 -m cybertron.installer workflow run <run_id> --project . --host fake
 
 `fake` 仅模拟九步与证据，不能作为真实开发完成的证明。`workflow resume <run_id>` 只恢复账本，不重放宿主调用。手动真实调用使用 `--host opencode --allow-external-model`；在 OpenCode 内通过插件调用时，模型调用由用户选择 `prima` 或 `/cybertron` 触发。详情见[阶段 E 记录](docs/stages/E-opencode-orchestration.md)。
 
-详见[安装与发布方案](docs/packaging-and-installation.md)。`v0.1.1` 的 tag 与 Release 见 [GitHub Release v0.1.1](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.1.1)。
+详见[安装与发布方案](docs/packaging-and-installation.md)和 [GitHub Release v0.2.0](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.2.0)。
 
 ## 飞书知识库（可选）
 

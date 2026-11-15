@@ -2,7 +2,7 @@
 
 七阶段最小闭环后的运行态持久化、安装发布与双宿主后续工作，见 [`docs/handoffs/2026-11-14-runtime-architecture.md`](docs/handoffs/2026-11-14-runtime-architecture.md)。该文件的 A–G 阶段是后续实施计划，不改变下表的历史验收状态。
 
-后续实施阶段 A（配置与安装基线）已完成本地离线开发验收，记录见 [`docs/stages/A-installation-baseline.md`](docs/stages/A-installation-baseline.md)。改动尚未发布到 npm/PyPI/GitHub Release；现有 `0.1.1` 公共包不包含这些修复。阶段 5 的隔离验收已在本轮恢复通过。
+后续实施阶段 A（配置与安装基线）已完成本地离线开发验收，记录见 [`docs/stages/A-installation-baseline.md`](docs/stages/A-installation-baseline.md)。改动已随 `0.2.0` 发布到 npm、PyPI 和 GitHub Release。阶段 5 的隔离验收已在本轮恢复通过。
 
 后续实施阶段 B（离线 RunStore）已完成本地开发验收，记录见 [`docs/stages/B-runstore.md`](docs/stages/B-runstore.md)。`cybertron run create/show/verify/resume` 仅管理本地状态，`resume` 不会调用模型或重新执行工具。
 
@@ -10,9 +10,9 @@
 
 后续实施阶段 D（证据来源与审批围栏）已完成本地离线开发验收，记录见 [`docs/stages/D-evidence-approval.md`](docs/stages/D-evidence-approval.md)。模型文字及未验证来源不能通过 L1/L2/测试门禁；有副作用操作必须绑定具体计划和宿主核验回执。真实宿主审批与执行仍待阶段 E 接入。
 
-后续实施阶段 E 已完成 OpenCode **软件路径**的本地开发与真实宿主验收，记录见 [`docs/stages/E-opencode-orchestration.md`](docs/stages/E-opencode-orchestration.md)。在临时项目中，`prima` 自然语言与 Build 模式下的 `/cybertron` 均触发持久化 run；九步软件流程含 12 次真实角色派单、L1/L2 宿主审查回执、隔离 QA 与明确的无硬件跳过。硬件路径的物理执行仍受独立审批约束，`0.2.0` 待发布。
+后续实施阶段 E 已完成 OpenCode **软件路径**的本地开发与真实宿主验收，记录见 [`docs/stages/E-opencode-orchestration.md`](docs/stages/E-opencode-orchestration.md)。在临时项目中，`prima` 自然语言与 Build 模式下的 `/cybertron` 均触发持久化 run；九步软件流程含 12 次真实角色派单、L1/L2 宿主审查回执、隔离 QA 与明确的无硬件跳过。硬件路径的物理执行仍受独立审批约束；`0.2.0` 已发布。
 
-模型配置与混合编队的[产品方案](docs/plans/model-configuration-product-spec.md)已获用户审核，并在本地 `0.2.0` 候选版实现。支持公司单 Key 多模型、私人多厂商混编、已有 OpenCode 认证复用、十三角色映射、重复切换与回滚。验收记录见[模型配置阶段](docs/stages/H-model-configuration.md)；公开 `0.1.1` 尚不包含这些功能。
+模型配置与混合编队的[产品方案](docs/plans/model-configuration-product-spec.md)已获用户审核，并随 `0.2.0` 发布。支持公司单 Key 多模型、私人多厂商混编、已有 OpenCode 认证复用、十三角色映射、重复切换与回滚。验收记录见[模型配置阶段](docs/stages/H-model-configuration.md)；渠道核验见[发布验收记录](docs/stages/I-release-020.md)。
 
 开发节奏：每次只交付一个阶段的代码和测试命令；开发者在终端验收并反馈结果后，再开始下一阶段。这里的七个开发阶段与引擎内部九步 SDLC 流程是两种不同的划分。
 

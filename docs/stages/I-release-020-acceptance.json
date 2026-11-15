@@ -1,0 +1,26 @@
+{
+  "stage": "I-release-0.2.0",
+  "date": "2026-11-15",
+  "source_commit": "e031548f3794ca8c14cbb865896eb0829b402474",
+  "github_release": "https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.2.0",
+  "npm": {
+    "version": "0.2.0",
+    "tarball_sha1": "165b38b1a9bf9ff351d132205ac3df08ad587378",
+    "tarball_sha256": "b1db6c36e5a248bbc70eceda96dfe8f1aff8fd309c154b40f2e9ef00d1cbd492",
+    "public_install_cli_version": "0.2.0"
+  },
+  "pypi": {
+    "version": "0.2.0",
+    "wheel_sha256": "c44654c2e736b19fc630386f008801f294eebae47bbc5b592364e63278b40fb5",
+    "sdist_sha256": "dbe7339e34bcf780084a636c99288031e0976d7e9682dba69e6bdfc784eac3c7",
+    "public_wheel_cli_version": "0.2.0",
+    "wheel_code_and_resources_equal_github_asset": true,
+    "sdist_file_contents_equal_github_asset": true
+  },
+  "github_install_sh_sha256": "82dced736623431df720072ca23ba0f2fc2dfc14d8bc95f617dd69907cb5f7b2",
+  "branch_ci": "success",
+  "main_ci": "success",
+  "local_unit_tests": 112,
+  "local_stage5_sandbox": "completed",
+  "company_gateway_verified": false
+}

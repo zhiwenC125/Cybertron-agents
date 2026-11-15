@@ -2,7 +2,7 @@
 
 日期：2026-11-15
 
-状态：**用户已审核；本地 `0.2.0` 候选版已实现。公开 `0.1.1` 尚无这些入口。**
+状态：**用户已审核；已在公开 `0.2.0` 实现并发布。**
 
 依据：[当前开发计划](../../DEVELOPMENT_PLAN.md)、[阶段 E 验收](../stages/E-opencode-orchestration.md)、[项目安全基线](../../AGENTS.md)。
 
@@ -83,7 +83,7 @@
 5. 错误路径：缺少账号、选中模型未登记或下线、能力检查失败、限流、无权限、配置文件损坏、项目覆盖全局、升级冲突，均给出明确状态且不留下半配置。只需登记实际选用的模型；38 个模型尚未全部登记时给出目录不完整提示，不阻止已登记模型的使用。
 6. 三种安装路径在干净临时项目做 dry-run、apply、重复安装、升级、回滚与 `doctor`；核对权限导出一致、Markdown/JSON 实际模型一致、`opencode2 debug config` 和 `debug agents` 加载结果一致。
 7. 在获授权的临时项目完成一次真实软件九步流程，记录各角色实际模型、L1/L2 宿主证据、隔离测试回执、重放校验。无需调用公司真实 Key 完成本地自动化测试；公司环境的在线连通性由用户在公司机器上执行。
-8. 运行项目既有验收：`python3 -m unittest discover -s tests -v`、`python3 -m cybertron.stage5_verify`、`python3 cybertron_primes_engine.py`。每个实施小阶段沉淀文档并提交；全部验收后再准备新版本的 npm、Python 包和固定 GitHub 归档。公开 `0.1.1` 不包含本文入口；本地 `0.2.0` 候选版已包含。
+8. 运行项目既有验收：`python3 -m unittest discover -s tests -v`、`python3 -m cybertron.stage5_verify`、`python3 cybertron_primes_engine.py`。每个实施小阶段沉淀文档并提交；`0.2.0` 已经完成 npm、PyPI 与固定 GitHub 归档发布，验收见[发布记录](../stages/I-release-020.md)。
 
 ## 6. 审核要点
 
