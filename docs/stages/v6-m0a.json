@@ -1,7 +1,7 @@
 {
   "milestone": "M0a",
   "status": "passed",
-  "commit": null,
+  "commit": "f4d2398bc8053f4cbc34f3b937c1ce4e0fc418a1",
   "required_gates": [
     "unit_tests_all_green"
   ],
