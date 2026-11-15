@@ -344,6 +344,9 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser = sub.add_parser("run", help="离线任务账本：create/show/verify/resume")
     run_parser.add_argument("run_args", nargs=argparse.REMAINDER)
 
+    session_parser = sub.add_parser("session", help="会话名称与多个 run 的管理")
+    session_parser.add_argument("session_args", nargs=argparse.REMAINDER)
+
     return parser
 
 
@@ -357,6 +360,9 @@ def main(argv=None) -> int:
     if args.command == "run":
         from .run_cli import main as run_main
         return run_main(args.run_args)
+    if args.command == "session":
+        from .session_cli import main as session_main
+        return session_main(args.session_args)
     parser.print_help()
     return 0
 

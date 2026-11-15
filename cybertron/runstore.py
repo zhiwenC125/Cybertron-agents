@@ -132,6 +132,8 @@ class RunStore:
             raise RunStoreError("No runs exist in this workspace")
         found = []
         for session in self.root.iterdir():
+            if session.name.startswith("."):
+                continue
             if session.is_symlink() or not session.is_dir():
                 raise RunCorrupt("Unsafe session directory")
             self._id(session.name)
@@ -220,12 +222,29 @@ class RunStore:
             "ledger": data,
         }
 
-    def create(self, request: str) -> dict:
+    def create(self, request: str, session_id: str | None = None) -> dict:
         if not request.strip():
             raise ValueError("A nonempty request is required")
         if self.root.is_symlink():
             raise RunCorrupt("Unsafe sessions directory")
-        session_id, run_id = str(uuid.uuid4()), str(uuid.uuid4())
+        existing_session = session_id is not None
+        if existing_session:
+            self._id(session_id)
+            session_dir = self.root / session_id
+            if session_dir.is_symlink() or not session_dir.is_dir():
+                raise RunStoreError("Session not found or unsafe")
+            session_file = self._safe_file(session_dir / "session.json")
+            try:
+                session_data = json.loads(session_file.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RunCorrupt("Session metadata is unreadable") from exc
+            if session_data.get("session_id") != session_id or session_data.get("schema_version") != SCHEMA_VERSION:
+                raise RunCorrupt("Session metadata identity or schema is invalid")
+            if session_data.get("archived"):
+                raise RunStoreError("Archived session cannot receive new runs")
+        else:
+            session_id = str(uuid.uuid4())
+        run_id = str(uuid.uuid4())
         directory = self.root / session_id / "runs" / run_id
         directory.mkdir(parents=True, exist_ok=False)
         metadata = {
@@ -237,12 +256,13 @@ class RunStore:
             "config_sha256": self._config_digest(),
             "runtime_sha256": self._runtime_digest(),
         }
-        self._atomic_json(directory.parent.parent / "session.json", {
-            "schema_version": SCHEMA_VERSION,
-            "session_id": session_id,
-            "created_at_utc": metadata["created_at_utc"],
-            "workspace": str(self.workspace),
-        })
+        if not existing_session:
+            self._atomic_json(directory.parent.parent / "session.json", {
+                "schema_version": SCHEMA_VERSION,
+                "session_id": session_id,
+                "created_at_utc": metadata["created_at_utc"],
+                "workspace": str(self.workspace),
+            })
         self._atomic_json(directory / "run.json", metadata)
         ledger = PrimaPlanOrchestrator().create_full_sdlc_hardware_ledger(request)
         event = self._event(metadata, 1, "run.created", ledger)

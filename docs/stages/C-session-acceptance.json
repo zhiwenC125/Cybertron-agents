@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "stage": "C",
+  "recorded_at_utc": "2026-11-15T01:18:45.973420+00:00",
+  "base_commit": "f834ad438af5a63511e3277dc4ef7ac79e5bd15c",
+  "tests": [
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-q"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c2b7721b379e7fb0e977de006297309dfe6f411d27765be9bc1f83e65520379f",
+      "summary": "----------------------------------------------------------------------\nRan 81 tests in 2.486s\n\nOK",
+      "test_count": 81
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-m",
+        "cybertron.stage5_verify"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "aec1568bf1e18302f80d45155e17aabb1229be50605767ead268de342768afdb",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": "Isolation: {'scratch_write': 'allowed', 'project_write': 'blocked', 'device_read': 'blocked', 'network_connect': 'blocked'}\nQA: completed; ledger step 6: completed\nQA evidence: (QualityEvidence(kind=<QualityKind.TEST: 'test'>, passed=True, source='sandbox://sha256/8a529754da5e495a4af9999f2828f374e29bbb9187082f1b141ffcd00c6bf98e'),)"
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "cybertron_primes_engine.py"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "6a765936bd6248befc8aa162b8f6660f1da1ed944c0b8e96077a6451e8d87ff4",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": "on ===\n[PASS] 9-Step Software + Hardware Full-Lifecycle Ledger verified.\n[PASS] Dedicated Documentation & Feishu Wiki Steward (Alpha Trion) verified.\n[PASS] Dedicated Two-Tier Code Review (Micronus L1 + Liege Maximo L2) verified.\n[PASS] Hardware Deployment Separation verified: Nexus Prime (Cross-Compile=DENY until sandboxed, Flash=DENY) vs Megatronus (Physical Flash=ASK).\n[PASS] Exported 14 OpenCode V2 files & 1 DeepSeek Harness files to /Users/alanbanana/Cybertron-Agent/cybertron_workspace_dist"
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": ""
+    }
+  ],
+  "external_model_called": false,
+  "hardware_operation": false
+}
