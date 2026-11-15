@@ -23,14 +23,22 @@ class InstallerCliTest(unittest.TestCase):
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="cybertron-installer-"))
+        # Isolate the developer's global model profile; installers must match
+        # the checked-in bundle, which follows registry defaults.
+        self.config_home = self.tmp / "config-home"
+        self.config_home.mkdir()
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def env(self):
+        return {**os.environ, "XDG_CONFIG_HOME": str(self.config_home)}
 
     def run_cli(self, *args):
         return subprocess.run(
             [sys.executable, "-m", "cybertron.installer", *args],
             cwd=ROOT,
+            env=self.env(),
             capture_output=True,
             text=True,
         )
@@ -44,7 +52,7 @@ class InstallerCliTest(unittest.TestCase):
         if entry == "npm" and shutil.which("node") is None:
             self.skipTest("node is unavailable")
         return subprocess.run([*commands[entry], *args, "--project", str(self.tmp)],
-                              cwd=ROOT, capture_output=True, text=True)
+                              cwd=ROOT, env=self.env(), capture_output=True, text=True)
 
     def test_dry_run_does_not_write(self):
         result = self.run_cli("init", "--dry-run", "--project", str(self.tmp))
@@ -112,11 +120,11 @@ class InstallerCliTest(unittest.TestCase):
                     if entry == "shell":
                         doctor = subprocess.run(["bash", str(ROOT / "install.sh"), *doctor_args,
                                                  "--project", str(project)], cwd=ROOT,
-                                                capture_output=True, text=True)
+                                                env=self.env(), capture_output=True, text=True)
                     elif entry == "npm":
                         doctor = subprocess.run(["node", str(ROOT / "bin/cybertron.mjs"),
                                                  *doctor_args, "--project", str(project)], cwd=ROOT,
-                                                capture_output=True, text=True)
+                                                env=self.env(), capture_output=True, text=True)
                     else:
                         doctor = self.run_cli(*doctor_args, "--project", str(project))
                     self.assertEqual(doctor.returncode, 0, doctor.stderr)
