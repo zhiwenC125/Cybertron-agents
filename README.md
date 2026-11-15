@@ -44,7 +44,7 @@ python3 -m cybertron.opencode_run "请澄清 STM32F4 电机控制任务还缺少
 
 ## 安装到 OpenCode
 
-三条安装路径共享同一份 payload（13 个角色、可选 `/cybertron` 命令、OpenCode 插件和 Python 运行时），默认 dry-run，`--apply` 才写入。本轮发布版本为 **0.2.1**。
+三条安装路径共享同一份 payload（13 个角色、可选 `/cybertron` 命令、OpenCode 插件和 Python 运行时），默认 dry-run，`--apply` 才写入。公开版本为 **0.2.1**。
 
 可从本源码分支安装，也可使用[三种公开安装方式](docs/packaging-and-installation.md)：
 
@@ -94,7 +94,7 @@ python3 -m cybertron.installer workflow run <run_id> --project . --host fake
 
 `fake` 仅模拟九步与证据，不能作为真实开发完成的证明。`workflow resume <run_id>` 只恢复账本，不重放宿主调用。手动真实调用使用 `--host opencode --allow-external-model`；在 OpenCode 内通过插件调用时，模型调用由用户选择 `prima` 或 `/cybertron` 触发。详情见[阶段 E 记录](docs/stages/E-opencode-orchestration.md)。
 
-详见[安装与发布方案](docs/packaging-and-installation.md)和 [GitHub Release v0.2.1](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.2.1)。
+详见[安装与发布方案](docs/packaging-and-installation.md)、[GitHub Release v0.2.1](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.2.1)和[发布验收记录](docs/stages/I-release-021.md)。
 
 ## 飞书知识库（可选）
 
