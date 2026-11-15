@@ -347,6 +347,9 @@ def build_parser() -> argparse.ArgumentParser:
     session_parser = sub.add_parser("session", help="会话名称与多个 run 的管理")
     session_parser.add_argument("session_args", nargs=argparse.REMAINDER)
 
+    workflow_parser = sub.add_parser("workflow", help="可恢复的宿主外层接力")
+    workflow_parser.add_argument("workflow_args", nargs=argparse.REMAINDER)
+
     return parser
 
 
@@ -363,6 +366,9 @@ def main(argv=None) -> int:
     if args.command == "session":
         from .session_cli import main as session_main
         return session_main(args.session_args)
+    if args.command == "workflow":
+        from .workflow_cli import main as workflow_main
+        return workflow_main(args.workflow_args)
     parser.print_help()
     return 0
 

@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "stage": "E-offline-slice",
+  "recorded_at_utc": "2026-11-15T02:56:46.616551+00:00",
+  "base_commit": "51a6452c51a7be0222b213c8e79bb0747cf82a0e",
+  "tests": [
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-q"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "ad30f3c52962bdaec51c52face0d89bcf1ce6f838a5cbe7daa528d6a4b6a7474",
+      "summary": "----------------------------------------------------------------------\nRan 97 tests in 3.641s\n\nOK",
+      "test_count": 97
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-m",
+        "cybertron.stage5_verify"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "835dc1a7ee2abcdef1c567fd744ac1b94aab5486c6e1903370cc21052c803182",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": " 'test'>, passed=True, source='sandbox://sha256/559f5045f5c2b6d78369d0c15c6a16083dbbb7839445761a6311b95882ed1247', source_type=<EvidenceSource.SANDBOX: 'sandbox'>, command_or_tool='python -m unittest discover -s tests -q', exit_code=0, observed_at_utc='2026-11-15T02:56:46.501931+00:00', output_sha256='559f5045f5c2b6d78369d0c15c6a16083dbbb7839445761a6311b95882ed1247', verified_by='MacOSSandboxRunner', reference='sandbox://sha256/559f5045f5c2b6d78369d0c15c6a16083dbbb7839445761a6311b95882ed1247'),)"
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "cybertron_primes_engine.py"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "6a765936bd6248befc8aa162b8f6660f1da1ed944c0b8e96077a6451e8d87ff4",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": "on ===\n[PASS] 9-Step Software + Hardware Full-Lifecycle Ledger verified.\n[PASS] Dedicated Documentation & Feishu Wiki Steward (Alpha Trion) verified.\n[PASS] Dedicated Two-Tier Code Review (Micronus L1 + Liege Maximo L2) verified.\n[PASS] Hardware Deployment Separation verified: Nexus Prime (Cross-Compile=DENY until sandboxed, Flash=DENY) vs Megatronus (Physical Flash=ASK).\n[PASS] Exported 14 OpenCode V2 files & 1 DeepSeek Harness files to /Users/alanbanana/Cybertron-Agent/cybertron_workspace_dist"
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-m",
+        "cybertron.installer",
+        "workflow",
+        "doctor",
+        "--project",
+        "."
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "409f256174efb1f5604a2d96d2a31ced0fb610d71a4a9770b05ce7cbfcff2fe4",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": "{\n  \"config_valid\": true,\n  \"errors\": [],\n  \"external_model_called\": false\n}"
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": ""
+    }
+  ],
+  "external_model_called": false,
+  "opencode_plugin_load_verified": false,
+  "real_nine_stage_run_verified": false,
+  "hardware_operation": false
+}

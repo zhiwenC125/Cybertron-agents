@@ -14,6 +14,17 @@ class PrimaDispatcher:
         self.agent_ids = {agent.agent_id for agent in THIRTEEN_PRIMES_REGISTRY}
 
     def run_next(self, ledger: CybertronTaskLedger) -> AgentResult | None:
+        task = self.prepare_task(ledger)
+        if task is None:
+            return None
+        try:
+            result = self.executor.execute(task)
+        except Exception as exc:
+            ledger.block_step(task.step_id, f"Executor error: {exc}")
+            raise
+        return self.apply_result(ledger, task, result)
+
+    def prepare_task(self, ledger: CybertronTaskLedger) -> AgentTask | None:
         step = ledger.next_step()
         if step is None:
             return None
@@ -43,12 +54,14 @@ class PrimaDispatcher:
             ) + tuple(step.evidence),
         )
         ledger.turn_count += 1
-        try:
-            result = self.executor.execute(task)
-        except Exception as exc:
-            ledger.block_step(step.step_id, f"Executor error: {exc}")
-            raise
+        return task
 
+    def apply_result(self, ledger: CybertronTaskLedger, task: AgentTask,
+                     result: AgentResult) -> AgentResult:
+        step = ledger.next_step()
+        if step is None or step.step_id != task.step_id or step.status != "in_progress":
+            raise ValueError("Result does not match an active ledger stage")
+        agent_id = task.agent_id
         if result.step_id != task.step_id or result.agent_id != task.agent_id:
             ledger.block_step(step.step_id, "Executor returned a result for a different task")
             raise ValueError("Executor returned a result for a different task")

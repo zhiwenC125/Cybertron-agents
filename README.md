@@ -6,7 +6,7 @@
 
 当前项目协作与权限基线见 [AGENTS.md](AGENTS.md)。普通角色的测试、构建和静态检查 Shell 权限暂时关闭；阶段 5 的本地隔离运行器尚未接入 OpenCode 角色工具调用。
 
-**当前状态（2026-11-14）**：七阶段的最小闭环基线已达到。阶段 7 的 STM32 最小 App 已经人工批准真机烧录、读回、观察 SRAM 心跳并恢复原固件；完整 OTA App、ESP32-S3、九步自动接力和宿主审批接口仍在开发。证据见[阶段 7 文档](docs/stages/07-deployment.md)。在其他电脑使用或规划一条命令安装，请先看[安装与发布方案](docs/packaging-and-installation.md)。
+**当前状态（2026-11-15）**：七阶段的最小闭环基线已达到。后续 A–D 已完成本地离线验收；E 的持久化九步外层编排通过假宿主验收，真实 OpenCode 全角色接力仍在开发。阶段 7 的 STM32 最小 App 已经人工批准真机烧录、读回、观察 SRAM 心跳并恢复原固件；完整 OTA App、ESP32-S3 和宿主审批接口仍在开发。证据见[阶段 7 文档](docs/stages/07-deployment.md)和[阶段 E 文档](docs/stages/E-opencode-orchestration.md)。在其他电脑使用或规划一条命令安装，请先看[安装与发布方案](docs/packaging-and-installation.md)。
 
 各阶段的代码摘录、验收记录与后续实现建议见 [阶段文档目录](docs/stages/01-foundation.md)：[1](docs/stages/01-foundation.md) · [2](docs/stages/02-local-execution.md) · [3](docs/stages/03-opencode-config.md) · [4](docs/stages/04-opencode-executor.md) · [5](docs/stages/05-quality-gates.md) · [6](docs/stages/06-feishu.md) · [7](docs/stages/07-deployment.md)。参考资料新增 [Datawhale Hello Agents](https://datawhalechina.github.io/hello-agents/#/)。
 
@@ -71,6 +71,17 @@ bash install.sh --apply --project .
 
 装完在 OpenCode 里：`opencode2 debug agents` 确认 13 个角色；`opencode` 默认 `prima`，`Tab` / `Shift+Tab` 切换。当前 `/cybertron <需求>` 是提示词入口，尚未连接完整 Python 九步编排；此连接属于后续阶段 E。`cybertron doctor` 只做本地检查，不会联网下载。
 
+源码分支现在可离线创建并检查持久化 run：
+
+```bash
+python3 -m cybertron.installer workflow doctor --project .
+python3 -m cybertron.installer workflow create "开发示例功能" --project .
+python3 -m cybertron.installer workflow status <上一步的 run_id> --project .
+python3 -m cybertron.installer workflow run <run_id> --project . --host fake
+```
+
+`fake` 仅模拟九步与证据，默认停在硬件审批前，不能作为真实开发完成的证明。`workflow resume <run_id>` 只恢复账本，不重放宿主调用。`--host opencode-readonly` 只支持少数只读角色，真实调用还要求显式传入 `--allow-external-model`；当前没有执行该调用。`/cybertron` 不会自动创建 run。详情见[阶段 E 记录](docs/stages/E-opencode-orchestration.md)。
+
 详见[安装与发布方案](docs/packaging-and-installation.md)。`v0.1.1` 的 tag 与 Release 见 [GitHub Release v0.1.1](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.1.1)。
 
 ## 飞书知识库（可选）
@@ -96,6 +107,8 @@ bash install.sh --apply --project .
 | `ledger.py` | SDLC 计划和顺序状态转换 |
 | `execution.py` | 宿主无关的任务、结果和执行器协议 |
 | `dispatch.py` | 派单、结果校验和账本推进 |
+| `runstore.py` / `orchestrator.py` | 持久化 run、外层派单及中断恢复 |
+| `hosts.py` / `workflow_cli.py` | 假宿主、受限 OpenCode 适配及本地工作流命令 |
 | `simulation.py` | 不产生外部副作用的本地模拟执行器 |
 | `isolated_runner.py` | macOS 沙箱内运行单元测试并生成 QA 证据 |
 | `deployment.py` | 第七阶段固件、设备、擦写与回滚契约及无硬件仿真 |

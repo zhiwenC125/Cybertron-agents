@@ -356,6 +356,12 @@ class RunStore:
         _, ledger = self._replay(directory, metadata)
         return ledger
 
+    def events(self, run_id: str) -> list[dict]:
+        """Return validated Cybertron events without host transcript contents."""
+        directory, metadata = self._locate(run_id)
+        self._replay(directory, metadata)
+        return [json.loads(line) for line in (directory / "events.jsonl").read_text().splitlines()]
+
     def verify(self, run_id: str) -> dict:
         result = self.show(run_id)
         if result["snapshot"] in ("ahead", "unsupported"):
@@ -385,7 +391,7 @@ class RunStore:
     def transition(self, run_id: str, event_type: str,
                    mutate: Callable[[CybertronTaskLedger], None], *, stage_id: int | None = None,
                    dispatch_id: str | None = None, attempt_id: str | None = None,
-                   payload: dict | None = None) -> dict:
+                   payload: dict | None = None, expected_seq: int | None = None) -> dict:
         directory, metadata = self._locate(run_id)
         with self._writer(directory):
             if metadata["config_sha256"] != self._config_digest():
@@ -393,6 +399,8 @@ class RunStore:
             if metadata["runtime_sha256"] != self._runtime_digest() or metadata["workspace"] != str(self.workspace):
                 raise ConfigChanged("Runtime or workspace changed since this run was created")
             seq, ledger = self._replay(directory, metadata)
+            if expected_seq is not None and seq != expected_seq:
+                raise RunLocked("Run advanced before this transition")
             mutate(ledger)
             event = self._event(metadata, seq + 1, event_type, ledger,
                                 stage_id=stage_id, dispatch_id=dispatch_id,

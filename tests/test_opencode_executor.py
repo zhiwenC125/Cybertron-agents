@@ -77,6 +77,22 @@ class OpenCodeExecutorTests(unittest.TestCase):
                                         runner=runner).execute(task)
             self.assertEqual(result.status, ResultStatus.COMPLETED)
 
+    def test_host_session_and_turn_are_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "opencode.jsonc").write_text("{}")
+
+            def runner(command, **kwargs):
+                self.assertEqual(command[command.index("--session") + 1], "ses_test")
+                event = {"type": "text", "part": {"messageID": "msg_test", "text": json.dumps({
+                    "status": "completed", "summary": "done", "evidence": ["local://read"]})}}
+                return subprocess.CompletedProcess(command, 0, json.dumps(event), "")
+
+            executor = OpenCodeV2Executor(root, host_session_id="ses_test", runner=runner)
+            result = executor.execute(AgentTask(1, "thirteenth", "question", "clarify", "input", "output"))
+            self.assertEqual(result.status, ResultStatus.COMPLETED)
+            self.assertEqual(executor.last_host_turn_id, "msg_test")
+
     def test_provider_limit_is_reported_without_raw_event_dump(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

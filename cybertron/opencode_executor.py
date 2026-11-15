@@ -14,11 +14,14 @@ class OpenCodeV2Executor:
     def __init__(self, workspace: Path, *, binary: str = "opencode2",
                  timeout_seconds: int = 120,
                  model_override: str | None = None,
+                 host_session_id: str | None = None,
                  runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run) -> None:
         self.workspace = workspace
         self.binary = binary
         self.timeout_seconds = timeout_seconds
         self.model_override = model_override
+        self.host_session_id = host_session_id
+        self.last_host_turn_id: str | None = None
         self.runner = runner
 
     def execute(self, task: AgentTask) -> AgentResult:
@@ -47,6 +50,8 @@ class OpenCodeV2Executor:
                    f"\n输入约定：{task.input_artifact}\n已有证据：{list(task.prior_evidence)}")
         command = [self.binary, "run", "--standalone", "--archived", "--agent",
                    task.agent_id, "--format", "json"]
+        if self.host_session_id:
+            command.extend(["--session", self.host_session_id])
         if self.model_override:
             command.extend(["--model", self.model_override])
         command.append(prompt)
@@ -70,6 +75,9 @@ class OpenCodeV2Executor:
             if event.get("type") == "error":
                 return self._blocked(task, "OpenCode emitted an error event")
             if event.get("type") == "text":
+                candidate = event.get("messageID") or event.get("part", {}).get("messageID")
+                if isinstance(candidate, str) and candidate:
+                    self.last_host_turn_id = candidate
                 value = event.get("part", {}).get("text")
                 if isinstance(value, str):
                     texts.append(value)
