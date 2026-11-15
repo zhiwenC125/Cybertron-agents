@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "stage": "D",
+  "recorded_at_utc": "2026-11-15T02:06:09.956766+00:00",
+  "base_commit": "f0781611fdcae457ae86947a3bb5f19f1b224d52",
+  "tests": [
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-q"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "9578ec987bab4228fec6f967dc5ae5ebf545cae23f7e192eb719836d97dafde6",
+      "summary": "----------------------------------------------------------------------\nRan 88 tests in 2.511s\n\nOK",
+      "test_count": 88
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-m",
+        "cybertron.stage5_verify"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "f8e34c20099cb027bd4ed980132bab407a2ca0e2260d2d7d833dc4e6c3f1cb23",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": " 'test'>, passed=True, source='sandbox://sha256/c4f80806cd3a963b1345a66d678dea3357374a0c169be27ce3b77e8fae45311e', source_type=<EvidenceSource.SANDBOX: 'sandbox'>, command_or_tool='python -m unittest discover -s tests -q', exit_code=0, observed_at_utc='2026-11-15T02:06:09.893304+00:00', output_sha256='c4f80806cd3a963b1345a66d678dea3357374a0c169be27ce3b77e8fae45311e', verified_by='MacOSSandboxRunner', reference='sandbox://sha256/c4f80806cd3a963b1345a66d678dea3357374a0c169be27ce3b77e8fae45311e'),)"
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "cybertron_primes_engine.py"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "6a765936bd6248befc8aa162b8f6660f1da1ed944c0b8e96077a6451e8d87ff4",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": "on ===\n[PASS] 9-Step Software + Hardware Full-Lifecycle Ledger verified.\n[PASS] Dedicated Documentation & Feishu Wiki Steward (Alpha Trion) verified.\n[PASS] Dedicated Two-Tier Code Review (Micronus L1 + Liege Maximo L2) verified.\n[PASS] Hardware Deployment Separation verified: Nexus Prime (Cross-Compile=DENY until sandboxed, Flash=DENY) vs Megatronus (Physical Flash=ASK).\n[PASS] Exported 14 OpenCode V2 files & 1 DeepSeek Harness files to /Users/alanbanana/Cybertron-Agent/cybertron_workspace_dist"
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": ""
+    }
+  ],
+  "external_model_called": false,
+  "hardware_operation": false,
+  "approval_receipts": "fake-host-verifier-only"
+}

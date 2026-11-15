@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 
 from .dispatch import PrimaDispatcher
-from .execution import AgentResult, AgentTask, QualityEvidence, QualityKind, ResultStatus
+from .execution import AgentResult, AgentTask, EvidenceSource, QualityEvidence, QualityKind, ResultStatus
 from .ledger import PrimaPlanOrchestrator
 
 
@@ -35,7 +35,8 @@ class SimulationExecutor:
             task.step_id, task.agent_id, ResultStatus.COMPLETED,
             f"模拟完成：{task.objective}" + (f"；已处理反馈：{task.feedback}" if task.feedback else ""),
             evidence=(f"simulation://step/{task.step_id}/{task.agent_id}",),
-            quality_evidence=(QualityEvidence(gate_kind, True, "simulation-only"),)
+            quality_evidence=(QualityEvidence(gate_kind, True, "simulation-only",
+                                              source_type=EvidenceSource.SIMULATION),)
             if gate_kind else (),
         )
 
@@ -51,7 +52,7 @@ def main() -> None:
     dispatcher = PrimaDispatcher(SimulationExecutor(
         simulate_hardware_approval=args.simulate_hardware_approval,
         reject_review_once=args.reject_review_once,
-    ))
+    ), allow_simulated_evidence=True)
     results = dispatcher.run_until_blocked(ledger)
     while results and results[-1].status == ResultStatus.REJECTED and ledger.next_step().status == "pending":
         results.extend(dispatcher.run_until_blocked(ledger))

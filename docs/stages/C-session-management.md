@@ -28,4 +28,4 @@ python3 -m cybertron.installer session archive drive-control --project .
 
 ## 下一阶段接口
 
-阶段 D 在稳定的 session/run/dispatch/attempt 标识上记录证据来源、审批对象和副作用生命周期；归档只控制新增 run，不替代审批。
+阶段 D 在稳定的 session/run/dispatch/attempt 标识上记录证据来源、审批对象和副作用生命周期；归档只控制新增 run，不替代审批。若阶段升级改变运行时代码摘要，旧 run 保持只读，直到提供显式兼容迁移。

@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
-from .execution import AgentResult, AgentTask, QualityEvidence, QualityKind, ResultStatus
+from .execution import AgentResult, AgentTask, EvidenceSource, QualityEvidence, QualityKind, ResultStatus
 
 
 class OpenCodeV2Executor:
@@ -102,7 +102,8 @@ class OpenCodeV2Executor:
                         or item.get("passed") is not True \
                         or not isinstance(item.get("source"), str) or not item["source"].strip():
                     return self._blocked(task, "L2 reply has invalid quality_evidence")
-                parsed.append(QualityEvidence(QualityKind.REVIEW_L2, True, item["source"]))
+                parsed.append(QualityEvidence(QualityKind.REVIEW_L2, True, item["source"],
+                                              source_type=EvidenceSource.MODEL))
             quality_evidence = tuple(parsed)
         return AgentResult(task.step_id, task.agent_id, status, summary,
                            evidence=tuple(evidence), quality_evidence=quality_evidence)

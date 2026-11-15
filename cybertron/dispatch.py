@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from .execution import AgentExecutor, AgentResult, AgentTask, QualityKind, ResultStatus
+from .execution import AgentExecutor, AgentResult, AgentTask, EvidenceSource, QualityKind, ResultStatus
 from .ledger import CybertronTaskLedger
 from .registry import THIRTEEN_PRIMES_REGISTRY
 
 
 class PrimaDispatcher:
-    def __init__(self, executor: AgentExecutor) -> None:
+    def __init__(self, executor: AgentExecutor, *, allow_simulated_evidence: bool = False) -> None:
         self.executor = executor
+        self.allow_simulated_evidence = allow_simulated_evidence
         self.agent_ids = {agent.agent_id for agent in THIRTEEN_PRIMES_REGISTRY}
 
     def run_next(self, ledger: CybertronTaskLedger) -> AgentResult | None:
@@ -63,8 +64,11 @@ class PrimaDispatcher:
                 "liege-maximo": QualityKind.REVIEW_L2,
                 "alchemist": QualityKind.TEST,
             }.get(agent_id)
+            verify_receipt = getattr(self.executor, "verify_evidence", None)
             if gate_kind is not None and not any(
-                item.kind == gate_kind and item.passed and item.source.strip()
+                item.kind == gate_kind and ((item.verified() and callable(verify_receipt)
+                    and verify_receipt(item)) or
+                    (self.allow_simulated_evidence and item.source_type == EvidenceSource.SIMULATION and item.passed))
                 for item in result.quality_evidence
             ):
                 ledger.block_step(step.step_id, f"Missing passing {gate_kind.value} evidence")

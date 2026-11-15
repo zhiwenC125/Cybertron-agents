@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterator
 
-from .execution import QualityEvidence, QualityKind
+from .execution import EvidenceSource, QualityEvidence, QualityKind
 from .ledger import CybertronTaskLedger, LedgerStep, PrimaPlanOrchestrator
 
 
@@ -77,8 +77,11 @@ def _decode_ledger(data: object) -> CybertronTaskLedger:
         try:
             decoded.append(LedgerStep(**{
                 **raw,
-                "quality_evidence": [QualityEvidence(QualityKind(item["kind"]),
-                                                     item["passed"], item["source"])
+                "quality_evidence": [QualityEvidence(**{
+                    **item,
+                    "kind": QualityKind(item["kind"]),
+                    "source_type": EvidenceSource(item.get("source_type", "unverified")),
+                })
                                      for item in evidence],
             }))
         except (KeyError, TypeError, ValueError) as exc:
@@ -218,6 +221,7 @@ class RunStore:
             "source": "cybertron",
             "type": event_type,
             "payload": payload or {},
+            "payload_sha256": _digest(payload or {}),
             "ledger_sha256": _digest(data),
             "ledger": data,
         }
@@ -298,6 +302,11 @@ class RunStore:
                 raise RunCorrupt(f"Event {seq} has duplicate or noncontiguous identity")
             if event.get("session_id") != metadata["session_id"] or event.get("run_id") != metadata["run_id"]:
                 raise RunCorrupt(f"Event {seq} belongs to another run")
+            if "payload_sha256" in event:
+                if event["payload_sha256"] != _digest(event.get("payload")):
+                    raise RunCorrupt(f"Event {seq} payload digest differs")
+            elif event["type"].startswith(("operation.", "approval.")):
+                raise RunCorrupt(f"Event {seq} side effect payload lacks a digest")
             seen.add(event["event_id"])
             if event.get("ledger_sha256") != _digest(event.get("ledger")):
                 raise RunCorrupt(f"Event {seq} ledger digest differs")

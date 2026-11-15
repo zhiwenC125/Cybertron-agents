@@ -6,7 +6,9 @@
 
 后续实施阶段 B（离线 RunStore）已完成本地开发验收，记录见 [`docs/stages/B-runstore.md`](docs/stages/B-runstore.md)。`cybertron run create/show/verify/resume` 仅管理本地状态，`resume` 不会调用模型或重新执行工具。
 
-后续实施阶段 C（session/slug 管理）已完成本地开发验收，记录见 [`docs/stages/C-session-management.md`](docs/stages/C-session-management.md)。同一 session 可含多个 run，旧 slug 保留为别名；下一步进入阶段 D 的证据来源与审批围栏。
+后续实施阶段 C（session/slug 管理）已完成本地开发验收，记录见 [`docs/stages/C-session-management.md`](docs/stages/C-session-management.md)。同一 session 可含多个 run，旧 slug 保留为别名。
+
+后续实施阶段 D（证据来源与审批围栏）已完成本地离线开发验收，记录见 [`docs/stages/D-evidence-approval.md`](docs/stages/D-evidence-approval.md)。模型文字及未验证来源不能通过 L1/L2/测试门禁；有副作用操作必须绑定具体计划和宿主核验回执。真实宿主审批与执行仍待阶段 E 接入。
 
 开发节奏：每次只交付一个阶段的代码和测试命令；开发者在终端验收并反馈结果后，再开始下一阶段。这里的七个开发阶段与引擎内部九步 SDLC 流程是两种不同的划分。
 

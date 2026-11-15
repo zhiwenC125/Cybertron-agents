@@ -1,14 +1,15 @@
 import unittest
+from datetime import datetime, timezone
 
 from cybertron import (AgentResult, PrimaDispatcher, PrimaPlanOrchestrator,
-                       QualityEvidence, QualityKind, ResultStatus)
+                       EvidenceSource, QualityEvidence, QualityKind, ResultStatus)
 from cybertron.simulation import SimulationExecutor
 
 
 class DispatchTests(unittest.TestCase):
     def test_simulation_stops_before_unapproved_hardware_step(self):
         ledger = PrimaPlanOrchestrator().create_full_sdlc_hardware_ledger("demo")
-        results = PrimaDispatcher(SimulationExecutor()).run_until_blocked(ledger)
+        results = PrimaDispatcher(SimulationExecutor(), allow_simulated_evidence=True).run_until_blocked(ledger)
         self.assertEqual(len(results), 11)
         self.assertEqual(results[-1].status, ResultStatus.NEEDS_APPROVAL)
         self.assertEqual(ledger.plan[7].status, "blocked")
@@ -23,7 +24,7 @@ class DispatchTests(unittest.TestCase):
         ledger = PrimaPlanOrchestrator().create_full_sdlc_hardware_ledger("demo")
         results = PrimaDispatcher(SimulationExecutor(
             simulate_hardware_approval=True,
-        )).run_until_blocked(ledger)
+        ), allow_simulated_evidence=True).run_until_blocked(ledger)
         self.assertEqual(len(results), 13)
         self.assertIsNone(ledger.next_step())
         self.assertEqual(ledger.plan[7].evidence, ["simulation://step/8/megatronus"])
@@ -60,12 +61,20 @@ class DispatchTests(unittest.TestCase):
                     "liege-maximo": QualityKind.REVIEW_L2,
                     "alchemist": QualityKind.TEST,
                 }
-                gate = (QualityEvidence(gate_kinds[task.agent_id], True, "test-report"),) \
+                gate = (QualityEvidence(
+                    gate_kinds[task.agent_id], True, "test-report",
+                    source_type=EvidenceSource.HOST, command_or_tool="fake-host-receipt",
+                    observed_at_utc=datetime.now(timezone.utc).isoformat(),
+                    output_sha256="a" * 64, verified_by="test-host",
+                ),) \
                     if task.agent_id in gate_kinds else ()
                 return AgentResult(task.step_id, task.agent_id,
                                    ResultStatus.COMPLETED, "passed",
                                    evidence=(f"proof:{task.agent_id}",),
                                    quality_evidence=gate)
+
+            def verify_evidence(self, evidence):
+                return evidence.source_type == EvidenceSource.HOST and evidence.verified()
 
         executor = RejectOnce()
         ledger = PrimaPlanOrchestrator().create_full_sdlc_hardware_ledger("demo")
@@ -96,11 +105,34 @@ class DispatchTests(unittest.TestCase):
             dispatcher.run_next(ledger)
         self.assertEqual(ledger.plan[4].status, "blocked")
 
+    def test_model_or_unverified_host_claim_cannot_pass_review(self):
+        for source_type in (EvidenceSource.MODEL, EvidenceSource.HOST):
+            with self.subTest(source_type=source_type):
+                class ClaimedPass:
+                    def execute(self, task):
+                        gate = (QualityEvidence(
+                            QualityKind.REVIEW_L1, True, "claimed-pass",
+                            source_type=source_type, command_or_tool="fake-review",
+                            observed_at_utc=datetime.now(timezone.utc).isoformat(),
+                            output_sha256="a" * 64, verified_by="model-claim",
+                        ),) if task.agent_id == "micronus-prime" else ()
+                        return AgentResult(task.step_id, task.agent_id,
+                                           ResultStatus.COMPLETED, "passed",
+                                           evidence=("model://claim",), quality_evidence=gate)
+
+                ledger = PrimaPlanOrchestrator().create_full_sdlc_hardware_ledger("demo")
+                dispatcher = PrimaDispatcher(ClaimedPass())
+                for _ in range(6):
+                    dispatcher.run_next(ledger)
+                with self.assertRaisesRegex(ValueError, "review_l1"):
+                    dispatcher.run_next(ledger)
+                self.assertEqual(ledger.plan[4].status, "blocked")
+
     def test_rejected_review_returns_to_coder_and_rechecks_both_levels(self):
         executor = SimulationExecutor(reject_review_once=True,
                                       simulate_hardware_approval=True)
         ledger = PrimaPlanOrchestrator().create_full_sdlc_hardware_ledger("demo")
-        dispatcher = PrimaDispatcher(executor)
+        dispatcher = PrimaDispatcher(executor, allow_simulated_evidence=True)
         first = dispatcher.run_until_blocked(ledger)
         self.assertEqual(first[-1].status, ResultStatus.REJECTED)
         self.assertEqual(ledger.next_step().step_id, 4)

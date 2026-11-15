@@ -7,11 +7,12 @@ import os
 import shutil
 import subprocess
 import tempfile
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
-from .execution import AgentResult, AgentTask, QualityEvidence, QualityKind, ResultStatus
+from .execution import AgentResult, AgentTask, EvidenceSource, QualityEvidence, QualityKind, ResultStatus
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,14 @@ class AlchemistTestExecutor:
     def __init__(self, runner: MacOSSandboxRunner, python_binary: str) -> None:
         self.runner = runner
         self.python_binary = python_binary
+        self._last_report: SandboxReport | None = None
+
+    def verify_evidence(self, evidence: QualityEvidence) -> bool:
+        report = self._last_report
+        return (report is not None and report.exit_code == 0 and not report.timed_out
+                and evidence.source_type == EvidenceSource.SANDBOX
+                and evidence.output_sha256 == report.digest
+                and evidence.source == f"sandbox://sha256/{report.digest}")
 
     def execute(self, task: AgentTask) -> AgentResult:
         if task.step_id != 6 or task.agent_id != "alchemist":
@@ -98,6 +107,7 @@ class AlchemistTestExecutor:
         report = self.runner.run([
             self.python_binary, "-m", "unittest", "discover", "-s", "tests", "-q",
         ])
+        self._last_report = report
         source = f"sandbox://sha256/{report.digest}"
         if report.timed_out or report.exit_code != 0:
             detail = (report.stderr or report.stdout).strip()[-500:]
@@ -106,5 +116,13 @@ class AlchemistTestExecutor:
         return AgentResult(
             task.step_id, task.agent_id, ResultStatus.COMPLETED,
             "Sandboxed unittest suite passed", evidence=(source,),
-            quality_evidence=(QualityEvidence(QualityKind.TEST, True, source),),
+            quality_evidence=(QualityEvidence(
+                QualityKind.TEST, True, source, source_type=EvidenceSource.SANDBOX,
+                command_or_tool="python -m unittest discover -s tests -q",
+                exit_code=report.exit_code,
+                observed_at_utc=datetime.now(timezone.utc).isoformat(),
+                output_sha256=report.digest,
+                verified_by="MacOSSandboxRunner",
+                reference=source,
+            ),),
         )
