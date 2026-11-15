@@ -1,0 +1,97 @@
+{
+  "source": "tool",
+  "cases": [
+    {
+      "run_id": "success",
+      "status": "completed",
+      "rejected_paths": [],
+      "events": [
+        {
+          "capability": "doc.write",
+          "node_id": "n1",
+          "role": "alpha-trion",
+          "type": "dispatch.started",
+          "utc": "2026-11-15T18:28:50.589115+00:00",
+          "write_scope": [
+            "notes.md"
+          ]
+        },
+        {
+          "artifacts": {
+            "notes.md": "b24d6d33736ecd5604a4b17bc9c6481039fac362bb7df044ef1c10a2bfd21db6"
+          },
+          "changed_paths": [
+            "notes.md"
+          ],
+          "evidence": {
+            "command": "python3 -c \"from pathlib import Path; Path('notes.md').write_text('ready'); print('wrote notes')\"",
+            "exit": 0,
+            "session_id": null,
+            "sha256": "7dce0f59837f6d6ec16cfda544a19a811bcfee9aa55a8b69298cd3409e50d909",
+            "source": "tool",
+            "utc": "2026-11-15T18:28:50.607052+00:00"
+          },
+          "node_id": "n1",
+          "reason": null,
+          "rejected_paths": [],
+          "type": "node.completed",
+          "utc": "2026-11-15T18:28:50.607263+00:00"
+        }
+      ],
+      "escape_exists_after_rollback": false
+    },
+    {
+      "run_id": "violation",
+      "status": "failed",
+      "rejected_paths": [
+        "escape.txt"
+      ],
+      "events": [
+        {
+          "capability": "doc.write",
+          "node_id": "n1",
+          "role": "alpha-trion",
+          "type": "dispatch.started",
+          "utc": "2026-11-15T18:28:50.607977+00:00",
+          "write_scope": [
+            "notes.md"
+          ]
+        },
+        {
+          "node_id": "n1",
+          "paths": [
+            "escape.txt"
+          ],
+          "reason": "write_scope violation",
+          "type": "plan.op.rejected",
+          "utc": "2026-11-15T18:28:50.625245+00:00"
+        },
+        {
+          "artifacts": {
+            "notes.md": "06b29bb318814108e94270528fe7994c096308b3692923723bf1ae6f98d50b4f"
+          },
+          "changed_paths": [
+            "escape.txt",
+            "notes.md"
+          ],
+          "evidence": {
+            "command": "python3 -c \"from pathlib import Path; Path('notes.md').write_text('retry'); Path('escape.txt').write_text('forbidden'); print('attempted escape')\"",
+            "exit": 0,
+            "session_id": null,
+            "sha256": "690292e279ac7b2a529c1bbda4e85c1956c893ef3fdb3914d6f4d59dd7bfd19a",
+            "source": "tool",
+            "utc": "2026-11-15T18:28:50.625327+00:00"
+          },
+          "node_id": "n1",
+          "reason": null,
+          "rejected_paths": [
+            "escape.txt"
+          ],
+          "type": "node.failed",
+          "utc": "2026-11-15T18:28:50.625607+00:00"
+        }
+      ],
+      "escape_exists_after_rollback": false
+    }
+  ]
+}
