@@ -7,6 +7,11 @@ on:
         description: Existing vX.Y.Z tag on main to publish
         required: true
         type: string
+      publish_pypi:
+        description: Publish to PyPI (disable for an npm-only retry)
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -82,11 +87,13 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           registry-url: https://registry.npmjs.org
-          package-manager-cache: false
       - uses: actions/download-artifact@v4
         with:
           name: release-dist
@@ -97,10 +104,11 @@ jobs:
         shell: bash
         run: |
           npm install --global npm@^11
-          npm publish "dist/cybertron-agents-${RELEASE_TAG#v}.tgz" --access public --provenance
+          npm publish "./dist/cybertron-agents-${RELEASE_TAG#v}.tgz" --access public --provenance
 
   pypi:
     needs: build
+    if: ${{ inputs.publish_pypi }}
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -120,6 +128,7 @@ jobs:
 
   github_release:
     needs: [npm, pypi]
+    if: ${{ !cancelled() && needs.npm.result == 'success' && (needs.pypi.result == 'success' || needs.pypi.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
