@@ -4,20 +4,20 @@
 
 | 渠道 | 版本 | 地址 |
 | --- | --- | --- |
-| npm | `cybertron-agents@0.2.0` | https://www.npmjs.com/package/cybertron-agents/v/0.2.0 |
-| PyPI | `cybertron-agents 0.2.0` | https://pypi.org/project/cybertron-agents/0.2.0/ |
-| GitHub tag | `v0.2.0` | https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.2.0 |
-| `install.sh` SHA-256 | `82dced736623431df720072ca23ba0f2fc2dfc14d8bc95f617dd69907cb5f7b2` | Release 附件 |
+| npm | `cybertron-agents@0.2.1` | https://www.npmjs.com/package/cybertron-agents/v/0.2.1 |
+| PyPI | `cybertron-agents 0.2.1` | https://pypi.org/project/cybertron-agents/0.2.1/ |
+| GitHub tag | `v0.2.1` | https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.2.1 |
+| `install.sh` SHA-256 | 由 Release 的 `SHA256SUMS` 提供 | Release 附件 |
 
-> `0.2.0` 已发布到 npm、PyPI 和 GitHub Release，包含阶段 A–E 的 OpenCode 软件工作流和十三角色模型编队。正式渠道核验见[发布验收记录](stages/I-release-020.md)。
+> `0.2.1` 为协作治理补丁，包含 `CONTRIBUTING.md`、`RELEASE.md`、`scripts/bump_version.py` 和标签驱动的 Trusted Publishing 工作流；`0.2.0` 为上一版，包含阶段 A–E 与十三角色模型编队。渠道核验见[发布验收记录](stages/I-release-020.md)。
 
 ## 三条安装路径
 
-Cybertron 的 OpenCode 集成由 13 个角色 Markdown、可选 `/cybertron` 命令、插件和 Python 运行时组成。三条路径共享同一份 payload；公开 `0.2.0` 包含阶段 E 与模型编队：
+Cybertron 的 OpenCode 集成由 13 个角色 Markdown、可选 `/cybertron` 命令、插件和 Python 运行时组成。三条路径共享同一份 payload；`0.2.0` 引入阶段 E 与模型编队，`0.2.1` 为协作治理补丁：
 
 | 路径 | 命令 | 适合 |
 | --- | --- | --- |
-| npm CLI | `npx -y cybertron-agents@0.2.0 init` | 装有 Node.js 的开发者 |
+| npm CLI | `npx -y cybertron-agents@0.2.1 init` | 装有 Node.js 的开发者 |
 | GitHub Shell | `bash install.sh`（先下载、可审阅） | 有 Bash 与 Python 3.9+ 的用户 |
 | pipx | `pipx install cybertron-agents`，再 `cybertron init` | 装有 Python 3.9+ 的用户 |
 
@@ -33,9 +33,9 @@ Cybertron 的 OpenCode 集成由 13 个角色 Markdown、可选 `/cybertron` 命
 ## 路径一：npm CLI
 
 ```bash
-npx -y cybertron-agents@0.2.0 init --dry-run           # 预览
-npx -y cybertron-agents@0.2.0 init --apply --project . # 装到当前项目
-npx -y cybertron-agents@0.2.0 init --apply --global    # 装到全局
+npx -y cybertron-agents@0.2.1 init --dry-run           # 预览
+npx -y cybertron-agents@0.2.1 init --apply --project . # 装到当前项目
+npx -y cybertron-agents@0.2.1 init --apply --global    # 装到全局
 ```
 
 - **不要在本仓库目录内运行 `npx`**：npm 会向上命中本地同名 `package.json`，从而不安装 registry 包，报 `cybertron: command not found`。请在你自己的项目目录运行。
@@ -46,7 +46,7 @@ npx -y cybertron-agents@0.2.0 init --apply --global    # 装到全局
 ## 路径二：GitHub Shell
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zhiwenC125/Cybertron-agents/v0.2.0/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/zhiwenC125/Cybertron-agents/v0.2.1/install.sh -o install.sh
 bash install.sh --dry-run            # 先看要改哪些文件
 bash install.sh --apply --project .  # 确认后安装
 ```
@@ -54,7 +54,7 @@ bash install.sh --apply --project .  # 确认后安装
 固定版本与校验：
 
 ```bash
-bash install.sh --apply --version v0.2.0 --sha256 <归档文件的 SHA-256>
+bash install.sh --apply --version v0.2.1 --sha256 <归档文件的 SHA-256>
 ```
 
 - 在本地 clone 内运行时直接读取仓库 `.opencode/`。
@@ -65,7 +65,7 @@ bash install.sh --apply --version v0.2.0 --sha256 <归档文件的 SHA-256>
 `pipx` 与 npm 无关：它从 PyPI 安装 Python CLI 到隔离 venv。要求 Python 3.9+。
 
 ```bash
-pipx install cybertron-agents==0.2.0
+pipx install cybertron-agents==0.2.1
 cybertron init --dry-run
 cybertron init --apply --project .
 cybertron init --apply --global
@@ -97,7 +97,7 @@ opencode                        # 保留 Build/Plan 默认行为
 ## 发布前检查
 
 - npm：`npm pack --dry-run` 确认包内有 CLI、角色、插件、Python 运行时和 `install.sh`。
-- npm：`npm publish` 需要维护者账号（发布前用本地 `cybertron-agents-0.2.0.tgz` 在临时项目验证）。
+- npm：`npm publish` 需要维护者账号（发布前用本地 `cybertron-agents-0.2.1.tgz` 在临时项目验证）。
 - pipx：`python -m build` 生成 wheel/sdist，再 `twine upload` 到 PyPI；发布前可用 `pipx install .` 验证。
 - 在干净目录分别跑三条路径的 `--dry-run` 与 `--apply`，用 `opencode2 debug agents` 确认 13 个角色出现。
 - 打 tag（`v0.1.0`、`v0.1.1` 已完成），在 GitHub Release 附归档与 `install.sh` 的 SHA-256。
