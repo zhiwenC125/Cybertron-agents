@@ -12,6 +12,7 @@ stage7_fixture/stm32_minimal/build/
 *.key
 node_modules/
 /payload/
+/.cybertron/
 build/
 dist/
 *.egg-info/

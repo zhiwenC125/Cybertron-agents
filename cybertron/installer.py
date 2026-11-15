@@ -341,6 +341,9 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser.add_argument("--ref", default="")
     doctor_parser.add_argument("--sha256", default="")
 
+    run_parser = sub.add_parser("run", help="离线任务账本：create/show/verify/resume")
+    run_parser.add_argument("run_args", nargs=argparse.REMAINDER)
+
     return parser
 
 
@@ -351,6 +354,9 @@ def main(argv=None) -> int:
         return run_init(args)
     if args.command == "doctor":
         return run_doctor(args)
+    if args.command == "run":
+        from .run_cli import main as run_main
+        return run_main(args.run_args)
     parser.print_help()
     return 0
 
