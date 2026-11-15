@@ -46,6 +46,8 @@ python3 -m cybertron.opencode_run "请澄清 STM32F4 电机控制任务还缺少
 
 三条安装路径共享同一份 payload（13 个角色 + `/cybertron` 命令），默认 dry-run，`--apply` 才写入。当前已发布版本为 **0.1.1**：
 
+源码分支已完成阶段 A 的离线安装基线修复；这些改动尚未发布到公共 `0.1.1` 包，详见[阶段 A 记录](docs/stages/A-installation-baseline.md)。
+
 ```bash
 # 1) npm（在你自己的项目目录运行，不要在 Cybertron-Agent 仓库内运行）
 npx -y cybertron-agents@0.1.1 init --dry-run
@@ -57,9 +59,9 @@ cybertron init --dry-run
 cybertron init --apply --project .
 
 # 3) GitHub Shell
-curl -fsSL https://raw.githubusercontent.com/zhiwenC125/Cybertron-agents/main/install.sh -o install.sh
-sh install.sh --dry-run
-sh install.sh --apply --project .
+curl -fsSL https://raw.githubusercontent.com/zhiwenC125/Cybertron-agents/v0.1.1/install.sh -o install.sh
+bash install.sh --dry-run
+bash install.sh --apply --project .
 ```
 
 安装目标：
@@ -67,7 +69,7 @@ sh install.sh --apply --project .
 - `--project DIR`：写入 `DIR/.opencode/agents` 与 `DIR/.opencode/commands`
 - `--global`：写入 `${XDG_CONFIG_HOME:-~/.config}/opencode/agents|commands`
 
-装完在 OpenCode 里：`opencode2 debug agents` 确认 13 个角色；`opencode` 默认 `prima`，`Tab` / `Shift+Tab` 切换；`/cybertron <需求>` 启动编排。`cybertron doctor` 只做本地检查，不会联网下载。
+装完在 OpenCode 里：`opencode2 debug agents` 确认 13 个角色；`opencode` 默认 `prima`，`Tab` / `Shift+Tab` 切换。当前 `/cybertron <需求>` 是提示词入口，尚未连接完整 Python 九步编排；此连接属于后续阶段 E。`cybertron doctor` 只做本地检查，不会联网下载。
 
 详见[安装与发布方案](docs/packaging-and-installation.md)。`v0.1.1` 的 tag 与 Release 见 [GitHub Release v0.1.1](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.1.1)。
 

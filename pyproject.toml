@@ -22,3 +22,6 @@ cybertron = "cybertron.installer:main"
 [tool.setuptools.packages.find]
 include = ["cybertron*"]
 exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+cybertron = ["payload/agents/*.md", "payload/commands/*.md"]

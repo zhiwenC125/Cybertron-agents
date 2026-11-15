@@ -2,6 +2,8 @@
 
 七阶段最小闭环后的运行态持久化、安装发布与双宿主后续工作，见 [`docs/handoffs/2026-11-14-runtime-architecture.md`](docs/handoffs/2026-11-14-runtime-architecture.md)。该文件的 A–G 阶段是后续实施计划，不改变下表的历史验收状态。
 
+后续实施阶段 A（配置与安装基线）已完成本地离线开发验收，记录见 [`docs/stages/A-installation-baseline.md`](docs/stages/A-installation-baseline.md)。改动尚未发布到 npm/PyPI/GitHub Release；现有 `0.1.1` 公共包不包含这些修复。下一步按用户指定顺序进入阶段 B（可恢复 RunStore），随后为 C、D、E。阶段 5 的隔离验收已在本轮恢复通过。
+
 开发节奏：每次只交付一个阶段的代码和测试命令；开发者在终端验收并反馈结果后，再开始下一阶段。这里的七个开发阶段与引擎内部九步 SDLC 流程是两种不同的划分。
 
 截至 2026-11-14，七阶段的**最小闭环基线已达成**：第 7 阶段已通过 STM32 最小测试 App 的真实烧录、SRAM 心跳和原固件逐字节回滚。表中第 7 阶段仍标为进行中，表示完整 OTA App、ESP32-S3、隔离构建及宿主审批接口没有验收；不能把最小闭环等同于全部目标完成。

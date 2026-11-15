@@ -56,9 +56,9 @@ function describe(item) {
 
 const CONFIG_TEXT = {
   'would-create': '将写入最小配置',
-  'filled-empty': '将补全 default_agent',
+  'filled-empty': '空配置；请先移走或修复',
   'has-default': '已有 default_agent',
-  'set-default': '将补 default_agent',
+  'missing-default': '已有配置缺少 default_agent；请手动设置 prima',
   'parse-failed': '无法解析，跳过',
   'not-object': '不是对象，跳过',
 };
@@ -81,15 +81,20 @@ function runInit(opts) {
   console.log(`模式: ${dryRun ? '预览（dry-run，加 --apply 写入）' : '写入（--apply）'}`);
   for (const item of plan.items) console.log(describe(item));
 
-  const config = ensureConfig(plan.base, dryRun);
+  const config = ensureConfig(plan.base, true);
   console.log(`配置: ${config.file} -> ${CONFIG_TEXT[config.action] ?? config.action}`);
+  if (['filled-empty', 'parse-failed', 'not-object', 'missing-default'].includes(config.action)) {
+    console.error('已有配置无法安全安装；请先修复配置。');
+    process.exitCode = 2;
+    return;
+  }
 
   if (dryRun) {
     console.log('\n这是预览。确认后加 --apply 执行。');
     return;
   }
 
-  const result = applyInstall(plan);
+  const result = applyInstall(plan, config.action === 'would-create' ? config.file : null);
   console.log(`\n新增 ${result.created}，更新 ${result.updated}，未变 ${result.same}`);
   console.log('安装完成。运行: opencode2 debug agents');
 }
@@ -110,6 +115,9 @@ function runDoctor(opts) {
 
   if (agents.length !== expected) {
     console.log('提示: 角色数量不符，运行 cybertron init --apply 重新安装。');
+  }
+  if (agents.length !== expected || commands.length !== 1 || !existsSync(config)) {
+    process.exitCode = 1;
   }
 }
 

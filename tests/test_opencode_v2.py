@@ -8,6 +8,27 @@ from cybertron.opencode_v2 import validate_bundle
 
 
 class OpenCodeV2BundleTests(unittest.TestCase):
+    def test_checked_in_and_python_payload_match_registry(self):
+        repository = Path(__file__).resolve().parent.parent
+        with tempfile.TemporaryDirectory() as directory:
+            generated = Path(directory)
+            compile_opencode_v2_assets(generated)
+            expected = [Path("opencode.jsonc"), *sorted(path.relative_to(repository)
+                        for path in (repository / ".opencode/agents").glob("*.md"))]
+            self.assertEqual(len(expected), 14)
+            for relative in expected:
+                with self.subTest(file=str(relative)):
+                    self.assertEqual((repository / relative).read_bytes(),
+                                     (generated / relative).read_bytes())
+            for kind in ("agents", "commands"):
+                source = repository / ".opencode" / kind
+                bundled = repository / "cybertron" / "payload" / kind
+                self.assertEqual([path.name for path in source.glob("*.md")],
+                                 [path.name for path in bundled.glob("*.md")])
+                for path in source.glob("*.md"):
+                    with self.subTest(payload=str(path)):
+                        self.assertEqual(path.read_bytes(), (bundled / path.name).read_bytes())
+
     def test_default_bundle_loads_without_feishu_credentials(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

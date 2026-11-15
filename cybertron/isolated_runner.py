@@ -63,6 +63,7 @@ class MacOSSandboxRunner:
                 "PYTHONDONTWRITEBYTECODE": "1",
                 # Python can start without opening /dev/urandom, which is denied below.
                 "PYTHONHASHSEED": "0",
+                "CYBERTRON_SANDBOX": "1",
                 "LANG": os.environ.get("LANG", "C.UTF-8"),
             }
             argv = [binary, "-p", self._profile(scratch), *command]

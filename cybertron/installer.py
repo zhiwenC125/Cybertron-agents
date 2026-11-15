@@ -18,7 +18,7 @@ import urllib.request
 from pathlib import Path
 
 REPO = "zhiwenC125/Cybertron-agents"
-DEFAULT_REF = "main"
+DEFAULT_REF = "v0.1.1"
 KNOWN_AGENT_COUNT = 13
 MINIMAL_CONFIG = (
     '{\n'
@@ -29,9 +29,9 @@ MINIMAL_CONFIG = (
 
 CONFIG_LABELS = {
     "would-create": "将写入最小配置",
-    "filled-empty": "将补全 default_agent",
+    "filled-empty": "空配置；请先移走或修复",
     "has-default": "已有 default_agent",
-    "set-default": "将补 default_agent",
+    "missing-default": "已有配置缺少 default_agent；请手动设置 prima",
     "parse-failed": "无法解析，跳过",
     "not-object": "不是对象，跳过",
 }
@@ -68,17 +68,20 @@ def resolve_payload(
     if explicit:
         return find_payload_dir(Path(explicit).resolve())
 
-    here = Path(__file__).resolve().parent
-    repo = here.parent
-    if (repo / ".opencode" / "agents").is_dir():
-        return repo / ".opencode"
+    if (ref or expected_sha256) and allow_download:
+        return download_payload(ref or DEFAULT_REF, expected_sha256)
 
+    here = Path(__file__).resolve().parent
     bundled = here / "payload"
     if (bundled / "agents").is_dir():
         return bundled
 
+    repo = here.parent
+    if (repo / ".opencode" / "agents").is_dir():
+        return repo / ".opencode"
+
     if allow_download:
-        return download_payload(ref, expected_sha256)
+        return download_payload(ref or DEFAULT_REF, expected_sha256)
     return None
 
 
@@ -127,6 +130,8 @@ def plan(payload: Path, base: Path) -> list:
     for kind in ("agents", "commands"):
         for src in list_markdown(payload / kind):
             target = base / kind / src.name
+            if target.is_symlink():
+                raise SystemExit(f"拒绝符号链接安装目标: {target}")
             if target.exists():
                 state = "same" if src.read_bytes() == target.read_bytes() else "update"
             else:
@@ -186,8 +191,6 @@ def ensure_config(base: Path, dry_run: bool) -> tuple:
 
     raw = path.read_text(encoding="utf-8")
     if not raw.strip():
-        if not dry_run:
-            path.write_text(MINIMAL_CONFIG, encoding="utf-8")
         return "filled-empty", path
 
     try:
@@ -198,29 +201,58 @@ def ensure_config(base: Path, dry_run: bool) -> tuple:
         return "not-object", path
     if "default_agent" in data:
         return "has-default", path
-
-    data["default_agent"] = "prima"
-    if not dry_run:
-        path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-        )
-    return "set-default", path
+    return "missing-default", path
 
 
-def apply_install(items: list) -> tuple:
+def _next_backup(target: Path) -> Path:
+    index = 1
+    while True:
+        backup = target.with_name(f"{target.name}.bak.{index}")
+        if not backup.exists() and not backup.is_symlink():
+            return backup
+        index += 1
+
+
+def apply_install(items: list, config_path: Path | None = None) -> tuple:
     created = updated = same = 0
-    for _kind, src, target, state in items:
-        if state == "new":
+    changed = []
+    try:
+        for _kind, src, target, state in items:
+            if state == "same":
+                same += 1
+                continue
+            if target.is_symlink() or target.parent.is_symlink():
+                raise OSError(f"拒绝符号链接安装目标: {target}")
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(src, target)
-            created += 1
-        elif state == "update":
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(target, target.with_suffix(target.suffix + ".bak"))
-            shutil.copyfile(src, target)
-            updated += 1
-        else:
-            same += 1
+            previous = target.read_bytes() if state == "update" else None
+            backup = None
+            if previous is not None:
+                backup = _next_backup(target)
+                backup.write_bytes(previous)
+            changed.append((target, previous, backup))
+            temporary = target.with_name(target.name + ".cybertron-tmp")
+            try:
+                temporary.write_bytes(src.read_bytes())
+                temporary.replace(target)
+            finally:
+                temporary.unlink(missing_ok=True)
+            if previous is None:
+                created += 1
+            else:
+                updated += 1
+        if config_path is not None:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            changed.append((config_path, None, None))
+            config_path.write_text(MINIMAL_CONFIG, encoding="utf-8")
+    except Exception:
+        for target, previous, backup in reversed(changed):
+            if previous is None:
+                target.unlink(missing_ok=True)
+            else:
+                target.write_bytes(previous)
+            if backup is not None:
+                backup.unlink(missing_ok=True)
+        raise
     return created, updated, same
 
 
@@ -240,14 +272,17 @@ def run_init(args) -> int:
         note = " (备份为 .bak 后覆盖)" if state == "update" else ""
         print(f"  {marks[state]} {target}{note}")
 
-    action, config_path = ensure_config(base, dry_run)
+    action, config_path = ensure_config(base, True)
     print(f"配置: {config_path} -> {CONFIG_LABELS.get(action, action)}")
+    if action in ("filled-empty", "parse-failed", "not-object", "missing-default"):
+        print("已有配置无法安全安装；请先修复配置。", file=sys.stderr)
+        return 2
 
     if dry_run:
         print("\n这是预览。确认后加 --apply 执行。")
         return 0
 
-    created, updated, same = apply_install(items)
+    created, updated, same = apply_install(items, config_path if action == "would-create" else None)
     print(f"\n新增 {created}，更新 {updated}，未变 {same}")
     print("安装完成。运行: opencode2 debug agents")
     return 0
@@ -274,9 +309,10 @@ def run_doctor(args) -> int:
     print(f"已安装命令: {len(commands)}")
     print(f"配置: {'存在' if config.exists() else '缺失'}")
     print(f"python: {sys.version.split()[0]}")
-    if len(agents) != expected:
+    healthy = len(agents) == expected and len(commands) == 1 and config.is_file()
+    if not healthy:
         print("提示: 角色数量不符，运行 cybertron init --apply 重新安装。")
-    return 0
+    return 0 if healthy else 1
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -293,7 +329,7 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument("--global", dest="global_", action="store_true")
     init_parser.add_argument("--project", default=".")
     init_parser.add_argument("--payload", default="")
-    init_parser.add_argument("--ref", default=DEFAULT_REF)
+    init_parser.add_argument("--ref", default="")
     init_parser.add_argument("--sha256", default="")
     init_parser.add_argument("--apply", action="store_true")
     init_parser.add_argument("--dry-run", dest="apply", action="store_false")
@@ -302,7 +338,7 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser.add_argument("--global", dest="global_", action="store_true")
     doctor_parser.add_argument("--project", default=".")
     doctor_parser.add_argument("--payload", default="")
-    doctor_parser.add_argument("--ref", default=DEFAULT_REF)
+    doctor_parser.add_argument("--ref", default="")
     doctor_parser.add_argument("--sha256", default="")
 
     return parser

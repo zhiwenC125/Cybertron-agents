@@ -7,8 +7,9 @@ REPO="zhiwenC125/Cybertron-agents"
 MODE="project"
 PROJECT_DIR="."
 APPLY=0
-VERSION="main"
+VERSION="v0.1.1"
 EXPECTED_SHA256=""
+DOCTOR=0
 
 usage() {
   cat <<'EOF'
@@ -22,8 +23,9 @@ Cybertron 安装脚本
   --project DIR         安装到 DIR/.opencode（默认当前目录）
   --apply               真正写入文件（默认只预览）
   --dry-run             只预览（默认）
-  --version REF         指定分支或 tag（默认 main）
+  --version REF         指定 tag（默认 v0.1.1）；分支仅用于显式开发测试
   --sha256 HEX          校验下载归档的 SHA-256
+  --doctor              只检查本地安装，不下载或写入
   -h, --help            显示本帮助
 
 示例:
@@ -45,6 +47,7 @@ while [ $# -gt 0 ]; do
     --project=*) MODE="project"; PROJECT_DIR="${1#*=}" ;;
     --apply) APPLY=1 ;;
     --dry-run) APPLY=0 ;;
+    --doctor) DOCTOR=1 ;;
     --version)
       VERSION="${2:?--version 需要一个分支或 tag 参数}"
       shift
@@ -61,10 +64,28 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+if [ "$MODE" = "global" ]; then
+  BASE="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
+else
+  BASE="$PROJECT_DIR/.opencode"
+fi
+
+if [ "$DOCTOR" = "1" ]; then
+  AGENT_COUNT=0
+  COMMAND_COUNT=0
+  for f in "$BASE"/agents/*.md; do [ -e "$f" ] && AGENT_COUNT=$((AGENT_COUNT + 1)); done
+  for f in "$BASE"/commands/*.md; do [ -e "$f" ] && COMMAND_COUNT=$((COMMAND_COUNT + 1)); done
+  echo "目标: $BASE"
+  echo "已安装角色: ${AGENT_COUNT}（期望 13）"
+  echo "已安装命令: ${COMMAND_COUNT}（期望 1）"
+  [ "$AGENT_COUNT" -eq 13 ] && [ "$COMMAND_COUNT" -eq 1 ] && [ -f "$BASE/opencode.jsonc" ]
+  exit $?
+fi
+
 # 定位源：本地 clone 直接用仓库，否则下载 GitHub 归档
 SCRIPT_DIR=""
 if [ -n "${BASH_SOURCE[0]:-}" ]; then
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 fi
 
 if [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR/.opencode/agents" ]; then
@@ -96,12 +117,6 @@ else
   SRC="$TMP_DIR"
 fi
 
-if [ "$MODE" = "global" ]; then
-  BASE="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
-else
-  BASE="$PROJECT_DIR/.opencode"
-fi
-
 echo "安装目标: $BASE"
 if [ "$APPLY" = "1" ]; then
   echo "模式: 写入（--apply）"
@@ -112,23 +127,59 @@ fi
 NEW=0
 UPD=0
 SAME=0
+CONFIG="$BASE/opencode.jsonc"
+if [ -L "$BASE" ] || [ -L "$CONFIG" ]; then
+  echo "拒绝符号链接安装目录或配置: $BASE" >&2
+  exit 2
+fi
+if [ -e "$CONFIG" ] && ! grep -Eq '"default_agent"[[:space:]]*:' "$CONFIG"; then
+  echo "已有配置缺少 default_agent，或无法安全识别；请先手动设置 prima: $CONFIG" >&2
+  exit 2
+fi
+
+CHANGED_TARGETS=()
+CHANGED_KINDS=()
+CHANGED_BACKUPS=()
+DONE=0
+rollback() {
+  if [ "$DONE" = "1" ]; then return; fi
+  for ((i=${#CHANGED_TARGETS[@]}-1; i>=0; i--)); do
+    target="${CHANGED_TARGETS[$i]}"
+    if [ "${CHANGED_KINDS[$i]}" = "new" ]; then
+      rm -f "$target"
+    else
+      cp "${CHANGED_BACKUPS[$i]}" "$target"
+      rm -f "${CHANGED_BACKUPS[$i]}"
+    fi
+  done
+}
+trap rollback EXIT
+
 for kind in agents commands; do
   src_dir="$SRC/.opencode/$kind"
   [ -d "$src_dir" ] || continue
+  if [ -L "$BASE/$kind" ]; then echo "拒绝符号链接安装目录: $BASE/$kind" >&2; exit 2; fi
   for f in "$src_dir"/*.md; do
     [ -e "$f" ] || continue
     name="$(basename "$f")"
     target="$BASE/$kind/$name"
+    if [ -L "$target" ]; then echo "拒绝符号链接安装目标: $target" >&2; exit 2; fi
     if [ -e "$target" ]; then
       if cmp -s "$f" "$target"; then
         echo "  = $target"
         SAME=$((SAME + 1))
       else
-        echo "  ~ $target (备份为 .bak 后覆盖)"
+        echo "  ~ $target (保留编号备份后覆盖)"
         UPD=$((UPD + 1))
         if [ "$APPLY" = "1" ]; then
           mkdir -p "$BASE/$kind"
-          cp "$target" "$target.bak"
+          index=1
+          while [ -e "$target.bak.$index" ]; do index=$((index + 1)); done
+          backup="$target.bak.$index"
+          cp "$target" "$backup"
+          CHANGED_TARGETS+=("$target")
+          CHANGED_KINDS+=("update")
+          CHANGED_BACKUPS+=("$backup")
           cp "$f" "$target"
         fi
       fi
@@ -137,23 +188,24 @@ for kind in agents commands; do
       NEW=$((NEW + 1))
       if [ "$APPLY" = "1" ]; then
         mkdir -p "$BASE/$kind"
+          CHANGED_TARGETS+=("$target")
+          CHANGED_KINDS+=("new")
+          CHANGED_BACKUPS+=("")
         cp "$f" "$target"
       fi
     fi
   done
 done
 
-CONFIG="$BASE/opencode.jsonc"
 if [ -e "$CONFIG" ]; then
-  if grep -q '"default_agent"' "$CONFIG" 2>/dev/null; then
-    echo "  = $CONFIG (已有 default_agent)"
-  else
-    echo "  ! $CONFIG 缺少 default_agent；请手动加入 \"default_agent\": \"prima\""
-  fi
+  echo "  = $CONFIG (已有配置，保持原字节)"
 else
   echo "  + $CONFIG (最小配置，默认 prima)"
   if [ "$APPLY" = "1" ]; then
     mkdir -p "$BASE"
+    CHANGED_TARGETS+=("$CONFIG")
+    CHANGED_KINDS+=("new")
+    CHANGED_BACKUPS+=("")
     printf '{\n  "$schema": "https://opencode.ai/config.json",\n  "default_agent": "prima"\n}\n' > "$CONFIG"
   fi
 fi
@@ -161,7 +213,9 @@ fi
 echo
 echo "新增 ${NEW}，更新 ${UPD}，未变 ${SAME}"
 if [ "$APPLY" != "1" ]; then
+  DONE=1
   echo "这是预览。确认后加 --apply 执行。"
   exit 0
 fi
+DONE=1
 echo "安装完成。运行: opencode2 debug agents"

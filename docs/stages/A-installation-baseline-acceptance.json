@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "stage": "A",
+  "recorded_at_utc": "2026-11-15T01:01:57.173464+00:00",
+  "base_commit": "69074cac53cd84ac48fb0e2afa8d2a3b2cc6488f",
+  "tests": [
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-q"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "7236c2b6c8204615438c17453620e9311811e74fcedcdf5182508986728bdf63",
+      "summary": "----------------------------------------------------------------------\nRan 65 tests in 1.805s\n\nOK",
+      "test_count": 65
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-m",
+        "cybertron.stage5_verify"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "c8f243a0c746d81a28ae06d841382764a2eb0554d528f2d0629efc7b055d9e6d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": "Isolation: {'scratch_write': 'allowed', 'project_write': 'blocked', 'device_read': 'blocked', 'network_connect': 'blocked'}\nQA: completed; ledger step 6: completed\nQA evidence: (QualityEvidence(kind=<QualityKind.TEST: 'test'>, passed=True, source='sandbox://sha256/7907116f2b4b0a6a964b7a5b55ad7459f987c452b38cabce1621a33a90e7d00c'),)"
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "cybertron_primes_engine.py"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "6a765936bd6248befc8aa162b8f6660f1da1ed944c0b8e96077a6451e8d87ff4",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": "on ===\n[PASS] 9-Step Software + Hardware Full-Lifecycle Ledger verified.\n[PASS] Dedicated Documentation & Feishu Wiki Steward (Alpha Trion) verified.\n[PASS] Dedicated Two-Tier Code Review (Micronus L1 + Liege Maximo L2) verified.\n[PASS] Hardware Deployment Separation verified: Nexus Prime (Cross-Compile=DENY until sandboxed, Flash=DENY) vs Megatronus (Physical Flash=ASK).\n[PASS] Exported 14 OpenCode V2 files & 1 DeepSeek Harness files to /Users/alanbanana/Cybertron-Agent/cybertron_workspace_dist"
+    },
+    {
+      "argv": [
+        "bash",
+        "-n",
+        "install.sh"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": ""
+    },
+    {
+      "argv": [
+        "node",
+        "--check",
+        "bin/cybertron.mjs"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": ""
+    },
+    {
+      "argv": [
+        "node",
+        "--check",
+        "lib/install.mjs"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": ""
+    },
+    {
+      "argv": [
+        "node",
+        "scripts/build-payload.mjs"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "3334c2ed85cfae997a463e3123ab37d469f8b6fe45ba7bffde3a6d3f6776387a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": "payload 已生成: /Users/alanbanana/Cybertron-Agent/payload"
+    }
+  ],
+  "packages": {
+    "npm_pack_exit_code": 0,
+    "npm_payload_count": 13,
+    "wheel_name": "cybertron_agents-0.1.1-py3-none-any.whl",
+    "wheel_sha256": "6661d852f20e43679561ee238f8904d42adfe8bb1b520a932839c2a121c87c80",
+    "wheel_payload_count": 13,
+    "matching_payload_names": true
+  },
+  "external_model_called": false,
+  "hardware_operation": false,
+  "publication": "not_published"
+}
