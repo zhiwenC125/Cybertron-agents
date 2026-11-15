@@ -107,6 +107,8 @@ class RunCoordinator:
 
         dispatch_id, attempt_id = str(uuid.uuid4()), str(uuid.uuid4())
         host_session_id = f"ses_{uuid.uuid4().hex}"
+        from .model_config import model_for
+        selected_model = model_for(self.store.workspace, agent_id) if not self.host.simulated else None
         prepared = []
 
         def start(current) -> None:
@@ -118,7 +120,8 @@ class RunCoordinator:
         started = self.store.transition(run_id, "dispatch.started", start, stage_id=step.step_id,
                                         dispatch_id=dispatch_id, attempt_id=attempt_id,
                                         payload={"agent_id": agent_id, "host": self.host.host_name,
-                                                 "host_session_id": host_session_id},
+                                                 "host_session_id": host_session_id,
+                                                 "configured_model": selected_model},
                                         expected_seq=expected_seq)
         task = prepared[0]
         try:

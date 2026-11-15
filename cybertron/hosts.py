@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .execution import AgentResult, AgentTask, EvidenceSource, QualityEvidence, QualityKind, ResultStatus
 from .isolated_runner import AlchemistTestExecutor, MacOSSandboxRunner
+from .model_config import model_for
 from .opencode_executor import OpenCodeV2Executor
 from .orchestrator import HostTurnResult
 from .simulation import SimulationExecutor
@@ -93,7 +94,7 @@ class OpenCodeWorkflowHost(OpenCodeReadOnlyHost):
         if not self.can_execute(task):
             raise ValueError("Physical flash requires a bound plan and human approval")
         executor = OpenCodeV2Executor(self.workspace, binary=self.binary,
-                                      model_override=self.model_override,
+                                      model_override=model_for(self.workspace, task.agent_id) or self.model_override,
                                       host_session_id=host_session_id,
                                       workflow_mode=True)
         result = executor.execute(task)

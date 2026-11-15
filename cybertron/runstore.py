@@ -119,14 +119,21 @@ class RunStore:
         config = self.workspace / "opencode.jsonc"
         if not config.is_file():
             config = self.workspace / ".opencode" / "opencode.jsonc"
-        return hashlib.sha256(config.read_bytes()).hexdigest() if config.is_file() else "missing"
+        from .model_config import profile_digest
+        fleet = profile_digest(self.workspace)
+        if fleet is None:
+            return hashlib.sha256(config.read_bytes()).hexdigest() if config.is_file() else "missing"
+        digest = hashlib.sha256()
+        digest.update(config.read_bytes() if config.is_file() else b"missing")
+        digest.update(fleet.encode())
+        return digest.hexdigest()
 
     @staticmethod
     def _runtime_digest() -> str:
         package = Path(__file__).resolve().parent
         digest = hashlib.sha256()
-        for name in ("dispatch.py", "hosts.py", "ledger.py", "opencode_executor.py",
-                     "orchestrator.py", "plugin_cli.py", "registry.py", "runstore.py"):
+        for name in ("dispatch.py", "hosts.py", "ledger.py", "model_config.py", "model_cli.py",
+                     "opencode_executor.py", "orchestrator.py", "plugin_cli.py", "registry.py", "runstore.py"):
             digest.update(name.encode() + b"\0" + (package / name).read_bytes())
         return digest.hexdigest()
 

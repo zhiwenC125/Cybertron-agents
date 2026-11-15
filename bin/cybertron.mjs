@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
@@ -13,12 +14,26 @@ import {
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+function runModelCli(args) {
+  const runtime = existsSync(path.join(pkgRoot, '.opencode', 'agents'))
+    ? pkgRoot : path.join(pkgRoot, 'payload', 'cybertron-runtime');
+  const result = spawnSync(process.env.CYBERTRON_PYTHON || 'python3',
+    ['-m', 'cybertron.model_cli', ...args], {
+      cwd: runtime, stdio: 'inherit', shell: false,
+      env: { ...process.env, CYBERTRON_PROJECT_CWD: process.cwd(),
+        PYTHONPATH: [runtime, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) },
+  });
+  if (result.error) throw result.error;
+  return result.status ?? 1;
+}
+
 function usage() {
   console.log(`cybertron-agents
 
 用法:
   cybertron init [--global | --project DIR] [--apply] [--dry-run]
   cybertron doctor [--global | --project DIR]
+  cybertron models setup|show|doctor|rollback [--global | --project DIR]
   cybertron --version
   cybertron --help
 
@@ -94,9 +109,13 @@ function runInit(opts) {
     return;
   }
 
-  const result = applyInstall(plan, config.action === 'would-create' ? config.file : null);
+  const result = applyInstall(plan, config.action === 'would-create' ? config.file : null, () => {
+    const modelStatus = runModelCli(['apply', ...(opts.global ? ['--global'] : ['--project', opts.projectDir])]);
+    if (modelStatus !== 0) throw new Error('模型编队重应用失败，安装文件已恢复');
+  });
   console.log(`\n新增 ${result.created}，更新 ${result.updated}，未变 ${result.same}`);
   console.log('安装完成。运行: opencode2 debug agents');
+  console.log('模型编队配置入口: cybertron models setup');
 }
 
 function runDoctor(opts) {
@@ -137,6 +156,7 @@ if (argv.length === 0 || argv.includes('--help') || argv.includes('-h')) {
 }
 
 const cmd = argv[0];
+if (cmd === 'models') process.exit(runModelCli(argv.slice(1)));
 const opts = parseArgs(argv.slice(1));
 if (opts.error) {
   console.error(opts.error);

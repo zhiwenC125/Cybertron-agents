@@ -11,11 +11,11 @@
 
 > 版本状态：`0.1.1` 已发布到 npm 与 PyPI，包含 `project.license` 改为 SPDX 字符串并打包 `LICENSE`、`cybertron doctor` 不再联网下载 payload 两项修复。`0.1.0` 为上一版。
 
-> 后续阶段 A–E 的源码候选版为 `0.2.0`，尚未发布。公开 `0.1.1` 没有持久化九步插件。候选版已分别打包并在干净项目验证 npm、Python wheel、本地 Shell 安装；发布时仍须核验正式归档 SHA-256。
+> 后续阶段 A–E 与模型编队的源码候选版为 `0.2.0`，尚未发布。公开 `0.1.1` 没有持久化九步插件或模型配置入口。发布时仍须核验正式归档 SHA-256。
 
 ## 三条安装路径
 
-Cybertron 的 OpenCode 集成由 13 个角色 Markdown、可选 `/cybertron` 命令、插件和 Python 运行时组成。三条路径共享同一份 payload；下表的 `0.1.1` 是**现有公开版**，发布 `0.2.0` 后才包含阶段 E：
+Cybertron 的 OpenCode 集成由 13 个角色 Markdown、可选 `/cybertron` 命令、插件和 Python 运行时组成。三条路径共享同一份 payload；下表的 `0.1.1` 是**现有公开版**，发布 `0.2.0` 后才包含阶段 E 与模型编队：
 
 | 路径 | 命令 | 适合 |
 | --- | --- | --- |
@@ -86,6 +86,8 @@ cybertron doctor
 - 二者互不相干，`pipx install` 不是 npm 的安装方式，只是第三条独立路径。
 
 ## 安装后使用
+
+候选版三条安装路径都会提示 `cybertron models setup`。npm、pipx 用安装后的 CLI；Shell 路径会打印 `${目标 .opencode}/bin/cybertron` 启动器的完整路径，不修改 PATH。`setup` 默认写用户全局编队；`--project DIR` 写项目编队。重复运行 `setup` 可逐角色切换，`rollback` 恢复上一版；`doctor` 校验 OpenCode 加载结果。公司自定义网关可用 `models provider-add` 登记接口与模型 ID，Key 只交给 OpenCode 认证或其服务环境，详见[模型编队说明](../README.md#配置十三角色模型编队本地-020-候选版)。
 
 ```bash
 opencode2 debug agents          # 确认 13 个角色已加载

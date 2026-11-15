@@ -245,5 +245,33 @@ if [ "$APPLY" != "1" ]; then
   echo "这是预览。确认后加 --apply 执行。"
   exit 0
 fi
+if [ "$MODE" = "global" ]; then
+  model_args=(--global)
+else
+  model_args=(--project "$PROJECT_DIR")
+fi
+launcher="$BASE/bin/cybertron"
+if [ -L "$launcher" ] || [ -L "$BASE/bin" ]; then
+  echo "拒绝符号链接启动器目录: $launcher" >&2
+  exit 2
+fi
+mkdir -p "$BASE/bin"
+if [ -e "$launcher" ]; then
+  index=1
+  while [ -e "$launcher.bak.$index" ]; do index=$((index + 1)); done
+  backup="$launcher.bak.$index"
+  cp "$launcher" "$backup"
+  CHANGED_TARGETS+=("$launcher")
+  CHANGED_KINDS+=("update")
+  CHANGED_BACKUPS+=("$backup")
+else
+  CHANGED_TARGETS+=("$launcher")
+  CHANGED_KINDS+=("new")
+  CHANGED_BACKUPS+=("")
+fi
+printf '#!/usr/bin/env bash\nexport CYBERTRON_PROJECT_CWD="$PWD"\nexport PYTHONPATH=%q${PYTHONPATH:+:$PYTHONPATH}\ncd %q\nexec python3 -m cybertron.installer "$@"\n' "$BASE/cybertron-runtime" "$BASE/cybertron-runtime" > "$launcher"
+chmod 755 "$launcher"
+PYTHONPATH="$BASE/cybertron-runtime${PYTHONPATH:+:$PYTHONPATH}" python3 -m cybertron.model_cli apply "${model_args[@]}"
 DONE=1
 echo "安装完成。运行: opencode2 debug agents"
+echo "模型编队配置入口: $launcher models setup ${model_args[*]}"

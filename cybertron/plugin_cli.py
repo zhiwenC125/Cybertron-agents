@@ -45,7 +45,12 @@ def main(argv: list[str] | None = None) -> int:
                 store.transition(run_id, "run.clarified", clarify, stage_id=1,
                                  payload={"answer": args.answer},
                                  expected_seq=state["event_seq"])
-        result = coordinator.run_until_blocked(run_id) if args.operation == "continue" else coordinator.status(run_id)
+        state = coordinator.status(run_id)
+        if args.operation == "continue" and state["config"] == "changed":
+            result = {**state, "status": "blocked",
+                      "block_reason": "本次 run 创建后模型编队或 OpenCode 配置已变化；请开启新任务，旧 run 不会静默换模。"}
+        else:
+            result = coordinator.run_until_blocked(run_id) if args.operation == "continue" else state
     print(json.dumps(result, ensure_ascii=False))
     return 0
 

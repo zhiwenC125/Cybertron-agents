@@ -12,7 +12,7 @@
 
 后续实施阶段 E 已完成 OpenCode **软件路径**的本地开发与真实宿主验收，记录见 [`docs/stages/E-opencode-orchestration.md`](docs/stages/E-opencode-orchestration.md)。在临时项目中，`prima` 自然语言与 Build 模式下的 `/cybertron` 均触发持久化 run；九步软件流程含 12 次真实角色派单、L1/L2 宿主审查回执、隔离 QA 与明确的无硬件跳过。硬件路径的物理执行仍受独立审批约束，`0.2.0` 待发布。
 
-下一项产品方案为[模型配置与混合编队](docs/plans/model-configuration-product-spec.md)：覆盖公司单 Key 多模型、私人多厂商多 Key、已有 OpenCode 认证复用及十三角色模型映射。方案待用户审核，尚未开始开发。
+模型配置与混合编队的[产品方案](docs/plans/model-configuration-product-spec.md)已获用户审核，并在本地 `0.2.0` 候选版实现。支持公司单 Key 多模型、私人多厂商混编、已有 OpenCode 认证复用、十三角色映射、重复切换与回滚。验收记录见[模型配置阶段](docs/stages/H-model-configuration.md)；公开 `0.1.1` 尚不包含这些功能。
 
 开发节奏：每次只交付一个阶段的代码和测试命令；开发者在终端验收并反馈结果后，再开始下一阶段。这里的七个开发阶段与引擎内部九步 SDLC 流程是两种不同的划分。
 

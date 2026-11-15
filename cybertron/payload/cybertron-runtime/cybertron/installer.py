@@ -50,7 +50,9 @@ def default_base(global_install: bool, project: str) -> Path:
         config_home = os.environ.get("XDG_CONFIG_HOME")
         root = Path(config_home) if config_home else Path.home() / ".config"
         return root / "opencode"
-    return Path(project or ".") / ".opencode"
+    caller = Path(os.environ.get("CYBERTRON_PROJECT_CWD", ".")).resolve()
+    requested = Path(project or ".")
+    return (requested if requested.is_absolute() else caller / requested).resolve() / ".opencode"
 
 
 def find_payload_dir(base: Path) -> Path:
@@ -195,7 +197,28 @@ def strip_jsonc(text: str) -> str:
             continue
         out.append(char)
         i += 1
-    return "".join(out)
+    cleaned = "".join(out)
+    result = []
+    quoted = False
+    index = 0
+    while index < len(cleaned):
+        char = cleaned[index]
+        if quoted and char == "\\" and index + 1 < len(cleaned):
+            result.extend((char, cleaned[index + 1]))
+            index += 2
+            continue
+        if char == '"':
+            quoted = not quoted
+        if char == "," and not quoted:
+            cursor = index + 1
+            while cursor < len(cleaned) and cleaned[cursor].isspace():
+                cursor += 1
+            if cursor < len(cleaned) and cleaned[cursor] in "}]":
+                index += 1
+                continue
+        result.append(char)
+        index += 1
+    return "".join(result)
 
 
 def ensure_config(base: Path, dry_run: bool) -> tuple:
@@ -230,7 +253,7 @@ def _next_backup(target: Path) -> Path:
         index += 1
 
 
-def apply_install(items: list, config_path: Path | None = None) -> tuple:
+def apply_install(items: list, config_path: Path | None = None, post_apply=None) -> tuple:
     created = updated = same = 0
     changed = []
     try:
@@ -261,6 +284,8 @@ def apply_install(items: list, config_path: Path | None = None) -> tuple:
             config_path.parent.mkdir(parents=True, exist_ok=True)
             changed.append((config_path, None, None))
             config_path.write_text(MINIMAL_CONFIG, encoding="utf-8")
+        if post_apply is not None:
+            post_apply()
     except Exception:
         for target, previous, backup in reversed(changed):
             if previous is None:
@@ -299,9 +324,15 @@ def run_init(args) -> int:
         print("\n这是预览。确认后加 --apply 执行。")
         return 0
 
-    created, updated, same = apply_install(items, config_path if action == "would-create" else None)
+    from .model_config import apply_to_install, effective_profile, load_profile, profile_path
+    profile = (load_profile(profile_path(base.parent, True)) if args.global_
+               else effective_profile(base.parent))
+    created, updated, same = apply_install(
+        items, config_path if action == "would-create" else None,
+        (lambda: apply_to_install(base, profile)) if profile else None)
     print(f"\n新增 {created}，更新 {updated}，未变 {same}")
     print("安装完成。运行: opencode2 debug agents")
+    print("模型编队配置入口: cybertron models setup")
     return 0
 
 
@@ -348,7 +379,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     init_parser = sub.add_parser("init", help="安装角色与 /cybertron 命令")
     init_parser.add_argument("--global", dest="global_", action="store_true")
-    init_parser.add_argument("--project", default=".")
+    init_parser.add_argument("--project", default=os.environ.get("CYBERTRON_PROJECT_CWD", "."))
     init_parser.add_argument("--payload", default="")
     init_parser.add_argument("--ref", default="")
     init_parser.add_argument("--sha256", default="")
@@ -357,7 +388,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     doctor_parser = sub.add_parser("doctor", help="检查安装状态")
     doctor_parser.add_argument("--global", dest="global_", action="store_true")
-    doctor_parser.add_argument("--project", default=".")
+    doctor_parser.add_argument("--project", default=os.environ.get("CYBERTRON_PROJECT_CWD", "."))
     doctor_parser.add_argument("--payload", default="")
     doctor_parser.add_argument("--ref", default="")
     doctor_parser.add_argument("--sha256", default="")
@@ -370,6 +401,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     workflow_parser = sub.add_parser("workflow", help="可恢复的宿主外层接力")
     workflow_parser.add_argument("workflow_args", nargs=argparse.REMAINDER)
+
+    models_parser = sub.add_parser("models", help="配置和检查十三角色模型编队")
+    models_parser.add_argument("models_args", nargs=argparse.REMAINDER)
 
     return parser
 
@@ -390,6 +424,9 @@ def main(argv=None) -> int:
     if args.command == "workflow":
         from .workflow_cli import main as workflow_main
         return workflow_main(args.workflow_args)
+    if args.command == "models":
+        from .model_cli import main as models_main
+        return models_main(args.models_args)
     parser.print_help()
     return 0
 

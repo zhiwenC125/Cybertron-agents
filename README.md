@@ -64,6 +64,25 @@ python3 -m cybertron.installer init --apply --global
 
 安装后在目标项目运行 `opencode2 debug agents`，确认 13 个 Cybertron 角色加载。OpenCode 仍保持原有 Build/Plan 默认行为；用 **Shift+Tab** 选到 `prima`，直接输入自然语言软件需求即可自动创建 run 并接力。也可在 Build 模式输入 `/cybertron <需求>`，命令会选用 `prima` 并触发同一插件工作流。插件使用本机 Python 3.9+；`cybertron doctor` 只做本地检查。
 
+### 配置十三角色模型编队（本地 `0.2.0` 候选版）
+
+安装后运行 `cybertron models setup`。默认配置当前用户的全局编队；再次运行同一命令，可以只修改一个角色、调整三档模型，或全部改为同一模型。`cybertron models show` 查看当前生效映射，`cybertron models doctor` 核对 OpenCode 实际加载的角色，`cybertron models rollback` 恢复上一份配置。`--project /path/to/project` 可为公司项目设置独立的完整十三角色编队，覆盖私人全局配置。配置只保存模型 ID，不保存 API Key。
+
+```bash
+# 公司的一把 Key 对应的高、中、低档模型已在 OpenCode 登记后
+cybertron models setup --project /path/to/project \
+  --high company/high --middle company/middle --low company/low --yes
+
+# 个人多厂商混编：保留其余十二位，只切换一位
+cybertron models setup --set solus-prime=anthropic/claude-model --yes
+
+cybertron models show
+cybertron models doctor
+cybertron models rollback
+```
+
+已有的 OpenCode `/connect` 认证和 OpenCode 服务环境中的 Key 可以复用。公司使用 OpenAI 兼容网关时，可用 `cybertron models provider-add --provider-id company --base-url https://your-gateway.example/v1 --env-name COMPANY_API_KEY --model-id high --model-id middle --model-id low --yes` 登记非密钥元数据；38 个模型可重复添加 `--model-id` 参数。请通过 OpenCode 认证流程或其运行环境提供 Key。可选 `models setup --probe` 会在只含合成文件的临时目录逐个检查所选模型，可能产生少量模型费用。具体用法见[模型配置阶段记录](docs/stages/H-model-configuration.md)。
+
 源码分支现在可离线创建并检查持久化 run：
 
 ```bash

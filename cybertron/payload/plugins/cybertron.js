@@ -1,10 +1,31 @@
 import { Plugin } from '@opencode/plugin';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const pluginDirectory = path.dirname(fileURLToPath(import.meta.url));
+
+function primaryModel(project) {
+  const configHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
+  const local = path.join(project, '.cybertron', 'models.json');
+  const global = path.join(configHome, 'cybertron', 'models.json');
+  const file = existsSync(local) ? local : global;
+  if (!existsSync(file)) return null;
+  const profile = JSON.parse(readFileSync(file, 'utf8'));
+  if (profile.schema_version !== 1 || typeof profile.agents?.prima !== 'string') {
+    throw new Error('Cybertron model profile is invalid; run cybertron models doctor');
+  }
+  const separator = profile.agents.prima.indexOf('/');
+  if (separator < 1) throw new Error('Cybertron prima model ID is invalid');
+  const providerID = profile.agents.prima.slice(0, separator);
+  const rest = profile.agents.prima.slice(separator + 1);
+  const variantSeparator = rest.lastIndexOf('#');
+  const id = variantSeparator < 0 ? rest : rest.slice(0, variantSeparator);
+  const variant = variantSeparator < 0 ? undefined : rest.slice(variantSeparator + 1);
+  return { providerID, id, ...(variant ? { variant } : {}) };
+}
 
 function runtimePath() {
   const bundled = path.resolve(pluginDirectory, '..', 'cybertron-runtime');
@@ -49,6 +70,11 @@ export default Plugin.define({
     await ctx.session.hook('prompt', async event => {
       const request = event.prompt.text?.trim();
       if (request) await ctx.storage.set(`prompt/${event.sessionID}`, request);
+      const selected = await ctx.session.get({ sessionID: event.sessionID });
+      if (selected.agent === 'prima') {
+        const model = primaryModel(project);
+        if (model) await ctx.session.switchModel({ sessionID: event.sessionID, model });
+      }
     });
     await ctx.tool.transform(editor => {
       editor.add({
@@ -72,6 +98,7 @@ export default Plugin.define({
           const differentRequest = typeof request === 'string' && request !== previous;
           const shouldStart = !existing || input.new_run === true ||
             (differentRequest && (prior.status === 'completed' ||
+              prior.config === 'changed' ||
               (prior.status === 'blocked' && prior.stage_id !== 1)));
           const runID = !shouldStart ? existing : (await bridge('start', {
             project, sessionID: context.sessionID, request, mode: input.mode || 'software',
@@ -90,6 +117,11 @@ export default Plugin.define({
       if (event.agent !== 'prima') {
         delete event.tools.cybertron_run;
         return;
+      }
+      const expected = primaryModel(project);
+      if (expected && (event.model.providerID !== expected.providerID ||
+          event.model.id !== expected.id || event.model.variant !== expected.variant)) {
+        throw new Error('Cybertron prima model differs from active session; run cybertron models doctor');
       }
       delete event.tools.subagent;
       event.system.push({ type: 'text', text: 'For each new user development request, call cybertron_run exactly once before answering. Pass mode=hardware only when the user explicitly requests firmware or device work; otherwise mode=software. Set new_run=true when the user starts a distinct task in this same chat. The tool owns the nine-stage ledger and all role dispatch. Do not launch subagents directly. Report the returned run ID, current stage, and block_reason exactly as returned. Do not guess why a run is blocked. Never claim fake or model-only evidence is a real test receipt.' });
