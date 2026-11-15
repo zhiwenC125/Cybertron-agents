@@ -1,7 +1,7 @@
 {
   "milestone": "M0b",
   "status": "passed",
-  "commit": null,
+  "commit": "f0968169e8b8c5084343d3bbb7623d778da54f38",
   "required_gates": [
     "unit_tests_all_green",
     "integration_test_real_subprocess",
