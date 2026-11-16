@@ -239,6 +239,11 @@
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
+        },
+        {
+          "action": "cy_check",
+          "resource": "*",
+          "effect": "allow"
         }
       ]
     },
@@ -402,6 +407,11 @@
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
+        },
+        {
+          "action": "cy_check",
+          "resource": "*",
+          "effect": "allow"
         }
       ]
     },
@@ -461,6 +471,11 @@
           "action": "edit",
           "resource": "bsp/**",
           "effect": "allow"
+        },
+        {
+          "action": "cy_check",
+          "resource": "*",
+          "effect": "allow"
         }
       ]
     },
@@ -485,6 +500,11 @@
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
+        },
+        {
+          "action": "cy_check",
+          "resource": "*",
+          "effect": "allow"
         }
       ]
     },
@@ -608,6 +628,11 @@
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
+        },
+        {
+          "action": "cy_check",
+          "resource": "*",
+          "effect": "allow"
         }
       ]
     },
@@ -687,6 +712,11 @@
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
+        },
+        {
+          "action": "cy_check",
+          "resource": "*",
+          "effect": "allow"
         }
       ]
     },

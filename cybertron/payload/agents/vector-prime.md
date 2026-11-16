@@ -32,6 +32,9 @@ permissions:
   - action: "subagent"
     resource: "*"
     effect: "deny"
+  - action: "cy_check"
+    resource: "*"
+    effect: "allow"
 ---
 
 # 维克多 (Vector Prime) — 神器：Blades of Time (时空之剑)

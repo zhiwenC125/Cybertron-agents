@@ -326,7 +326,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         system_prompt=(
             "你是微米天（Micronus Prime），专职的第一道代码审查官（L1 Style & Static Analysis Code Reviewer）。\n"
             "【专职职责与正交铁律】：\n"
-            "1. 任何软硬件代码在送交测试前，必须先经过你的 L1 Code Review。当前只读审查源码；ruff/mypy/clang-tidy/cppcheck 需等隔离运行器接入后执行。\n"
+            "1. 任何软硬件代码在送交测试前，必须先经过你的 L1 Code Review。使用 cy_check(target=lint) 获取隔离运行器的真实回执；你只解读回执，不直接运行 shell。\n"
             "2. 你只输出审查报告，不修改源码；格式、注释或逻辑问题交由先觉天打回赛天骄修改。"
         ),
         permissions=[
@@ -436,7 +436,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "你是合体天（Nexus Prime），执掌合体之谜的软硬件构建与部署集成工程师。\n"
             "【专职职责与正交铁律】：\n"
             "1. 你只维护构建配置文件（`CMakeLists.txt`, `Makefile`, `platformio.ini`, `*.ld`, `*.dts`, `Dockerfile*`）；不得修改 agent 权限配置或 CI 工作流。\n"
-            "2. 当前可维护构建配置并探测只读设备信息；cmake/make/编译命令需等隔离运行器接入后才能执行。生成烧录指令单移交震天尊执行物理烧录。"
+            "2. 使用 cy_check(target=build) 获取隔离构建回执；不得直接运行 cmake/make/编译命令。生成烧录指令单移交震天尊执行物理烧录。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
@@ -578,6 +578,12 @@ for _prime in THIRTEEN_PRIMES_REGISTRY:
         if _root not in _host_edits:
             _prime.permissions.append(PermissionRule("edit", _root, PermissionEffect.ALLOW))
 
+_CHECK_ROLES = frozenset({"micronus-prime", "nexus-prime", "alchemist", "solus-prime",
+                          "amalgamous", "vector-prime"})
+for _prime in THIRTEEN_PRIMES_REGISTRY:
+    if _prime.agent_id in _CHECK_ROLES:
+        _prime.permissions.append(PermissionRule("cy_check", "*", PermissionEffect.ALLOW))
+
 PRIME_ROLES: Mapping[str, PrimeRole] = MappingProxyType({
     spec.agent_id: PrimeRole(
         agent_id=spec.agent_id,
@@ -590,7 +596,7 @@ PRIME_ROLES: Mapping[str, PrimeRole] = MappingProxyType({
         tool_classes=("task", "cy_state", "cy_plan", "cy_ask") if spec.agent_id == "prima" else
                      tuple(sorted({rule.action for rule in spec.permissions if rule.effect is PermissionEffect.ALLOW and rule.action != "*"})),
         command_mode="git-allow-list" if spec.agent_id == "vector-prime" else
-                     "kernel-check" if spec.agent_id == "nexus-prime" else "none",
+                     "kernel-check" if spec.agent_id in _CHECK_ROLES else "none",
         network=spec.agent_id in {"thirteenth", "alpha-trion"},
         device="broker" if spec.agent_id == "megatronus" else None,
         external_write=("feishu",) if spec.agent_id == "alpha-trion" else (),
@@ -606,7 +612,7 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
     if set(roles) != set(_ROLE_CAPABILITIES) or len(specs) != len(roles):
         raise ValueError("role catalogue must contain exactly thirteen unique agents")
     known_actions = {"*", "read", "glob", "grep", "edit", "shell", "subagent",
-                     "cy_state", "cy_plan", "cy_ask", "feishu_mcp_healthcheck*",
+                     "cy_state", "cy_plan", "cy_ask", "cy_check", "feishu_mcp_healthcheck*",
                      "feishu_wiki_delete*", "feishu_wiki_docx_v1_document_rawContent",
                      "feishu_wiki_wiki_v2_space_getNode"}
     for spec in specs:
@@ -625,6 +631,9 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
             raise ValueError("only prima may dispatch")
         if ("task" in role.tool_classes) != (spec.agent_id == "prima"):
             raise ValueError("only prima may have task tool")
+        check_permission = any(r.action == "cy_check" for r in allowed)
+        if check_permission != (spec.agent_id in _CHECK_ROLES) or ("cy_check" in role.tool_classes) != check_permission:
+            raise ValueError("cy_check role permission drift")
         if spec.agent_id == "prima" and any(r.action in {"read", "glob", "grep", "edit", "shell"} for r in allowed):
             raise ValueError("prima cannot use file or command tools")
         if spec.agent_id != "prima" and not any(r.action == "subagent" and r.resource == "*" and r.effect is PermissionEffect.DENY for r in spec.permissions):

@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import Any
 
 from .graph import GraphRejected, PlanGraph, PlanNode
+from .gates import diff_facts, risk_floor
+from .profiles import run_check
 from .scope_guard import FileState, ScopeGuard, Snapshot
 
 
@@ -85,6 +87,26 @@ class V6HostBridge:
         path = self._dir(run_id) / "events.jsonl"
         return [json.loads(line) for line in path.read_text().splitlines() if line]
 
+    def _workspace_digest(self) -> str:
+        snapshot = ScopeGuard(self.project, ()).snapshot()
+        visible = {name: (state.kind, state.mode, state.sha256)
+                   for name, state in snapshot.entries.items()
+                   if not name.startswith((".git/", ".cybertron/runs/"))
+                   and name not in {".git", ".cybertron/runs"}}
+        return _hash(json.dumps(visible, sort_keys=True).encode())
+
+    def check(self, run_id: str, target: str) -> dict:
+        if target not in {"lint", "build", "test"}:
+            raise HostBridgeError("invalid check target")
+        self._dir(run_id)
+        result = run_check(self.project, target)
+        last = result["receipts"][-1]
+        self._append(run_id, "gate.check", gate=target, status=result["status"],
+                     profile=result["profile"], receipt={
+                         key: last[key] for key in ("source", "command", "exit", "utc", "sha256")
+                     }, workspace_sha256=self._workspace_digest())
+        return {**result, "run_id": run_id, "state": self.state(run_id)}
+
     def plan(self, node_data: dict | list[dict], host_session_id: str) -> dict:
         try:
             nodes = [PlanNode.from_dict(data) for data in
@@ -130,20 +152,38 @@ class V6HostBridge:
                 status[node_id] = "pending" if event["type"] == "node.retry" else event["type"].split(".", 1)[1]
         for node_id, value in status.items():
             graph.nodes[node_id].status = value
+        required_gates = set(graph.gates)
+        for event in events:
+            if event["type"] == "gate.required":
+                required_gates.update(event["gates"])
+        passed_gates = set()
+        if any(event["type"] == "node.completed" for event in events):
+            passed_gates.add("scope_guard")
+        current_digest = self._workspace_digest() if any(
+            event["type"] == "gate.check" for event in events) else None
+        for event in events:
+            if (event["type"] == "gate.check" and event["status"] == "pass"
+                    and event["workspace_sha256"] == current_digest):
+                passed_gates.add(event["gate"])
+        pending_gates = sorted(required_gates - passed_gates)
         ready = [node.node_id for node in graph.ready_nodes()]
         nodes = [{"node_id": node.node_id, "status": status[node.node_id],
                   "card": self._card(node), "role": node.role,
                   "write_scope": list(node.write_scope)} for node in graph.nodes.values()]
         active = next((node for node in nodes if node["status"] == "running"), None)
         result = {"run_id": run_id, "status": "running" if active else
-                  "ready" if ready else "completed" if all(v == "completed" for v in status.values()) else "blocked",
+                  "ready" if ready else "completed" if all(v == "completed" for v in status.values())
+                  and not pending_gates else "blocked",
                   "plan_revision": graph.revision, "nodes": nodes, "ready_nodes": ready,
+                  "required_gates": sorted(required_gates), "passed_gates": sorted(passed_gates),
+                  "pending_gates": pending_gates,
                   "child_session_id": child.get(active["node_id"]) if active else None,
                   "event_seq": len(events), "events_path": str(self._dir(run_id) / "events.jsonl")}
         if len(nodes) == 1:
             result.update({"node_id": nodes[0]["node_id"], "card": nodes[0]["card"],
                            "write_scope": nodes[0]["write_scope"],
-                           "status": "ready" if ready else nodes[0]["status"]})
+                           "status": "ready" if ready else "blocked" if pending_gates
+                           else nodes[0]["status"]})
         return result
 
     def ask(self, run_id: str, question: str) -> dict:
@@ -273,4 +313,10 @@ class V6HostBridge:
                                "exit": 0 if returned["tool_status"] == "completed" else 1,
                                "utc": _utc(), "sha256": returned["output_sha256"],
                                "session_id": child_session_id})
+        if status == "completed":
+            facts = diff_facts(baseline, guard.snapshot())
+            risk, floor = risk_floor(facts)
+            self._append(run_id, "gate.required", node_id=node.node_id,
+                         risk=risk.name.lower(), gates=sorted(floor),
+                         changed_paths=list(facts.paths), changed_lines=facts.changed_lines)
         return self.state(run_id)

@@ -145,6 +145,21 @@ export default Plugin.define({
           return { content: JSON.stringify(result) };
         },
       });
+      editor.add({
+        name: 'cy_check', description: 'Run a fixed lint, build, or test target in an isolated project copy and return tool receipts.',
+        input: { type: 'object', properties: {
+          target: { type: 'string', enum: ['lint', 'build', 'test'] },
+          run_id: { type: 'string' },
+        }, required: ['target'], additionalProperties: false },
+        execute: async (input, context) => {
+          const allowed = new Set(['micronus-prime', 'nexus-prime', 'alchemist',
+            'solus-prime', 'amalgamous', 'vector-prime']);
+          if (!allowed.has(context.agent)) throw new Error('This role cannot run cy_check');
+          const result = await bridge('check', project,
+            { target: input.target, run_id: input.run_id }, context.signal);
+          return { content: JSON.stringify(result) };
+        },
+      });
     });
     await ctx.tool.hook('execute.before', async event => {
       if (event.tool !== 'subagent') return;
@@ -190,15 +205,18 @@ export default Plugin.define({
         delete event.tools.cy_plan;
         delete event.tools.cy_ask;
         delete event.tools.subagent;
+        if (!['micronus-prime', 'nexus-prime', 'alchemist', 'solus-prime',
+          'amalgamous', 'vector-prime'].includes(event.agent)) delete event.tools.cy_check;
         return;
       }
+      delete event.tools.cy_check;
       const expected = primaryModel(project);
       if (expected && (event.model.providerID !== expected.providerID ||
           event.model.id !== expected.id || event.model.variant !== expected.variant)) {
         throw new Error('Cybertron prima model differs from active session; run cybertron models doctor');
       }
       event.system.push({ type: 'text', text:
-        'Cybertron v6 M1: plan the smallest valid task graph for the user request with cy_plan. Use node for one task, nodes for a dependency graph, or the optional bug_fix template for a four-node investigation, fix, and review seed. For a single requested Markdown file within alpha-trion allowed paths, use capability doc.write, role alpha-trion, write_scope containing only that path, and scope_guard verifier; keep the requested content exact. Each task needs a registered capability and role, narrow write_scope, acceptance, and scope_guard verifier. Use cy_plan with a revisioned operation to add, split, or reassign nodes when needed. Dispatch only a ready node through the native subagent tool; use its exact returned card as description and include node_id, capability, write_scope, and objective in the child prompt. Call cy_state with wait=true after each child returns. Background is still running; cancellation is terminal. Gate N/A and complete_run remain unavailable until M2 verifier facts. Never claim model text as tool evidence.' });
+        'Cybertron v6 M2: plan the smallest valid task graph for the user request with cy_plan. Use node for one task, nodes for a dependency graph, or the optional bug_fix template. For a single requested Markdown file within alpha-trion allowed paths, use capability doc.write, role alpha-trion, write_scope containing only that path, and scope_guard verifier; keep the requested content exact. Each task needs a registered capability and role, narrow write_scope, acceptance, and scope_guard verifier. Dispatch only a ready node through the native subagent tool; use its exact returned card as description and include node_id, capability, write_scope, objective, and run_id in the child prompt. Call cy_state with wait=true after each child returns. The kernel derives risk gates from the actual workspace diff; cy_check runs fixed lint/build/test targets for eligible roles, and a run_id binds its receipt to the run. Required gates cannot be removed; mark_not_applicable and complete_run remain fail-closed until trusted verifier facts exist. Background is still running; cancellation is terminal. Never claim model text as tool evidence.' });
     });
   },
 });

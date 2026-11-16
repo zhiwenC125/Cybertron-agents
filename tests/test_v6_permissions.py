@@ -41,6 +41,16 @@ class V6PermissionTests(unittest.TestCase):
         self.assertEqual(MegatronusCircuitBreaker(prima.permissions).verify_tool_call(
             "cybertron_run", "*", "legacy")[0], PermissionEffect.DENY)
 
+    def test_cy_check_is_granted_only_to_isolated_check_roles(self):
+        allowed = {"micronus-prime", "nexus-prime", "alchemist", "solus-prime",
+                   "amalgamous", "vector-prime"}
+        for agent in THIRTEEN_PRIMES_REGISTRY:
+            with self.subTest(agent=agent.agent_id):
+                effect, _ = MegatronusCircuitBreaker(agent.permissions).verify_tool_call(
+                    "cy_check", "*", agent.agent_id)
+                self.assertEqual(effect, PermissionEffect.ALLOW if agent.agent_id in allowed
+                                 else PermissionEffect.DENY)
+
     def test_alpha_can_write_root_notes_but_not_role_config(self):
         alpha = next(agent for agent in THIRTEEN_PRIMES_REGISTRY if agent.agent_id == "alpha-trion")
         breaker = MegatronusCircuitBreaker(alpha.permissions)

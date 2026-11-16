@@ -9,17 +9,21 @@ from pathlib import Path
 
 from .host_v6 import HostBridgeError, V6HostBridge
 from .templates import bug_fix_template
+from .profiles import CheckRejected, run_check
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cybertron-v6-host")
-    parser.add_argument("operation", choices=("plan", "plan_op", "state", "ask", "before", "after", "finish"))
+    parser.add_argument("operation", choices=("plan", "plan_op", "state", "ask", "before", "after", "finish", "check"))
     parser.add_argument("--project", type=Path, required=True)
     args = parser.parse_args(argv)
     data = json.load(sys.stdin)
-    bridge = V6HostBridge(args.project)
+    bridge = V6HostBridge(args.project) if args.operation != "check" else None
     try:
-        if args.operation == "plan":
+        if args.operation == "check":
+            result = (V6HostBridge(args.project).check(data["run_id"], data["target"])
+                      if data.get("run_id") else run_check(args.project, data["target"]))
+        elif args.operation == "plan":
             if "template" in data:
                 template = data["template"]
                 if template.get("type") != "bug_fix":
@@ -44,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
                                   data["duration_ms"], data.get("output_sha256"))
         else:
             result = bridge.finish(data["run_id"], data["token"], data["child_session_id"])
-    except (HostBridgeError, KeyError, ValueError) as exc:
+    except (HostBridgeError, CheckRejected, KeyError, ValueError) as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False))
         return 2
     print(json.dumps(result, ensure_ascii=False))
