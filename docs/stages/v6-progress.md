@@ -47,4 +47,4 @@ M5 本轮进展（2026-11-16）：新增 `cybertron/learning.py`（仅从全部�
 
 DSH 第二宿主：新增可安装 bundle `cybertron/dsh_adapter`（`@local/cybertron-dsh`），声明 `Cybertron v6` preset，仅在 preset 内挂载 `cy_plan`/`cy_state`/`cy_ask`/`cy_templates`/`cy_metrics`，通过 `bridge.js` 调用同一 Python 内核；manifest、patch、locale、图标、DETAIL 与真实内核桥接契约均有测试（`test_dsh_adapter_m5.py`、`dsh_adapter_bridge.test.mjs`）。用户授权继续后，`cybertron/dsh_adapter` 通过 `plugin_manager install_bundle` 安装进运行中的 desktop profile：`application=applied`、无 warnings，`preset-cybertron` 的 `fiberPhase=active`；临时 headless/web 测试 profile 验证组合后已删除。证据见 `v6-m5-dsh-load.json`。DSH 适配目前是单一 prima persona + cy_* 工具，尚未把 13 角色映射为 13 个 DSH preset，也未绑定 DSH 子会话写范围，该限制已写入 bundle 的 DETAIL。M5 门禁全部通过，状态改为 passed。
 
-本轮验证：232 项 Python 单测、7 项 JS 测试、阶段 5 隔离验证、引擎自检和 `opencode2 debug config` 全部通过；命令、退出码、UTC 与 SHA-256 见 `v6-m5.json`。M0–M4 未改动。提交：实现与证据随后提交，并在 `v6-progress.md` 记录提交哈希。用户可在工作区新建 DSH 会话并选择 `Cybertron v6` preset 做 GUI 验收；真实模型会话属于使用验收，不再阻塞 M5 的加载门禁。
+本轮验证：232 项 Python 单测、7 项 JS 测试、阶段 5 隔离验证、引擎自检和 `opencode2 debug config` 全部通过；命令、退出码、UTC 与 SHA-256 见 `v6-m5.json`。M0–M4 未改动。实现与证据提交 `566c318`。用户可在工作区新建 DSH 会话并选择 `Cybertron v6` preset 做 GUI 验收；真实模型会话属于使用验收，不再阻塞 M5 的加载门禁。

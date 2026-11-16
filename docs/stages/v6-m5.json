@@ -1,7 +1,7 @@
 {
   "milestone": "M5",
   "status": "passed",
-  "commit": null,
+  "commit": "566c318413e6461691f7da85427368ef6a804019",
   "checked_at_utc": "2026-11-16T17:39:28.571789+00:00",
   "required_gates": [
     "unit_tests_all_green",
