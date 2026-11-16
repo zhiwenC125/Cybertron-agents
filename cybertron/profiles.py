@@ -91,9 +91,10 @@ def _binary(name: str) -> str:
     if found:
         return found
     if name == "clang-tidy":
-        homebrew = Path("/opt/homebrew/opt/llvm/bin/clang-tidy")
-        if homebrew.is_file():
-            return str(homebrew)
+        for prefix in ("/opt/homebrew", "/usr/local"):
+            homebrew = Path(prefix) / "opt" / "llvm" / "bin" / "clang-tidy"
+            if homebrew.is_file():
+                return str(homebrew)
     raise CheckRejected(f"required tool is unavailable: {name}")
 
 
