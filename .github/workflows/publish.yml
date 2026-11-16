@@ -40,7 +40,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$(git rev-list -n 1 "$RELEASE_TAG")"
           git merge-base --is-ancestor HEAD origin/main
           python scripts/bump_version.py "${RELEASE_TAG#v}" --check
-          test -f "docs/releases/${RELEASE_TAG#v}.md"
+          test -f "docs/releases/${RELEASE_TAG}.md"
       - name: Run release gates
         run: |
           python -m unittest discover -s tests -v
@@ -148,5 +148,5 @@ jobs:
         shell: bash
         run: |
           gh release create "$RELEASE_TAG" dist/* --verify-tag \
-            --notes-file "docs/releases/${RELEASE_TAG#v}.md" \
+            --notes-file "docs/releases/${RELEASE_TAG}.md" \
             --repo "$GITHUB_REPOSITORY"
