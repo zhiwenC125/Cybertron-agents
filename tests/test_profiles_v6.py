@@ -22,7 +22,7 @@ class ProfilesV6Tests(unittest.TestCase):
             for target, binary in (("lint", "clang-tidy"), ("build", "cmake")):
                 with self.subTest(target=target):
                     result = run_check(project, target)
-                    self.assertEqual(result["status"], "pass")
+                    self.assertEqual(result["status"], "pass", result["receipts"])
                     self.assertIn(binary, result["receipts"][-1]["command"])
                     self.assertTrue(all(item["source"] == "sandbox" and item["exit"] == 0
                                         and item["sha256"] == hashlib.sha256(item["output"].encode()).hexdigest()
