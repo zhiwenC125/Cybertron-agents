@@ -18,7 +18,7 @@ import urllib.request
 from pathlib import Path
 
 REPO = "zhiwenC125/Cybertron-agents"
-DEFAULT_REF = "v0.2.1"
+DEFAULT_REF = "v0.3.0"
 KNOWN_AGENT_COUNT = 13
 MINIMAL_CONFIG = (
     '{\n'
@@ -42,7 +42,7 @@ def _version() -> str:
 
         return version("cybertron-agents")
     except Exception:
-        return "0.2.1"
+        return "0.3.0"
 
 
 def default_base(global_install: bool, project: str) -> Path:
@@ -336,6 +336,28 @@ def run_init(args) -> int:
     return 0
 
 
+def dsh_bundle_dir(payload: Path) -> Path:
+    """Return the DSH adapter bundle shipped with this payload."""
+    candidates = (payload / "dsh-adapter", payload / "dsh_adapter",
+                  Path(__file__).resolve().parent / "dsh_adapter")
+    for candidate in candidates:
+        if (candidate / "package.json").is_file():
+            return candidate.resolve()
+    raise SystemExit("payload 缺少 DSH bundle（dsh-adapter/package.json）")
+
+
+def run_dsh(args) -> int:
+    payload = resolve_payload(args.payload, args.ref, args.sha256,
+                              allow_download=False)
+    if payload is None:
+        raise SystemExit("未找到本地 payload；请先安装 cybertron-agents")
+    bundle = dsh_bundle_dir(payload)
+    if getattr(args, "dsh_command", None) == "path":
+        print(bundle)
+        return 0
+    raise SystemExit("用法: cybertron dsh path")
+
+
 def run_doctor(args) -> int:
     base = default_base(args.global_, args.project)
     payload = resolve_payload(
@@ -405,6 +427,13 @@ def build_parser() -> argparse.ArgumentParser:
     models_parser = sub.add_parser("models", help="配置和检查十三角色模型编队")
     models_parser.add_argument("models_args", nargs=argparse.REMAINDER)
 
+    dsh_parser = sub.add_parser("dsh", help="DeepSeek Harness 适配器")
+    dsh_parser.add_argument("--payload", default="")
+    dsh_parser.add_argument("--ref", default="")
+    dsh_parser.add_argument("--sha256", default="")
+    dsh_sub = dsh_parser.add_subparsers(dest="dsh_command")
+    dsh_sub.add_parser("path", help="打印随包分发的 DSH bundle 绝对路径")
+
     return parser
 
 
@@ -427,6 +456,8 @@ def main(argv=None) -> int:
     if args.command == "models":
         from .model_cli import main as models_main
         return models_main(args.models_args)
+    if args.command == "dsh":
+        return run_dsh(args)
     parser.print_help()
     return 0
 

@@ -34,6 +34,7 @@ function usage() {
   cybertron init [--global | --project DIR] [--apply] [--dry-run]
   cybertron doctor [--global | --project DIR]
   cybertron models setup|show|doctor|rollback [--global | --project DIR]
+  cybertron dsh path
   cybertron --version
   cybertron --help
 
@@ -118,6 +119,20 @@ function runInit(opts) {
   console.log('模型编队配置入口: cybertron models setup');
 }
 
+function runDshPath() {
+  const payload = resolvePayload(pkgRoot);
+  const candidates = [
+    path.join(payload.base, 'dsh-adapter'),
+    path.join(pkgRoot, 'cybertron', 'dsh_adapter'),
+  ];
+  const bundle = candidates.find(dir => existsSync(path.join(dir, 'package.json')));
+  if (!bundle) {
+    console.error('未找到 DSH bundle（payload/dsh-adapter/package.json）。');
+    process.exit(1);
+  }
+  console.log(bundle);
+}
+
 function runDoctor(opts) {
   const base = targetBase({ global: opts.global, projectDir: opts.projectDir });
   const payload = resolvePayload(pkgRoot);
@@ -157,6 +172,16 @@ if (argv.length === 0 || argv.includes('--help') || argv.includes('-h')) {
 
 const cmd = argv[0];
 if (cmd === 'models') process.exit(runModelCli(argv.slice(1)));
+if (cmd === 'dsh') {
+  if (argv[1] === 'path') {
+    runDshPath();
+    process.exit(0);
+  }
+  console.error('用法: cybertron dsh path');
+  process.exit(2);
+}
+
+
 const opts = parseArgs(argv.slice(1));
 if (opts.error) {
   console.error(opts.error);

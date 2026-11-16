@@ -21,8 +21,7 @@ from typing import Any
 from .graph import GraphRejected, PlanGraph, PlanNode
 from .gates import diff_facts, risk_floor
 from .learning import (TemplateRejected, distill_template, instantiate, is_request_class,
-                       list_templates, load_template, match_template,
-                       request_class_of, save_template)
+                       list_templates, load_template, request_class_of, save_template)
 from .metrics import MetricsError, collect, render_panel, run_metrics, summarize, template_summary
 from .profiles import run_check
 from .scope_guard import FileState, ScopeGuard, Snapshot

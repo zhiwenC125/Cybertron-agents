@@ -54,6 +54,19 @@ class InstallerCliTest(unittest.TestCase):
         return subprocess.run([*commands[entry], *args, "--project", str(self.tmp)],
                               cwd=ROOT, env=self.env(), capture_output=True, text=True)
 
+    def test_dsh_path_points_at_the_bundled_adapter(self):
+        result = self.run_cli("dsh", "path")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        bundle = Path(result.stdout.strip())
+        self.assertTrue((bundle / "package.json").is_file())
+        self.assertEqual(json.loads((bundle / "package.json").read_text())["name"],
+                         "@local/cybertron-dsh")
+        if shutil.which("node") and not os.environ.get("CYBERTRON_SANDBOX"):
+            npm = subprocess.run(["node", str(ROOT / "bin/cybertron.mjs"), "dsh", "path"],
+                                 cwd=ROOT, env=self.env(), capture_output=True, text=True)
+            self.assertEqual(npm.returncode, 0, npm.stderr)
+            self.assertTrue((Path(npm.stdout.strip()) / "cordis.patch.yml").is_file())
+
     def test_dry_run_does_not_write(self):
         result = self.run_cli("init", "--dry-run", "--project", str(self.tmp))
         self.assertEqual(result.returncode, 0, result.stderr)

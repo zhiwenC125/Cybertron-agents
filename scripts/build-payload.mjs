@@ -23,6 +23,8 @@ for (const kind of ['agents', 'commands']) {
   cpSync(src, bundled, { recursive: true });
 }
 for (const base of [payload, path.join(root, 'cybertron', 'payload')]) {
+  cpSync(path.join(root, 'cybertron', 'dsh_adapter'),
+    path.join(base, 'dsh-adapter'), { recursive: true });
   const pluginDir = path.join(base, 'plugins');
   const runtimeDir = path.join(base, 'cybertron-runtime', 'cybertron');
   mkdirSync(pluginDir, { recursive: true });

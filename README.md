@@ -6,11 +6,11 @@
 
 当前项目协作与权限基线见 [AGENTS.md](AGENTS.md)。普通角色不能直接执行测试、构建和静态检查 Shell 命令；软件测试由 Cybertron 宿主在 macOS 隔离运行器中执行。
 
-**当前状态（2026-11-15）**：后续 A–E 和十三角色模型编队已完成；OpenCode 软件工作流在临时项目中通过真实九步接力、L1/L2 审查和隔离 QA。纯软件任务明确跳过物理烧录；硬件任务仍受设备审批边界约束。`0.2.0` 已发布到 npm、PyPI 和 GitHub Release。证据见[阶段 E 文档](docs/stages/E-opencode-orchestration.md)与[发布验收记录](docs/stages/I-release-020.md)。
+**当前状态（2026-11-17）**：v6 动态任务图 M0–M5 已全部通过门禁，`0.3.0` 是 v6 功能版本。运行时从固定九步账本改为“prima 提议、内核裁决”的图计划：写范围守卫、按实际 diff 计算风险门禁、并发写入锁、Loop-1/2 修复、设备审批与回滚、模板沉淀与指标面板。OpenCode 宿主已用真实模型完成学习门禁；DSH 适配器作为实验性 bundle 随包分发。历史 A–E 与七阶段记录见[阶段文档目录](docs/stages/)和[v6 进度](docs/stages/v6-progress.md)。
 
 各阶段的代码摘录、验收记录与后续实现建议见 [阶段文档目录](docs/stages/01-foundation.md)：[1](docs/stages/01-foundation.md) · [2](docs/stages/02-local-execution.md) · [3](docs/stages/03-opencode-config.md) · [4](docs/stages/04-opencode-executor.md) · [5](docs/stages/05-quality-gates.md) · [6](docs/stages/06-feishu.md) · [7](docs/stages/07-deployment.md)。参考资料新增 [Datawhale Hello Agents](https://datawhalechina.github.io/hello-agents/#/)。
 
-本仓库是 [v5 架构白皮书](design/cybertron_13_primes_architecture.md)的 Python 原型。当前实现包含 13 个角色的静态定义、权限规则、可恢复的九步账本、OpenCode V2 插件和宿主适配器、飞书 Wiki OpenAPI 网关，以及 DeepSeek Harness 配置导出。角色模型 ID 以 `cybertron/registry.py` 为准；白皮书中的旧 DeepSeek 模型名保留为当时的设计记录。
+本仓库是 [v6 动态任务图设计](design/DEVELOPMENT_PLAN.md) 的实现，保留 [v5 架构白皮书](design/cybertron_13_primes_architecture.md) 作为历史设计。0.3 运行时包含 13 角色注册表、图计划与写范围守卫、风险门禁与工具链配置档、并发调度与局部返工、设备副作用代理、模板沉淀与指标面板，以及 OpenCode 原生派单插件和 DSH 适配器。角色模型 ID 以 `cybertron/registry.py` 为准。
 
 ## 运行
 
@@ -42,9 +42,18 @@ python3 -m cybertron.opencode_run "请澄清 STM32F4 电机控制任务还缺少
 
 阶段 6 的离线测试包含在单元测试中。真实飞书测试使用自建应用身份：在本机设置 `FEISHU_APP_ID`、`FEISHU_APP_SECRET` 和测试空间的 `FEISHU_WIKI_SPACE_ID`，依次运行 `python3 -m cybertron.stage6_verify --check-env`、`--check-auth` 和 `--live`；最后一项会在该空间创建并保留一篇测试文档、追加正文并回读验证。完整步骤见[阶段 6 文档](docs/stages/06-feishu.md)。不要把 App Secret 或租户令牌提交到仓库或贴进聊天。
 
+## v6 动态任务图（0.3）
+
+v6 不再把九步流程写死在存储层。prima 通过 `cy_plan` 提交节点与依赖，内核按 `registry.py` 校验能力、角色和 `write_scope`，按实际 diff 计算风险下限；`insert_gate` 只能加门禁，风险下限内的门禁不能被模型标记为 N/A。派发仍走宿主原生 subagent，插件在派发前后校验节点、记录子会话，并在结束时用 `scope_guard` 计算 diff、越界即回滚。
+
+- **M0–M2**：图 schema、单节点计划、写范围守卫、测试门四种结论；prima 规划权、风险门禁与 python/node/cmake-arm 配置档；真实 `clang-tidy`/CMake 回执。
+- **M3**：并发写范围锁、Loop-1 修复循环、L2 拒绝后的局部返工。
+- **M4**：设备审批绑定设备/固件/擦写范围/回滚镜像，Renode 仿真配置档，STM32 真机烧录与逐字节回滚。
+- **M5**：完成后沉淀经重新校验的模板、从事件账本生成指标面板；同类需求第二次运行可复用模板并跳过只读发现节点。OpenCode 真实宿主上节点 2→1、人工干预 1→0。
+
 ## 安装到 OpenCode
 
-三条安装路径共享同一份 payload（13 个角色、可选 `/cybertron` 命令、OpenCode 插件和 Python 运行时），默认 dry-run，`--apply` 才写入。公开版本为 **0.2.1**。
+三条安装路径共享同一份 payload（13 个角色、可选 `/cybertron` 命令、OpenCode 插件、Python 运行时和 DSH 适配器），默认 dry-run，`--apply` 才写入。公开版本为 **0.3.0**。
 
 可从本源码分支安装，也可使用[三种公开安装方式](docs/packaging-and-installation.md)：
 
@@ -61,6 +70,17 @@ python3 -m cybertron.installer init --apply --global
 
 - `--project DIR`：写入 `DIR/.opencode/` 下的角色、命令、插件及运行时
 - `--global`：写入 `${XDG_CONFIG_HOME:-~/.config}/opencode/` 下的同一组文件
+
+### 安装到 DeepSeek Harness（实验性）
+
+bundle 随 npm/PyPI 包分发。先取得目录，再注册到目标 profile，最后新建会话选择 `Cybertron v6` preset：
+
+```bash
+BUNDLE="$(cybertron dsh path)"          # npm: npx cybertron-agents dsh path
+dsh plugin --profile desktop add "$BUNDLE"
+```
+
+preset 只在选中的会话里挂载 `cy_plan`/`cy_state`/`cy_ask`/`cy_templates`/`cy_metrics`，不改变默认模式；工作目录需包含 Cybertron 运行时。DSH 的子代理状态显示在会话头部的子代理目录（运行中/完成、token、时长），不是 OpenCode 的内联卡片。移除：`plugin_manager remove_bundle @local/cybertron-dsh` 或 Plugins 页。限制见[适配器说明](cybertron/dsh_adapter/docs/DETAIL.md)。
 
 安装后在目标项目运行 `opencode2 debug agents`，确认 13 个 Cybertron 角色加载。OpenCode 仍保持原有 Build/Plan 默认行为；用 **Shift+Tab** 选到 `prima`，直接输入自然语言软件需求即可自动创建 run 并接力。也可在 Build 模式输入 `/cybertron <需求>`，命令会选用 `prima` 并触发同一插件工作流。插件使用本机 Python 3.9+；`cybertron doctor` 只做本地检查。
 
@@ -94,7 +114,7 @@ python3 -m cybertron.installer workflow run <run_id> --project . --host fake
 
 `fake` 仅模拟九步与证据，不能作为真实开发完成的证明。`workflow resume <run_id>` 只恢复账本，不重放宿主调用。手动真实调用使用 `--host opencode --allow-external-model`；在 OpenCode 内通过插件调用时，模型调用由用户选择 `prima` 或 `/cybertron` 触发。详情见[阶段 E 记录](docs/stages/E-opencode-orchestration.md)。
 
-详见[安装与发布方案](docs/packaging-and-installation.md)、[GitHub Release v0.2.1](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.2.1)和[发布验收记录](docs/stages/I-release-021.md)。
+详见[安装与发布方案](docs/packaging-and-installation.md)、[v0.3.0 发布说明](docs/releases/v0.3.0.md)和[GitHub Release v0.3.0](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.3.0)。
 
 ## 飞书知识库（可选）
 
@@ -132,7 +152,7 @@ python3 -m cybertron.installer workflow run <run_id> --project . --host fake
 
 1. `ledger.py` 与 `dispatch.py` 已实现 L1/L2 拒绝后返回编码、重审及超限阻塞；真实软件流程已生成宿主审查证明与隔离 QA 回执。宿主回执证明审查发生及项目文件被读取，不保证模型判断一定正确。
 2. `policy.py` 是本地策略原型，不能代替宿主层权限和命令解析。生成配置后的真实权限仍需在目标宿主中验证。
-3. DeepSeek Harness 目前只导出预设 JSON，白皮书中的 `.dsh/cordis-cybertron-plugin.mjs` 尚未实现。
+3. DeepSeek Harness 适配器已实现为随包分发的 bundle：`cybertron dsh path`（npm 为 `npx cybertron-agents dsh path`）给出目录，再执行 `dsh plugin --profile <profile> add <目录>`，新建会话选择 `Cybertron v6` preset。它目前是单一 prima persona + `cy_*` 工具，DSH 子会话尚未绑定节点 `write_scope`，因此定位为实验性第二宿主。
 4. 阶段 6 的 Wiki OpenAPI 读写已由开发者在专用测试空间验收；阶段 7 的 STM32 最小真机烧录及回滚已通过。完整 OTA App、ESP32-S3、外部 Flash 备份和隔离构建仍待开发。
 
 缺少飞书 App ID 或 App Secret 时，网关默认报错。模拟租户令牌仅能通过显式传入 `mock_if_unset=True` 用于局部测试，不会进入真实 Wiki 请求。

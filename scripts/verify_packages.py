@@ -31,6 +31,15 @@ def main() -> None:
         assert f"payload/{plugin}" in npm_files
         assert f"cybertron/payload/{plugin}" in wheel_files
         assert archive.read(f"cybertron/payload/{plugin}") == Path(".opencode/plugins/cybertron.js").read_bytes()
+        dsh_files = ("package.json", "cordis.patch.yml", "index.js", "bridge.js",
+                     "icon.svg", "locale/en.json", "locale/zh.json", "docs/DETAIL.md")
+        for rel in dsh_files:
+            npm_path = f"payload/dsh-adapter/{rel}"
+            wheel_path = f"cybertron/payload/dsh-adapter/{rel}"
+            assert npm_path in npm_files, npm_path
+            assert wheel_path in wheel_files, wheel_path
+            assert archive.read(wheel_path) == (Path("cybertron/dsh_adapter") / rel).read_bytes()
+
         runtime = {path.name for path in Path("cybertron").glob("*.py")}
         for filename in runtime:
             npm_path = f"payload/cybertron-runtime/cybertron/{filename}"

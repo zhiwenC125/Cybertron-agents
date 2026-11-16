@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Cybertron v6",
+    "description": "带校验的 cy_* 任务图工具，由确定性内核记账。",
+    "detail": "docs/DETAIL.md"
+  }
+}
