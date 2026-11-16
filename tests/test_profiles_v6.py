@@ -1,5 +1,6 @@
 import hashlib
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -45,6 +46,34 @@ class ProfilesV6Tests(unittest.TestCase):
             self.assertEqual(detect_profile(project), "cmake-c")
             (project / "board.ioc").write_text("# board config\n")
             self.assertEqual(detect_profile(project), "cmake-arm")
+
+    @unittest.skipIf(os.environ.get("CYBERTRON_SANDBOX") == "1",
+                     "nested sandbox-exec is unsupported; run the host toolchain gate separately")
+    @unittest.skipUnless(shutil.which("renode"), "Renode is not installed")
+    def test_real_renode_sim_receipt_for_heartbeat_fixture(self):
+        fixture = Path(__file__).resolve().parent.parent / "stage7_fixture" / "stm32_minimal"
+        if not (fixture / "build" / "heartbeat.elf").is_file():
+            self.skipTest("heartbeat.elf has not been built")
+        result = run_check(fixture, "sim")
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["profile"], "renode")
+        receipt = result["receipts"][-1]
+        self.assertIn("renode", receipt["command"])
+        self.assertEqual(receipt["source"], "sandbox")
+        self.assertEqual(receipt["exit"], 0)
+        self.assertIn("CYBERTRON_SIM_PASS marker=C7B70001", receipt["output"])
+        self.assertEqual(receipt["sha256"], hashlib.sha256(receipt["output"].encode()).hexdigest())
+        self.assertEqual({path.name for path in fixture.iterdir()},
+                         {"README.md", "app.ld", "build", "heartbeat.s", "sim.resc", "sim.expect"})
+
+    def test_sim_target_requires_script_and_expectation(self):
+        with tempfile.TemporaryDirectory(prefix="cybertron-m4-test-") as directory:
+            project = Path(directory)
+            (project / "sim.resc").write_text("echo hello\n")
+            with self.assertRaises(CheckRejected):
+                run_check(project, "sim")
+            (project / "sim.expect").write_text("hello\n")
+            self.assertEqual(detect_profile(project), "renode")
 
     @unittest.skipIf(os.environ.get("CYBERTRON_SANDBOX") == "1",
                      "nested sandbox-exec is unsupported; run the host toolchain gate separately")

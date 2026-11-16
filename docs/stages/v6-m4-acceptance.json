@@ -1,0 +1,475 @@
+{
+  "milestone": "M4",
+  "checked_at_utc": "2026-11-16T16:42:33.015698+00:00",
+  "offline": false,
+  "output_dir": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z",
+  "authorization_path": "docs/stages/v6-m4-user-authorization.txt",
+  "authorization_sha256": "016a1a46a496b4b84d1ceb40aad732686c9abcb096c0b810da0813f569657ef7",
+  "status": "passed",
+  "commands": [
+    {
+      "cmd": "arm-none-eabi-gcc -mcpu=cortex-m3 -mthumb -nostdlib -Wl,-T,stage7_fixture/stm32_minimal/app.ld -Wl,--gc-sections -o /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.elf stage7_fixture/stm32_minimal/heartbeat.s",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T16:42:33.042598+00:00",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "tool",
+      "output_path": "local_backups/v6-m4-run-20261116T164233Z/build-gcc.log"
+    },
+    {
+      "cmd": "arm-none-eabi-objcopy -O binary /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.elf /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.bin",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T16:42:33.048546+00:00",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "tool",
+      "output_path": "local_backups/v6-m4-run-20261116T164233Z/build-objcopy.log"
+    },
+    {
+      "cmd": "arm-none-eabi-size /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.elf",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T16:42:33.052906+00:00",
+      "sha256": "6e90cb18c645813b63f5cf305e1a2d1dd60358e4c41075c560ea43aeb7789230",
+      "source": "tool",
+      "output_path": "local_backups/v6-m4-run-20261116T164233Z/build-size.log"
+    },
+    {
+      "cmd": "/opt/homebrew/bin/renode --config /private/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-check-4hm9yi_q/renode-config.json --console --disable-gui --plain sim.resc",
+      "exit": 0,
+      "utc": "2026-11-16T16:42:36.541868+00:00",
+      "sha256": "5c8f39f47d885437056794515585306ee79fb9443dafdc7350fa83e7de68ac0c",
+      "source": "sandbox"
+    }
+  ],
+  "offline_receipts": {
+    "fixture": {
+      "firmware": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.bin",
+      "sha256": "62554f5a0043bc92d2cfc6456e0ab116348324a1b699af62891532559e00476d",
+      "bytes": 100,
+      "gcc": {
+        "cmd": "arm-none-eabi-gcc -mcpu=cortex-m3 -mthumb -nostdlib -Wl,-T,stage7_fixture/stm32_minimal/app.ld -Wl,--gc-sections -o /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.elf stage7_fixture/stm32_minimal/heartbeat.s",
+        "cwd": "/Users/alanbanana/Cybertron-Agent",
+        "exit": 0,
+        "utc": "2026-11-16T16:42:33.042598+00:00",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source": "tool",
+        "output_path": "local_backups/v6-m4-run-20261116T164233Z/build-gcc.log"
+      },
+      "objcopy": {
+        "cmd": "arm-none-eabi-objcopy -O binary /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.elf /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.bin",
+        "cwd": "/Users/alanbanana/Cybertron-Agent",
+        "exit": 0,
+        "utc": "2026-11-16T16:42:33.048546+00:00",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source": "tool",
+        "output_path": "local_backups/v6-m4-run-20261116T164233Z/build-objcopy.log"
+      },
+      "size": {
+        "cmd": "arm-none-eabi-size /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.elf",
+        "cwd": "/Users/alanbanana/Cybertron-Agent",
+        "exit": 0,
+        "utc": "2026-11-16T16:42:33.052906+00:00",
+        "sha256": "6e90cb18c645813b63f5cf305e1a2d1dd60358e4c41075c560ea43aeb7789230",
+        "source": "tool",
+        "output_path": "local_backups/v6-m4-run-20261116T164233Z/build-size.log"
+      }
+    },
+    "sim": {
+      "source": "sandbox",
+      "command": "/opt/homebrew/bin/renode --config /private/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-check-4hm9yi_q/renode-config.json --console --disable-gui --plain sim.resc",
+      "exit": 0,
+      "utc": "2026-11-16T16:42:36.541868+00:00",
+      "sha256": "5c8f39f47d885437056794515585306ee79fb9443dafdc7350fa83e7de68ac0c",
+      "output": "[00:42:34.3213] [INFO] Loaded monitor commands from: /Applications/Renode.app/Contents/MacOS/scripts/monitor.py\nRenode, version 1.17.0 (1.17.0+20261116git89ea9e587)\n\n\n(monitor) i $CWD/sim.resc\n\n[00:42:34.3777] [INFO] Including script(s): /private/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-check-4hm9yi_q/project/sim.resc\n[00:42:34.3842] [INFO] System bus created.\n[00:42:35.1573] [WARNING] Translation cache size 536870912 is larger than maximum allowed 134217728. It will be clamped to maximum\n[00:42:35.3304] [INFO] sysbus: Loaded SVD: /private/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-check-4hm9yi_q/renode-77760/7179868b-b44e-4922-9a4e-4db66fb924ff.tmp. Name: STM32F103. Description: STM32F103.\n[00:42:35.3451] [INFO] sysbus: Loading block of 100 bytes length at 0x8002000.\nStarting emulation...\n\n[00:42:35.3569] [INFO] cpu: Guessing VectorTableOffset value to be 0x8002000.\n[00:42:35.3613] [INFO] cpu: Setting initial values: PC = 0x8002041, SP = 0x20005000.\n[00:42:35.3620] [INFO] stm32f103: Machine started.\nCYBERTRON_SIM_PASS marker=C7B70001 counter=0000001F..00000038\n\nRenode is quitting\n\n[00:42:36.5078] [INFO] stm32f103: Machine paused.\n[00:42:36.5271] [INFO] stm32f103: Disposed.\n",
+      "target": "sim",
+      "status": "pass",
+      "profile": "renode"
+    }
+  },
+  "device": {
+    "preflight": {
+      "receipt": {
+        "argv": [
+          "st-flash",
+          "--hot-plug",
+          "read",
+          "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-full.bin",
+          "0x8000000",
+          "0x10000"
+        ],
+        "command": "st-flash --hot-plug read /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-full.bin 0x8000000 0x10000",
+        "exit": 0,
+        "utc": "2026-11-16T16:42:36.543259+00:00",
+        "sha256": "cb12b4007221eb36a5f3d557f7307d6d297b40dafb49b60c8d66f1ab55c0be3b",
+        "output": "st-flash 1.9.0\n2026-11-17T00:42:36 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:36 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\n2026-11-17T00:42:36 INFO common_legacy.c: read from address 0x08000000 size 65536\n",
+        "file_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-full.bin",
+        "file_sha256": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+        "file_bytes": 65536,
+        "timed_out": false,
+        "source": "tool"
+      },
+      "full_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-full.bin",
+      "full_bytes": 65536,
+      "full_sha256": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+      "app_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-app.bin",
+      "app_bytes": 56320,
+      "app_sha256": "bfa1af7bac39eb065979b8c05cb8f79ffae7260751ad3f06a019b309eebcd852"
+    },
+    "plan_digest": "5d8bc0b74252c867869da93e3945a1027222d08fc96895108c889903b8ad63f7",
+    "firmware": {
+      "path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.bin",
+      "sha256": "62554f5a0043bc92d2cfc6456e0ab116348324a1b699af62891532559e00476d",
+      "bytes": 100
+    },
+    "rollback": {
+      "path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-app.bin",
+      "sha256": "bfa1af7bac39eb065979b8c05cb8f79ffae7260751ad3f06a019b309eebcd852",
+      "bytes": 56320
+    },
+    "erase": {
+      "start": 134225920,
+      "end": 134282240
+    },
+    "approval": {
+      "approval_id": "m4-chat-016a1a46a496b4b8",
+      "source": "human",
+      "approver_id": "developer",
+      "observed_at_utc": "2026-11-16T16:42:37.201070+00:00",
+      "plan_digest": "5d8bc0b74252c867869da93e3945a1027222d08fc96895108c889903b8ad63f7",
+      "device_id": "ST-LINK:local/STM32F1xx_MD:0x410",
+      "firmware_sha256": "62554f5a0043bc92d2cfc6456e0ab116348324a1b699af62891532559e00476d",
+      "erase_start": 134225920,
+      "erase_end": 134282240,
+      "rollback_sha256": "bfa1af7bac39eb065979b8c05cb8f79ffae7260751ad3f06a019b309eebcd852",
+      "message_sha256": "016a1a46a496b4b84d1ceb40aad732686c9abcb096c0b810da0813f569657ef7",
+      "session_id": "dsh:cybertron-v6-m4"
+    },
+    "node": {
+      "run_id": "m4-20261116t164233z",
+      "node_id": "device",
+      "status": "completed",
+      "error": null,
+      "events_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/workspace/.cybertron/runs/m4-20261116t164233z/events.jsonl",
+      "plan_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/workspace/.cybertron/runs/m4-20261116t164233z/plan.json",
+      "result": {
+        "status": "completed",
+        "plan_digest": "5d8bc0b74252c867869da93e3945a1027222d08fc96895108c889903b8ad63f7",
+        "approval_id": "m4-chat-016a1a46a496b4b8",
+        "preflight": {
+          "receipt": {
+            "argv": [
+              "st-flash",
+              "--hot-plug",
+              "read",
+              "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-full.bin",
+              "0x8000000",
+              "0x10000"
+            ],
+            "command": "st-flash --hot-plug read /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-full.bin 0x8000000 0x10000",
+            "exit": 0,
+            "utc": "2026-11-16T16:42:37.203482+00:00",
+            "sha256": "73e8c551c3a616239a0f3215083b8d06512e4616a7683b344d9d0e1ff1720094",
+            "output": "st-flash 1.9.0\n2026-11-17T00:42:37 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:37 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\n2026-11-17T00:42:37 INFO common_legacy.c: read from address 0x08000000 size 65536\n",
+            "file_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-full.bin",
+            "file_sha256": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+            "file_bytes": 65536,
+            "timed_out": false,
+            "source": "tool"
+          },
+          "full_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-full.bin",
+          "full_bytes": 65536,
+          "full_sha256": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+          "app_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-app.bin",
+          "app_bytes": 56320,
+          "app_sha256": "bfa1af7bac39eb065979b8c05cb8f79ffae7260751ad3f06a019b309eebcd852"
+        },
+        "flash": {
+          "app_sha256": "3c962ba6b2e114b72f70b7964584b3e6cbe7d755da2c8c69b17c7c03684169af",
+          "expected_app_sha256": "3c962ba6b2e114b72f70b7964584b3e6cbe7d755da2c8c69b17c7c03684169af",
+          "region_matches_fixture_and_erased_tail": true,
+          "bootloader_unchanged": true,
+          "ota_flag_page_unchanged": true,
+          "full_sha256": "a61aeae691ee62a334c47de390ff046bfc9875a2b68ac76a449878b71f98a360",
+          "full_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/post-flash-full.bin",
+          "full_bytes": 65536
+        },
+        "heartbeat": {
+          "address": "0x20000000",
+          "expected_marker": "0xc7b70001",
+          "marker_1": "0xc7b70001",
+          "marker_2": "0xc7b70001",
+          "counter_1": 1,
+          "counter_2": 2,
+          "passed": true,
+          "sram_1_sha256": "d1ae83fac3bd7ac275452631324defc5feda4536dc2c798c93d2b84d4aba8a6a",
+          "sram_2_sha256": "e314d78b5b8536a9c640e93f5e7b887af5f27512269517c775c27a1905365488"
+        },
+        "rollback": {
+          "full_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/rollback-full.bin",
+          "full_bytes": 65536,
+          "full_sha256": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+          "matches_preflight": true
+        },
+        "restored": true,
+        "error": null,
+        "receipts": [
+          {
+            "argv": [
+              "st-flash",
+              "--hot-plug",
+              "read",
+              "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-full.bin",
+              "0x8000000",
+              "0x10000"
+            ],
+            "command": "st-flash --hot-plug read /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-full.bin 0x8000000 0x10000",
+            "exit": 0,
+            "utc": "2026-11-16T16:42:37.203482+00:00",
+            "sha256": "73e8c551c3a616239a0f3215083b8d06512e4616a7683b344d9d0e1ff1720094",
+            "output": "st-flash 1.9.0\n2026-11-17T00:42:37 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:37 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\n2026-11-17T00:42:37 INFO common_legacy.c: read from address 0x08000000 size 65536\n",
+            "file_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-full.bin",
+            "file_sha256": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+            "file_bytes": 65536,
+            "timed_out": false,
+            "source": "tool"
+          },
+          {
+            "argv": [
+              "st-flash",
+              "--hot-plug",
+              "erase",
+              "0x8002000",
+              "0xdc00"
+            ],
+            "command": "st-flash --hot-plug erase 0x8002000 0xdc00",
+            "exit": 0,
+            "utc": "2026-11-16T16:42:37.865696+00:00",
+            "sha256": "ad3feb939fae00a9fb31aa9c4a1b1beb7b6b4c2da770c455759ab42cb240fc76",
+            "output": "st-flash 1.9.0\n2026-11-17T00:42:37 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:37 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\n-> Flash page at 0x8002000 erased (size: 0x400)\n-> Flash page at 0x8002400 erased (size: 0x400)\n-> Flash page at 0x8002800 erased (size: 0x400)\n-> Flash page at 0x8002c00 erased (size: 0x400)\n-> Flash page at 0x8003000 erased (size: 0x400)\n-> Flash page at 0x8003400 erased (size: 0x400)\n-> Flash page at 0x8003800 erased (size: 0x400)\n-> Flash page at 0x8003c00 erased (size: 0x400)\n-> Flash page at 0x8004000 erased (size: 0x400)\n-> Flash page at 0x8004400 erased (size: 0x400)\n-> Flash page at 0x8004800 erased (size: 0x400)\n-> Flash page at 0x8004c00 erased (size: 0x400)\n-> Flash page at 0x8005000 erased (size: 0x400)\n-> Flash page at 0x8005400 erased (size: 0x400)\n-> Flash page at 0x8005800 erased (size: 0x400)\n-> Flash page at 0x8005c00 erased (size: 0x400)\n-> Flash page at 0x8006000 erased (size: 0x400)\n-> Flash page at 0x8006400 erased (size: 0x400)\n-> Flash page at 0x8006800 erased (size: 0x400)\n-> Flash page at 0x8006c00 erased (size: 0x400)\n-> Flash page at 0x8007000 erased (size: 0x400)\n-> Flash page at 0x8007400 erased (size: 0x400)\n-> Flash page at 0x8007800 erased (size: 0x400)\n-> Flash page at 0x8007c00 erased (size: 0x400)\n-> Flash page at 0x8008000 erased (size: 0x400)\n-> Flash page at 0x8008400 erased (size: 0x400)\n-> Flash page at 0x8008800 erased (size: 0x400)\n-> Flash page at 0x8008c00 erased (size: 0x400)\n-> Flash page at 0x8009000 erased (size: 0x400)\n-> Flash page at 0x8009400 erased (size: 0x400)\n-> Flash page at 0x8009800 erased (size: 0x400)\n-> Flash page at 0x8009c00 erased (size: 0x400)\n-> Flash page at 0x800a000 erased (size: 0x400)\n-> Flash page at 0x800a400 erased (size: 0x400)\n-> Flash page at 0x800a800 erased (size: 0x400)\n-> Flash page at 0x800ac00 erased (size: 0x400)\n-> Flash page at 0x800b000 erased (size: 0x400)\n-> Flash page at 0x800b400 erased (size: 0x400)\n-> Flash page at 0x800b800 erased (size: 0x400)\n-> Flash page at 0x800bc00 erased (size: 0x400)\n-> Flash page at 0x800c000 erased (size: 0x400)\n-> Flash page at 0x800c400 erased (size: 0x400)\n-> Flash page at 0x800c800 erased (size: 0x400)\n-> Flash page at 0x800cc00 erased (size: 0x400)\n-> Flash page at 0x800d000 erased (size: 0x400)\n-> Flash page at 0x800d400 erased (size: 0x400)\n-> Flash page at 0x800d800 erased (size: 0x400)\n-> Flash page at 0x800dc00 erased (size: 0x400)\n-> Flash page at 0x800e000 erased (size: 0x400)\n-> Flash page at 0x800e400 erased (size: 0x400)\n-> Flash page at 0x800e800 erased (size: 0x400)\n-> Flash page at 0x800ec00 erased (size: 0x400)\n-> Flash page at 0x800f000 erased (size: 0x400)\n-> Flash page at 0x800f400 erased (size: 0x400)\n-> Flash page at 0x800f800 erased (size: 0x400)\n\nSection erase completed successfully.\n2026-11-17T00:42:39 INFO common_legacy.c: NRST is not connected --> using software reset via AIRCR\n2026-11-17T00:42:39 INFO common_legacy.c: Go to Thumb mode\n",
+            "file_path": null,
+            "file_sha256": null,
+            "file_bytes": null,
+            "timed_out": false,
+            "source": "tool"
+          },
+          {
+            "argv": [
+              "st-flash",
+              "--hot-plug",
+              "write",
+              "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.bin",
+              "0x8002000"
+            ],
+            "command": "st-flash --hot-plug write /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.bin 0x8002000",
+            "exit": 0,
+            "utc": "2026-11-16T16:42:39.343482+00:00",
+            "sha256": "3ed63ff8f15f8b67a812baa1c336df2542cba9d1c5c565fbb81a16cf47b8cdb9",
+            "output": "st-flash 1.9.0\n2026-11-17T00:42:39 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:39 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\nfile /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.bin md5 checksum: 2f6ad747a4372b4a281c7a47f04372c, stlink checksum: 0x0000152e\n2026-11-17T00:42:39 INFO common_flash.c: Attempting to write 100 (0x64) bytes to stm32 address: 134225920 (0x8002000)\n-> Flash page at 0x8002000 erased (size: 0x400)\n\n2026-11-17T00:42:39 INFO flash_loader.c: Starting Flash write for VL/F0/F3/F1_XL\n2026-11-17T00:42:39 INFO flash_loader.c: Successfully loaded flash loader in sram\n2026-11-17T00:42:39 INFO flash_loader.c: Clear DFSR\n  1/1   pages written\n\n2026-11-17T00:42:39 INFO common_flash.c: Starting verification of write complete\n2026-11-17T00:42:39 INFO common_flash.c: Flash written and verified! jolly good!\n",
+            "file_path": null,
+            "file_sha256": null,
+            "file_bytes": null,
+            "timed_out": false,
+            "source": "tool"
+          },
+          {
+            "argv": [
+              "st-flash",
+              "--hot-plug",
+              "read",
+              "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/post-flash-app.bin",
+              "0x8002000",
+              "0xdc00"
+            ],
+            "command": "st-flash --hot-plug read /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/post-flash-app.bin 0x8002000 0xdc00",
+            "exit": 0,
+            "utc": "2026-11-16T16:42:39.411456+00:00",
+            "sha256": "ed8bc4ed12fd589552c12ac218442f8cfed7af4f49bd5cead006b26fc6a9bc62",
+            "output": "st-flash 1.9.0\n2026-11-17T00:42:39 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:39 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\n2026-11-17T00:42:39 INFO common_legacy.c: read from address 0x08002000 size 56320\n",
+            "file_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/post-flash-app.bin",
+            "file_sha256": "3c962ba6b2e114b72f70b7964584b3e6cbe7d755da2c8c69b17c7c03684169af",
+            "file_bytes": 56320,
+            "timed_out": false,
+            "source": "tool"
+          },
+          {
+            "argv": [
+              "st-flash",
+              "--hot-plug",
+              "read",
+              "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/post-flash-full.bin",
+              "0x8000000",
+              "0x10000"
+            ],
+            "command": "st-flash --hot-plug read /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/post-flash-full.bin 0x8000000 0x10000",
+            "exit": 0,
+            "utc": "2026-11-16T16:42:39.989329+00:00",
+            "sha256": "15e8c9b127bda309b10f418805e64d83a525b98cdad5f853e6a6639ce9a8c27c",
+            "output": "st-flash 1.9.0\n2026-11-17T00:42:39 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:40 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\n2026-11-17T00:42:40 INFO common_legacy.c: read from address 0x08000000 size 65536\n",
+            "file_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/post-flash-full.bin",
+            "file_sha256": "a61aeae691ee62a334c47de390ff046bfc9875a2b68ac76a449878b71f98a360",
+            "file_bytes": 65536,
+            "timed_out": false,
+            "source": "tool"
+          },
+          {
+            "argv": [
+              "st-flash",
+              "--hot-plug",
+              "reset"
+            ],
+            "command": "st-flash --hot-plug reset",
+            "exit": 0,
+            "utc": "2026-11-16T16:42:40.655895+00:00",
+            "sha256": "2383b99ae89db415ee98f5e95e36c45d81e49599e0c2130dea292da748893337",
+            "output": "st-flash 1.9.0\n2026-11-17T00:42:40 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:40 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\n2026-11-17T00:42:40 INFO common_legacy.c: NRST is not connected --> using software reset via AIRCR\n2026-11-17T00:42:40 INFO common_legacy.c: Go to Thumb mode\n2026-11-17T00:42:40 INFO common_legacy.c: Go to Thumb mode\n",
+            "file_path": null,
+            "file_sha256": null,
+            "file_bytes": null,
+            "timed_out": false,
+            "source": "tool"
+          },
+          {
+            "argv": [
+              "st-flash",
+              "--hot-plug",
+              "read",
+              "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/sram-1.bin",
+              "0x20000000",
+              "0x10"
+            ],
+            "command": "st-flash --hot-plug read /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/sram-1.bin 0x20000000 0x10",
+            "exit": 0,
+            "utc": "2026-11-16T16:42:41.195866+00:00",
+            "sha256": "b6b3757d22e051203d9d2ff90ca8399a03d590c0432e3ca3fc093bf8c66805a6",
+            "output": "st-flash 1.9.0\n2026-11-17T00:42:41 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:41 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\n2026-11-17T00:42:41 INFO common_legacy.c: read from address 0x20000000 size 16\n",
+            "file_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/sram-1.bin",
+            "file_sha256": "d1ae83fac3bd7ac275452631324defc5feda4536dc2c798c93d2b84d4aba8a6a",
+            "file_bytes": 16,
+            "timed_out": false,
+            "source": "tool"
+          },
+          {
+            "argv": [
+              "st-flash",
+              "--hot-plug",
+              "read",
+              "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/sram-2.bin",
+              "0x20000000",
+              "0x10"
+            ],
+            "command": "st-flash --hot-plug read /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/sram-2.bin 0x20000000 0x10",
+            "exit": 0,
+            "utc": "2026-11-16T16:42:41.721813+00:00",
+            "sha256": "b6b3757d22e051203d9d2ff90ca8399a03d590c0432e3ca3fc093bf8c66805a6",
+            "output": "st-flash 1.9.0\n2026-11-17T00:42:41 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:41 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\n2026-11-17T00:42:41 INFO common_legacy.c: read from address 0x20000000 size 16\n",
+            "file_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/sram-2.bin",
+            "file_sha256": "e314d78b5b8536a9c640e93f5e7b887af5f27512269517c775c27a1905365488",
+            "file_bytes": 16,
+            "timed_out": false,
+            "source": "tool"
+          },
+          {
+            "argv": [
+              "st-flash",
+              "--hot-plug",
+              "erase",
+              "0x8002000",
+              "0xdc00"
+            ],
+            "command": "st-flash --hot-plug erase 0x8002000 0xdc00",
+            "exit": 0,
+            "utc": "2026-11-16T16:42:41.746030+00:00",
+            "sha256": "c45ff8efd91d9c93cce339d92aa6d103f6d87a0d0ee800512f95ecde0ed0a3aa",
+            "output": "st-flash 1.9.0\n2026-11-17T00:42:41 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:41 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\n-> Flash page at 0x8002000 erased (size: 0x400)\n-> Flash page at 0x8002400 erased (size: 0x400)\n-> Flash page at 0x8002800 erased (size: 0x400)\n-> Flash page at 0x8002c00 erased (size: 0x400)\n-> Flash page at 0x8003000 erased (size: 0x400)\n-> Flash page at 0x8003400 erased (size: 0x400)\n-> Flash page at 0x8003800 erased (size: 0x400)\n-> Flash page at 0x8003c00 erased (size: 0x400)\n-> Flash page at 0x8004000 erased (size: 0x400)\n-> Flash page at 0x8004400 erased (size: 0x400)\n-> Flash page at 0x8004800 erased (size: 0x400)\n-> Flash page at 0x8004c00 erased (size: 0x400)\n-> Flash page at 0x8005000 erased (size: 0x400)\n-> Flash page at 0x8005400 erased (size: 0x400)\n-> Flash page at 0x8005800 erased (size: 0x400)\n-> Flash page at 0x8005c00 erased (size: 0x400)\n-> Flash page at 0x8006000 erased (size: 0x400)\n-> Flash page at 0x8006400 erased (size: 0x400)\n-> Flash page at 0x8006800 erased (size: 0x400)\n-> Flash page at 0x8006c00 erased (size: 0x400)\n-> Flash page at 0x8007000 erased (size: 0x400)\n-> Flash page at 0x8007400 erased (size: 0x400)\n-> Flash page at 0x8007800 erased (size: 0x400)\n-> Flash page at 0x8007c00 erased (size: 0x400)\n-> Flash page at 0x8008000 erased (size: 0x400)\n-> Flash page at 0x8008400 erased (size: 0x400)\n-> Flash page at 0x8008800 erased (size: 0x400)\n-> Flash page at 0x8008c00 erased (size: 0x400)\n-> Flash page at 0x8009000 erased (size: 0x400)\n-> Flash page at 0x8009400 erased (size: 0x400)\n-> Flash page at 0x8009800 erased (size: 0x400)\n-> Flash page at 0x8009c00 erased (size: 0x400)\n-> Flash page at 0x800a000 erased (size: 0x400)\n-> Flash page at 0x800a400 erased (size: 0x400)\n-> Flash page at 0x800a800 erased (size: 0x400)\n-> Flash page at 0x800ac00 erased (size: 0x400)\n-> Flash page at 0x800b000 erased (size: 0x400)\n-> Flash page at 0x800b400 erased (size: 0x400)\n-> Flash page at 0x800b800 erased (size: 0x400)\n-> Flash page at 0x800bc00 erased (size: 0x400)\n-> Flash page at 0x800c000 erased (size: 0x400)\n-> Flash page at 0x800c400 erased (size: 0x400)\n-> Flash page at 0x800c800 erased (size: 0x400)\n-> Flash page at 0x800cc00 erased (size: 0x400)\n-> Flash page at 0x800d000 erased (size: 0x400)\n-> Flash page at 0x800d400 erased (size: 0x400)\n-> Flash page at 0x800d800 erased (size: 0x400)\n-> Flash page at 0x800dc00 erased (size: 0x400)\n-> Flash page at 0x800e000 erased (size: 0x400)\n-> Flash page at 0x800e400 erased (size: 0x400)\n-> Flash page at 0x800e800 erased (size: 0x400)\n-> Flash page at 0x800ec00 erased (size: 0x400)\n-> Flash page at 0x800f000 erased (size: 0x400)\n-> Flash page at 0x800f400 erased (size: 0x400)\n-> Flash page at 0x800f800 erased (size: 0x400)\n\nSection erase completed successfully.\n2026-11-17T00:42:43 INFO common_legacy.c: NRST is not connected --> using software reset via AIRCR\n2026-11-17T00:42:43 INFO common_legacy.c: Go to Thumb mode\n",
+            "file_path": null,
+            "file_sha256": null,
+            "file_bytes": null,
+            "timed_out": false,
+            "source": "tool"
+          },
+          {
+            "argv": [
+              "st-flash",
+              "--hot-plug",
+              "write",
+              "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-app.bin",
+              "0x8002000"
+            ],
+            "command": "st-flash --hot-plug write /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-app.bin 0x8002000",
+            "exit": 0,
+            "utc": "2026-11-16T16:42:43.225313+00:00",
+            "sha256": "1b5db11931c8514b9bd27f7cf02b190557075e6f7bdbc871f7f1808e68f9cb1c",
+            "output": "st-flash 1.9.0\n2026-11-17T00:42:43 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:43 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\nfile /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-app.bin md5 checksum: 6ed9f346132b114d5594437231c85b81, stlink checksum: 0x00965203\n2026-11-17T00:42:43 INFO common_flash.c: Attempting to write 56320 (0xdc00) bytes to stm32 address: 134225920 (0x8002000)\n-> Flash page at 0x8002000 erased (size: 0x400)\n-> Flash page at 0x8002400 erased (size: 0x400)\n-> Flash page at 0x8002800 erased (size: 0x400)\n-> Flash page at 0x8002c00 erased (size: 0x400)\n-> Flash page at 0x8003000 erased (size: 0x400)\n-> Flash page at 0x8003400 erased (size: 0x400)\n-> Flash page at 0x8003800 erased (size: 0x400)\n-> Flash page at 0x8003c00 erased (size: 0x400)\n-> Flash page at 0x8004000 erased (size: 0x400)\n-> Flash page at 0x8004400 erased (size: 0x400)\n-> Flash page at 0x8004800 erased (size: 0x400)\n-> Flash page at 0x8004c00 erased (size: 0x400)\n-> Flash page at 0x8005000 erased (size: 0x400)\n-> Flash page at 0x8005400 erased (size: 0x400)\n-> Flash page at 0x8005800 erased (size: 0x400)\n-> Flash page at 0x8005c00 erased (size: 0x400)\n-> Flash page at 0x8006000 erased (size: 0x400)\n-> Flash page at 0x8006400 erased (size: 0x400)\n-> Flash page at 0x8006800 erased (size: 0x400)\n-> Flash page at 0x8006c00 erased (size: 0x400)\n-> Flash page at 0x8007000 erased (size: 0x400)\n-> Flash page at 0x8007400 erased (size: 0x400)\n-> Flash page at 0x8007800 erased (size: 0x400)\n-> Flash page at 0x8007c00 erased (size: 0x400)\n-> Flash page at 0x8008000 erased (size: 0x400)\n-> Flash page at 0x8008400 erased (size: 0x400)\n-> Flash page at 0x8008800 erased (size: 0x400)\n-> Flash page at 0x8008c00 erased (size: 0x400)\n-> Flash page at 0x8009000 erased (size: 0x400)\n-> Flash page at 0x8009400 erased (size: 0x400)\n-> Flash page at 0x8009800 erased (size: 0x400)\n-> Flash page at 0x8009c00 erased (size: 0x400)\n-> Flash page at 0x800a000 erased (size: 0x400)\n-> Flash page at 0x800a400 erased (size: 0x400)\n-> Flash page at 0x800a800 erased (size: 0x400)\n-> Flash page at 0x800ac00 erased (size: 0x400)\n-> Flash page at 0x800b000 erased (size: 0x400)\n-> Flash page at 0x800b400 erased (size: 0x400)\n-> Flash page at 0x800b800 erased (size: 0x400)\n-> Flash page at 0x800bc00 erased (size: 0x400)\n-> Flash page at 0x800c000 erased (size: 0x400)\n-> Flash page at 0x800c400 erased (size: 0x400)\n-> Flash page at 0x800c800 erased (size: 0x400)\n-> Flash page at 0x800cc00 erased (size: 0x400)\n-> Flash page at 0x800d000 erased (size: 0x400)\n-> Flash page at 0x800d400 erased (size: 0x400)\n-> Flash page at 0x800d800 erased (size: 0x400)\n-> Flash page at 0x800dc00 erased (size: 0x400)\n-> Flash page at 0x800e000 erased (size: 0x400)\n-> Flash page at 0x800e400 erased (size: 0x400)\n-> Flash page at 0x800e800 erased (size: 0x400)\n-> Flash page at 0x800ec00 erased (size: 0x400)\n-> Flash page at 0x800f000 erased (size: 0x400)\n-> Flash page at 0x800f400 erased (size: 0x400)\n-> Flash page at 0x800f800 erased (size: 0x400)\n\n2026-11-17T00:42:44 INFO flash_loader.c: Starting Flash write for VL/F0/F3/F1_XL\n2026-11-17T00:42:44 INFO flash_loader.c: Successfully loaded flash loader in sram\n2026-11-17T00:42:44 INFO flash_loader.c: Clear DFSR\n  1/55  pages written\n  2/55  pages written\n  3/55  pages written\n  4/55  pages written\n  5/55  pages written\n  6/55  pages written\n  7/55  pages written\n  8/55  pages written\n  9/55  pages written\n 10/55  pages written\n 11/55  pages written\n 12/55  pages written\n 13/55  pages written\n 14/55  pages written\n 15/55  pages written\n 16/55  pages written\n 17/55  pages written\n 18/55  pages written\n 19/55  pages written\n 20/55  pages written\n 21/55  pages written\n 22/55  pages written\n 23/55  pages written\n 24/55  pages written\n 25/55  pages written\n 26/55  pages written\n 27/55  pages written\n 28/55  pages written\n 29/55  pages written\n 30/55  pages written\n 31/55  pages written\n 32/55  pages written\n 33/55  pages written\n 34/55  pages written\n 35/55  pages written\n 36/55  pages written\n 37/55  pages written\n 38/55  pages written\n 39/55  pages written\n 40/55  pages written\n 41/55  pages written\n 42/55  pages written\n 43/55  pages written\n 44/55  pages written\n 45/55  pages written\n 46/55  pages written\n 47/55  pages written\n 48/55  pages written\n 49/55  pages written\n 50/55  pages written\n 51/55  pages written\n 52/55  pages written\n 53/55  pages written\n 54/55  pages written\n 55/55  pages written\n\n2026-11-17T00:42:47 INFO common_flash.c: Starting verification of write complete\n2026-11-17T00:42:48 INFO common_flash.c: Flash written and verified! jolly good!\n",
+            "file_path": null,
+            "file_sha256": null,
+            "file_bytes": null,
+            "timed_out": false,
+            "source": "tool"
+          },
+          {
+            "argv": [
+              "st-flash",
+              "--hot-plug",
+              "read",
+              "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/rollback-full.bin",
+              "0x8000000",
+              "0x10000"
+            ],
+            "command": "st-flash --hot-plug read /Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/rollback-full.bin 0x8000000 0x10000",
+            "exit": 0,
+            "utc": "2026-11-16T16:42:48.218914+00:00",
+            "sha256": "92d79cce84816f46edb3a7fbc6cc82812a5bad977f41f049416656ed001239ec",
+            "output": "st-flash 1.9.0\n2026-11-17T00:42:48 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:48 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\n2026-11-17T00:42:48 INFO common_legacy.c: read from address 0x08000000 size 65536\n",
+            "file_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/rollback-full.bin",
+            "file_sha256": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+            "file_bytes": 65536,
+            "timed_out": false,
+            "source": "tool"
+          },
+          {
+            "argv": [
+              "st-flash",
+              "--hot-plug",
+              "reset"
+            ],
+            "command": "st-flash --hot-plug reset",
+            "exit": 0,
+            "utc": "2026-11-16T16:42:48.879503+00:00",
+            "sha256": "ad0fd834b01558a2218e7cecf329e568feb52771e30bf9a234c5e755cfd2624c",
+            "output": "st-flash 1.9.0\n2026-11-17T00:42:48 DEBUG stlink_fs_posix.c: Looking for chip description files in /opt/homebrew/bin/../share/stlink/config/chips\n2026-11-17T00:42:48 INFO common_legacy.c: STM32F1xx_MD: 20 KiB SRAM, 64 KiB flash in at least 1 KiB pages.\n2026-11-17T00:42:48 INFO common_legacy.c: NRST is not connected --> using software reset via AIRCR\n2026-11-17T00:42:48 INFO common_legacy.c: Go to Thumb mode\n2026-11-17T00:42:48 INFO common_legacy.c: Go to Thumb mode\n",
+            "file_path": null,
+            "file_sha256": null,
+            "file_bytes": null,
+            "timed_out": false,
+            "source": "tool"
+          }
+        ],
+        "artifacts": {
+          "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-full.bin": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+          "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-app.bin": "bfa1af7bac39eb065979b8c05cb8f79ffae7260751ad3f06a019b309eebcd852",
+          "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/post-flash-full.bin": "a61aeae691ee62a334c47de390ff046bfc9875a2b68ac76a449878b71f98a360",
+          "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/post-flash-app.bin": "3c962ba6b2e114b72f70b7964584b3e6cbe7d755da2c8c69b17c7c03684169af",
+          "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/rollback-full.bin": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+          "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/sram-1.bin": "d1ae83fac3bd7ac275452631324defc5feda4536dc2c798c93d2b84d4aba8a6a",
+          "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/sram-2.bin": "e314d78b5b8536a9c640e93f5e7b887af5f27512269517c775c27a1905365488"
+        },
+        "firmware": {
+          "path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.bin",
+          "sha256": "62554f5a0043bc92d2cfc6456e0ab116348324a1b699af62891532559e00476d",
+          "bytes": 100
+        },
+        "rollback_image": {
+          "path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/device/preflight-app.bin",
+          "sha256": "bfa1af7bac39eb065979b8c05cb8f79ffae7260751ad3f06a019b309eebcd852",
+          "bytes": 56320
+        }
+      }
+    },
+    "run_id": "m4-20261116t164233z"
+  },
+  "events_path": "/Users/alanbanana/Cybertron-Agent/local_backups/v6-m4-run-20261116T164233Z/workspace/.cybertron/runs/m4-20261116t164233z/events.jsonl",
+  "open_issues": [],
+  "events_sha256": "f388a45024ab28081e0b7af8ce3674dca3197b834f4dd0c84cf4bcbe9237ff5a",
+  "events_copy": "docs/stages/v6-m4-device-events.jsonl"
+}

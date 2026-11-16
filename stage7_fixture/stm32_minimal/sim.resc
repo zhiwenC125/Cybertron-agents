@@ -1,0 +1,11 @@
+mach create "stm32f103"
+machine LoadPlatformDescription @platforms/cpus/stm32f103.repl
+sysbus LoadELF @build/heartbeat.elf
+start
+sleep 0.5
+py "m = self.Machine.SystemBus.ReadDoubleWord(0x20000000)"
+py "c1 = self.Machine.SystemBus.ReadDoubleWord(0x20000004)"
+sleep 0.5
+py "c2 = self.Machine.SystemBus.ReadDoubleWord(0x20000004)"
+py "print('CYBERTRON_SIM_PASS marker=%08X counter=%08X..%08X' % (m, c1, c2) if m == 0xC7B70001 and c2 > c1 else 'CYBERTRON_SIM_FAIL marker=%08X counter=%08X..%08X' % (m, c1, c2))"
+quit

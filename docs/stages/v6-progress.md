@@ -8,8 +8,8 @@
 | M1 | passed | `docs/stages/v6-m1.json` | — | 本会话停止；下一会话从 M2 开始 |
 | M2 | passed | `docs/stages/v6-m2.json` | — | 本会话停止；下一会话从 M3 开始 |
 | M3 | passed | `docs/stages/v6-m3.json` | — | 本会话停止；下一会话从 M4 开始 |
-| M4 | pending | — | 等待 M4 门禁 | M3 已通过，可开始 M4 |
-| M5 | pending | — | M4 未通过 | 等待 M4 门禁 |
+| M4 | passed | `docs/stages/v6-m4.json` | — | 本会话停止；下一会话从 M5 开始 |
+| M5 | pending | — | 等待 M5 门禁 | M4 已通过，可开始 M5 |
 
 启动检查（2026-11-16）：`git status --short` 仅有本里程碑的进度文件；`python3 -m unittest discover -s tests` 为 112 tests OK。
 
@@ -36,3 +36,7 @@ M2 最终验收（2026-11-16）：确认 `HTTP_PROXY`/`HTTPS_PROXY` 指向无监
 M3 启动与停止（2026-11-16）：工作区干净，基线 179 tests OK。新增调度决策与受影响子图计算的四项单测，全部测试为 183 tests OK。共享工作目录探针复现并发安全冲突：两个写范围不重叠的节点各自保存全局快照，A 验证时将 B 合法写入的 `docs/b.md` 判为越界并删除。现有宿主桥接还使用单个 `snapshot.json` 和活动令牌，无法保持并发派单的独立证据。按总控 prompt 第 1 节“设计冲突立即停”停止，不接入生产派单，不提交、不开始 M4。命令、退出码、UTC 与输出 SHA-256 见 `v6-m3.json`。
 
 M3 最终验收（2026-11-16）：将单次 run 快照拆为每个 `call_id` 独立快照，每个原生子代理在启动前通过宿主会话权限绑定到自己的 `write_scope`；并发完成时只排除与当前派单活动窗口重叠的 peer 写入，已完成的 peer 不能再掩盖后续越界。新增调度锁、Loop-1 重试/升格、L2 受影响子图重跑，以及 `cy_review_reject` 的 liege-maximo 专属权限。真实宿主发现并修复了一个真实阻塞：`cy_plan` 的 `kind` 枚举只允许 `task`，review 节点无法创建；改为 `task|review` 并加入回归断言。实际宿主验收覆盖：两个不相交写者并发完成且各自只拿到自己的文件（`concurrency-r2`）；首次尝试无产物被阻塞、重试成功（`loop1-r5`）；越界写 `docs/escape.md` 被宿主以 `permission.rejected` 拒绝且未落盘（`scope-exec-r1`）；真实 L2 发现 `docs/fix.md` 内容不符并拒绝，只有 fix/review/deliver 重新执行，unrelated 只派发一次（`l2-r6`）。独立核验脚本对回执、事件账本、父/子会话哈希、权限和产物哈希执行 70 项检查，全部通过。最终 191 项 Python 单测、1 项 JS 插件测试、阶段 5 隔离验证、引擎自检和 `opencode2 debug config` 通过。证据见 `v6-m3.json`、`v6-m3-host-acceptance.json`、`v6-m3-host-verification.json` 和 `v6-m3-command-records.json`；实现提交 `ed221c3`。M3 声明的门禁全部通过，状态改为 `passed`；本会话只完成 M3，M4 未开始。
+
+M4 最终验收（2026-11-16）：Renode 1.17.0 与 OpenOCD 0.12.0 已安装；新增 `device_broker.py`（审批绑定设备/固件/擦写范围/回滚镜像、单次使用、超时记 `outcome_unknown` 且不自动重试、失败自动回滚）、`device_node.py`（`device_op` 节点事件链）、`profiles.py` 的 Renode `sim` 配置档，以及 `v6_m4_acceptance.py` 与独立核验脚本。206 项 Python 单测、4 项 JS 测试、阶段 5 隔离验证、引擎自检和 `opencode2 debug config` 通过。
+
+M4 真机门禁（2026-11-16）：ST-LINK 首次读取曾连续两次在 `GET_VERSION`/`ENTER_SWD` 上 USB 超时，按停止条件停止；用 OpenOCD 连接恢复后 `st-flash` 正常。真实 run `m4-20261116t164233z` 中，用户授权 `m4-chat-016a1a46a496b4b8` 绑定新计划 `5d8bc0b7...`；preflight 64 KiB 为 `58e2a250...`，100 字节夹具为 `62554f5a...`，回滚 App 为 `bfa1af7b...`，只擦写 `0x08002000..0x0800FBFF`。烧录后 Bootloader 与 OTA 标志页未变，SRAM 标记 `0xC7B70001`、计数 `1→2`；回滚后完整 64 KiB 与 preflight 逐字节一致，独立重读同样为 `58e2a250...`。共 12 条 `st-flash` 回执、24 条事件，独立核验脚本 59/59 通过；证据见 `v6-m4.json`、`v6-m4-acceptance.json`、`v6-m4-device-events.jsonl`、`v6-m4-verification.json`、`v6-m4-stlink-failure.log` 和 `v6-m4-stlink-recovery.log`。M4 声明的门禁全部通过，状态改为 `passed`；本会话只完成 M4，M5 未开始。
