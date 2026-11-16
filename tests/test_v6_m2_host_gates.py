@@ -42,7 +42,7 @@ class V6M2HostGateTests(unittest.TestCase):
                 "add_executable(hello src/main.c)\n")
             bridge, run_id, _ = self._code_run(root)
             check = bridge.check(run_id, "lint")
-            self.assertEqual(check["status"], "pass")
+            self.assertEqual(check["status"], "pass", check["receipts"][-1]["output"])
             self.assertIn("lint", check["state"]["passed_gates"])
             self.assertIn("test", check["state"]["pending_gates"])
             (root / "src" / "main.c").write_text('int main(void){return 1;}\n')
