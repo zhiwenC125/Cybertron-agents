@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cybertron-agents"
-version = "0.2.1"
+version = "0.3.0"
 description = "Install the 13 Cybertron Primes agents and the /cybertron command into OpenCode"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -24,4 +24,15 @@ include = ["cybertron*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-cybertron = ["payload/agents/*.md", "payload/commands/*.md", "payload/plugins/*.js", "payload/cybertron-runtime/cybertron/*.py"]
+cybertron = [
+    "payload/agents/*.md",
+    "payload/commands/*.md",
+    "payload/plugins/*.js",
+    "payload/cybertron-runtime/cybertron/*.py",
+    "payload/dsh-adapter/*.json",
+    "payload/dsh-adapter/*.js",
+    "payload/dsh-adapter/*.yml",
+    "payload/dsh-adapter/*.svg",
+    "payload/dsh-adapter/locale/*.json",
+    "payload/dsh-adapter/docs/*.md",
+]

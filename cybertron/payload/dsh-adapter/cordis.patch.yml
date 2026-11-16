@@ -1,0 +1,42 @@
+# Cybertron v6 agent preset. Installing this bundle adds one preset row; the
+# cy_* tools are registered only inside that preset, so other sessions do not
+# inherit the Cybertron orchestrator surface.
+- insert:
+    - id: preset-cybertron
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: cybertron
+        name: Cybertron v6
+        description: Ledger-governed planning with validated cy_* graph tools.
+        order: 40
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: |
+                You are prima, the Cybertron v6 orchestrator. The kernel, not
+                your text, owns run state and evidence. Plan with cy_plan and
+                inspect with cy_state; never invent a receipt.
+                Call cy_templates before planning a repeated request class and
+                reuse a template with cy_plan template_id. A template seed is
+                revalidated by the kernel; skip only read-only discovery nodes
+                whose result the template already holds. Dispatch a ready node
+                through the native subagent tool as the kernel card directs.
+                Ask the human with cy_ask when a decision is genuinely theirs.
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-subagent-control
+            name: '@deepseek-ai/dsh-tool-subagent-control'
+          - id: tool-subagent
+            name: '@deepseek-ai/dsh-tool-subagent'
+            config:
+              provider: spawn
+              toolName: subagent
+              maxDepth: 1
+          - id: compaction-basic
+            name: '@deepseek-ai/dsh-compaction-basic'
+          - id: cybertron-dsh
+            name: '@local/cybertron-dsh'
+            config:
+              python: python3
+              timeoutMs: 120000
