@@ -14,7 +14,7 @@ from .profiles import CheckRejected, run_check
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cybertron-v6-host")
-    parser.add_argument("operation", choices=("plan", "plan_op", "state", "ask", "before", "after", "finish", "check"))
+    parser.add_argument("operation", choices=("plan", "plan_op", "state", "ask", "before", "after", "bind", "review_reject", "finish", "check"))
     parser.add_argument("--project", type=Path, required=True)
     args = parser.parse_args(argv)
     data = json.load(sys.stdin)
@@ -46,8 +46,16 @@ def main(argv: list[str] | None = None) -> int:
             result = bridge.after(data["run_id"], data["call_id"], data["token"],
                                   data.get("child_session_id"), data["tool_status"],
                                   data["duration_ms"], data.get("output_sha256"))
+        elif args.operation == "bind":
+            result = bridge.bind(data["run_id"], data["call_id"], data["token"],
+                                 data["child_session_id"], data["write_scope"])
+        elif args.operation == "review_reject":
+            result = bridge.review_reject(data["run_id"], data["call_id"], data["token"],
+                                          data["child_session_id"], data["affected_node_id"],
+                                          data["diagnostic"])
         else:
-            result = bridge.finish(data["run_id"], data["token"], data["child_session_id"])
+            result = bridge.finish(data["run_id"], data["token"], data["child_session_id"],
+                                   call_id=data.get("call_id"))
     except (HostBridgeError, CheckRejected, KeyError, ValueError) as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False))
         return 2

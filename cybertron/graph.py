@@ -174,7 +174,8 @@ class PlanGraph:
     def ready_nodes(self) -> List[PlanNode]:
         self.validate()
         return [node for node in self.nodes.values()
-                if node.status == "pending" and all(self.nodes[dep].status == "completed" for dep in node.depends_on)]
+                if node.status in {"pending", "stale"}
+                and all(self.nodes[dep].status == "completed" for dep in node.depends_on)]
 
     def to_dict(self) -> Dict[str, Any]:
         return {"schema_version": 2, "plan_revision": self.revision,

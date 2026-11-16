@@ -586,6 +586,11 @@
           "effect": "allow"
         },
         {
+          "action": "cy_review_reject",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
           "action": "subagent",
           "resource": "*",
           "effect": "deny"

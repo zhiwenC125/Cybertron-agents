@@ -66,7 +66,7 @@ function bridge(operation, project, payload, signal) {
 const nodeInput = {
   type: 'object',
   properties: {
-    node_id: { type: 'string' }, kind: { type: 'string', enum: ['task'] },
+    node_id: { type: 'string' }, kind: { type: 'string', enum: ['task', 'review'] },
     capability: { type: 'string' }, role: { type: 'string' }, objective: { type: 'string' },
     depends_on: { type: 'array', items: { type: 'string' } },
     read_scope: { type: 'array', items: { type: 'string' } },
@@ -124,11 +124,16 @@ export default Plugin.define({
           const run_id = await ctx.storage.get(`run/${context.sessionID}`);
           if (!run_id) throw new Error('No v6 run in this session; call cy_plan first');
           let state = await bridge('state', project, { run_id }, context.signal);
-          if (input.wait && state.status === 'running' && state.child_session_id) {
-            await ctx.session.wait({ sessionID: state.child_session_id });
-            const token = await ctx.storage.get(`token/${run_id}`);
-            state = await bridge('finish', project,
-              { run_id, token, child_session_id: state.child_session_id }, context.signal);
+          if (input.wait && state.status === 'running') {
+            for (const active of state.active_dispatches || []) {
+              if (!active.child_session_id) continue;
+              await ctx.session.wait({ sessionID: active.child_session_id });
+              const dispatch = await ctx.storage.get(`dispatch/${active.call_id}`);
+              if (!dispatch) throw new Error('Missing bound native dispatch receipt');
+              state = await bridge('finish', project,
+                { run_id, token: dispatch.token, call_id: active.call_id,
+                  child_session_id: active.child_session_id }, context.signal);
+            }
           }
           return { content: JSON.stringify(state) };
         },
@@ -160,6 +165,27 @@ export default Plugin.define({
           return { content: JSON.stringify(result) };
         },
       });
+      editor.add({
+        name: 'cy_review_reject',
+        description: 'Record a blocking L2 finding against a direct producer of this review node.',
+        input: { type: 'object', properties: {
+          affected_node_id: { type: 'string' }, diagnostic: { type: 'string' },
+        }, required: ['affected_node_id', 'diagnostic'], additionalProperties: false },
+        execute: async (input, context) => {
+          if (context.agent !== 'liege-maximo') throw new Error('Only the L2 reviewer may reject');
+          const binding = await ctx.storage.get(`child/${context.sessionID}`);
+          if (!binding || !await ctx.storage.get(`bound/${context.sessionID}`))
+            throw new Error('L2 reviewer has no verified native node binding');
+          const dispatch = await ctx.storage.get(`dispatch/${binding.call_id}`);
+          if (!dispatch) throw new Error('Missing bound native dispatch receipt');
+          const result = await bridge('review_reject', project, {
+            run_id: binding.run_id, call_id: binding.call_id, token: dispatch.token,
+            child_session_id: context.sessionID, affected_node_id: input.affected_node_id,
+            diagnostic: input.diagnostic,
+          }, context.signal);
+          return { content: JSON.stringify(result) };
+        },
+      });
     });
     await ctx.tool.hook('execute.before', async event => {
       if (event.tool !== 'subagent') return;
@@ -181,6 +207,7 @@ export default Plugin.define({
         throw new Error(result.reason);
       }
       await ctx.storage.set(`dispatch/${callID}`, { run_id, token: result.token,
+        node_id: result.node_id, write_scope: result.write_scope,
         started_ms: Date.now(), parent_session_id: event.sessionID });
       await ctx.storage.set(`active/${run_id}`, callID);
       await ctx.storage.set(`token/${run_id}`, result.token);
@@ -198,18 +225,59 @@ export default Plugin.define({
         output_sha256: digest(event.result || event.error?.message || ''),
       });
       await ctx.storage.set(`token/${started.run_id}`, result.token);
+      if (child_session_id && tool_status === 'completed') {
+        await ctx.storage.set(`child/${child_session_id}`, {
+          run_id: started.run_id, call_id, node_id: started.node_id,
+          write_scope: started.write_scope, parent_session_id: started.parent_session_id,
+        });
+      }
     });
-    await ctx.session.hook('context', event => {
+    await ctx.session.hook('context', async event => {
       if (event.agent !== 'prima') {
+        const session = await ctx.session.get({ sessionID: event.sessionID });
+        const parentRun = session.parentID && await ctx.storage.get(`run/${session.parentID}`);
+        if (parentRun) {
+          let binding;
+          for (let attempt = 0; attempt < 100; attempt++) {
+            binding = await ctx.storage.get(`child/${event.sessionID}`);
+            if (binding) break;
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+          if (!binding || binding.run_id !== parentRun ||
+              binding.parent_session_id !== session.parentID) {
+            throw new Error('Native child has no verified Cybertron node binding');
+          }
+          if (!await ctx.storage.get(`bound/${event.sessionID}`)) {
+            const permissions = [
+              { action: 'edit', resource: '*', effect: 'deny' },
+              ...binding.write_scope.map(resource => ({ action: 'edit', resource, effect: 'allow' })),
+              { action: 'shell', resource: '*', effect: 'deny' },
+              { action: 'external_directory', resource: '*', effect: 'deny' },
+            ];
+            await ctx.session.update({ sessionID: event.sessionID, permissions });
+            const updated = await ctx.session.get({ sessionID: event.sessionID });
+            if (JSON.stringify(updated.permissions) !== JSON.stringify(permissions))
+              throw new Error('Native child permission binding was not persisted');
+            const dispatch = await ctx.storage.get(`dispatch/${binding.call_id}`);
+            if (!dispatch || dispatch.run_id !== binding.run_id)
+              throw new Error('Missing bound native dispatch receipt');
+            await bridge('bind', project, { run_id: binding.run_id, call_id: binding.call_id,
+              token: dispatch.token, child_session_id: event.sessionID,
+              write_scope: binding.write_scope });
+            await ctx.storage.set(`bound/${event.sessionID}`, true);
+          }
+        }
         delete event.tools.cy_state;
         delete event.tools.cy_plan;
         delete event.tools.cy_ask;
         delete event.tools.subagent;
+        if (event.agent !== 'liege-maximo') delete event.tools.cy_review_reject;
         if (!['micronus-prime', 'nexus-prime', 'alchemist', 'solus-prime',
           'amalgamous', 'vector-prime'].includes(event.agent)) delete event.tools.cy_check;
         return;
       }
       delete event.tools.cy_check;
+      delete event.tools.cy_review_reject;
       const expected = primaryModel(project);
       if (expected && (event.model.providerID !== expected.providerID ||
           event.model.id !== expected.id || event.model.variant !== expected.variant)) {

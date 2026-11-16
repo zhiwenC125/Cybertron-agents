@@ -22,10 +22,34 @@ from .graph import GraphRejected, PlanGraph, PlanNode
 from .gates import diff_facts, risk_floor
 from .profiles import run_check
 from .scope_guard import FileState, ScopeGuard, Snapshot
+from .scheduler_v6 import affected_subgraph, dispatchable
 
 
 class HostBridgeError(RuntimeError):
     pass
+
+
+_DISPATCH_END_EVENTS = {"node.completed", "node.failed", "node.blocked", "node.cancelled"}
+
+
+def _peer_was_concurrent(events: list[dict], peer_id: str, current_start: int) -> bool:
+    """True when a peer node's active window overlaps the current dispatch.
+
+    A peer that reached a terminal state before the current dispatch started
+    is not concurrent; its writes are already part of the current baseline and
+    may not be excluded from verification.
+    """
+    starts = [index for index, event in enumerate(events)
+              if event["type"] == "dispatch.started" and event.get("node_id") == peer_id]
+    if not starts:
+        return False
+    last_start = starts[-1]
+    if last_start > current_start:
+        return True
+    ends = [index for index in range(last_start + 1, len(events))
+            if events[index]["type"] in _DISPATCH_END_EVENTS
+            and events[index].get("node_id") == peer_id]
+    return not ends or ends[-1] > current_start
 
 
 _run_counter = itertools.count()
@@ -85,7 +109,10 @@ class V6HostBridge:
 
     def events(self, run_id: str) -> list[dict]:
         path = self._dir(run_id) / "events.jsonl"
-        return [json.loads(line) for line in path.read_text().splitlines() if line]
+        try:
+            return [json.loads(line) for line in path.read_text().splitlines() if line]
+        except (ValueError, TypeError) as exc:
+            raise HostBridgeError("event log is corrupt") from exc
 
     def _workspace_digest(self) -> str:
         snapshot = ScopeGuard(self.project, ()).snapshot()
@@ -116,8 +143,9 @@ class V6HostBridge:
             raise HostBridgeError(str(exc)) from exc
         if not nodes or any(node.status != "pending" or node.kind not in {"task", "review"} or node.role == "prima" for node in nodes):
             raise HostBridgeError("plan requires pending subagent task or review nodes")
-        if any(set(node.verifiers) != {"scope_guard"} for node in nodes):
-            raise HostBridgeError("M1 host only supports scope_guard until M2")
+        if any("scope_guard" not in node.verifiers or
+               set(node.verifiers) - {"scope_guard", "loop1"} for node in nodes):
+            raise HostBridgeError("unsupported host verifier")
         if not isinstance(host_session_id, str) or not host_session_id:
             raise HostBridgeError("host session ID is required")
         # A run ID is an identifier, not a secret. The macOS verification
@@ -140,16 +168,25 @@ class V6HostBridge:
         status = {node_id: "pending" for node_id in graph.nodes}
         child = {}
         starts = {}
+        active_calls = {}
         for event in events:
             node_id = event.get("node_id")
             if event["type"] == "dispatch.started" and node_id in status:
                 status[node_id] = "running"
                 starts[event["call_id"]] = node_id
+                active_calls[event["call_id"]] = {"node_id": node_id, "call_id": event["call_id"],
+                                                  "child_session_id": None}
             elif event["type"] == "dispatch.returned" and event.get("call_id"):
                 if event["call_id"] in starts:
                     child[starts[event["call_id"]]] = event.get("child_session_id")
+                    if event["call_id"] in active_calls:
+                        active_calls[event["call_id"]]["child_session_id"] = event.get("child_session_id")
             elif event["type"].startswith("node.") and node_id in status:
                 status[node_id] = "pending" if event["type"] == "node.retry" else event["type"].split(".", 1)[1]
+                if event["type"] != "node.retry":
+                    for call_id, entry in list(active_calls.items()):
+                        if entry["node_id"] == node_id:
+                            del active_calls[call_id]
         for node_id, value in status.items():
             graph.nodes[node_id].status = value
         required_gates = set(graph.gates)
@@ -166,18 +203,37 @@ class V6HostBridge:
                     and event["workspace_sha256"] == current_digest):
                 passed_gates.add(event["gate"])
         pending_gates = sorted(required_gates - passed_gates)
-        ready = [node.node_id for node in graph.ready_nodes()]
+        ready = [node.node_id for node in dispatchable(graph,
+                 tuple(entry["node_id"] for entry in active_calls.values()), max_writers=2)
+                 if sum(event["type"] == "dispatch.started" and event.get("node_id") == node.node_id
+                        for event in events) < node.budget["max_attempts"]]
+        repair_feedback = {}
+        rejected_calls = {event.get("call_id") for event in events
+                          if event["type"] == "review.rejected"}
+        for event in events:
+            if event["type"] in {"node.failed", "node.blocked"} and event.get("node_id"):
+                if event.get("call_id") in rejected_calls:
+                    continue
+                repair_feedback[event["node_id"]] = event.get("diagnostic") or event.get("reason")
+            elif event["type"] == "review.rejected" and event.get("affected_node_id"):
+                repair_feedback[event["affected_node_id"]] = (
+                    event.get("diagnostic") or event.get("reason"))
+        # Feedback is actionable only while the node still needs a retry.
+        repair_feedback = {node_id: value for node_id, value in repair_feedback.items()
+                           if status.get(node_id) != "completed"}
         nodes = [{"node_id": node.node_id, "status": status[node.node_id],
                   "card": self._card(node), "role": node.role,
                   "write_scope": list(node.write_scope)} for node in graph.nodes.values()]
-        active = next((node for node in nodes if node["status"] == "running"), None)
+        active = next(iter(active_calls.values()), None)
         result = {"run_id": run_id, "status": "running" if active else
                   "ready" if ready else "completed" if all(v == "completed" for v in status.values())
                   and not pending_gates else "blocked",
                   "plan_revision": graph.revision, "nodes": nodes, "ready_nodes": ready,
                   "required_gates": sorted(required_gates), "passed_gates": sorted(passed_gates),
                   "pending_gates": pending_gates,
-                  "child_session_id": child.get(active["node_id"]) if active else None,
+                  "repair_feedback": repair_feedback,
+                  "child_session_id": active["child_session_id"] if active else None,
+                  "active_dispatches": list(active_calls.values()),
                   "event_seq": len(events), "events_path": str(self._dir(run_id) / "events.jsonl")}
         if len(nodes) == 1:
             result.update({"node_id": nodes[0]["node_id"], "card": nodes[0]["card"],
@@ -218,15 +274,24 @@ class V6HostBridge:
         (self._dir(run_id) / "plan.json").write_text(json.dumps(graph.to_dict(), ensure_ascii=False))
         return self.state(run_id)
 
-    def _token(self, run_id: str) -> str:
+    def _snapshot_path(self, run_id: str, call_id: str) -> Path:
+        if not isinstance(call_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", call_id):
+            raise HostBridgeError("invalid host tool call ID")
+        return self._dir(run_id) / f"snapshot-{call_id}.json"
+
+    def _token(self, run_id: str, call_id: str) -> str:
         directory = self._dir(run_id)
-        return _hash((directory / "snapshot.json").read_bytes() + b"\0" +
-                     (directory / "events.jsonl").read_bytes() + b"\0" +
+        started = next((event for event in self.events(run_id)
+                        if event["type"] == "dispatch.started" and event.get("call_id") == call_id), None)
+        if started is None:
+            raise HostBridgeError("no matching dispatch")
+        return _hash(self._snapshot_path(run_id, call_id).read_bytes() + b"\0" +
+                     json.dumps(started, sort_keys=True).encode() + b"\0" +
                      (directory / "plan.json").read_bytes())
 
-    def _verify_token(self, run_id: str, token: str) -> None:
-        if not isinstance(token, str) or self._token(run_id) != token:
-            raise HostBridgeError("dispatch snapshot or event log changed")
+    def _verify_token(self, run_id: str, call_id: str, token: str) -> None:
+        if not isinstance(token, str) or self._token(run_id, call_id) != token:
+            raise HostBridgeError("dispatch snapshot or plan changed")
 
     def before(self, run_id: str, node_id: str, role: str, card: str, call_id: str,
                active_token: str | None = None) -> dict:
@@ -234,32 +299,98 @@ class V6HostBridge:
         node = graph.nodes.get(node_id)
         reason = None
         state = self.state(run_id)
-        if node is None or node_id not in state["ready_nodes"] or state["status"] == "running":
+        if node is None or node_id not in state["ready_nodes"]:
             reason = "node is not ready"
         elif role != node.role or card != self._card(node):
             reason = "node, role, capability, or write_scope differs from plan"
-        elif not isinstance(call_id, str) or not call_id:
+        elif not isinstance(call_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", call_id):
             reason = "host tool call ID is required"
+        elif any(event.get("call_id") == call_id for event in self.events(run_id)):
+            reason = "host tool call ID already used"
+        elif node is not None and node.write_scope and any(
+                self._graph(run_id).nodes[entry["node_id"]].write_scope
+                and not any(event["type"] == "dispatch.bound" and event.get("call_id") == entry["call_id"]
+                            for event in self.events(run_id))
+                for entry in state["active_dispatches"]):
+            reason = "active writer has no host permission binding"
         if reason:
-            if state["status"] == "running":
-                self._verify_token(run_id, active_token)
-                self._append(run_id, "plan.op.rejected", node_id=node_id, reason=reason)
-                return {"rejected": True, "reason": reason, "token": self._token(run_id)}
             self._append(run_id, "plan.op.rejected", node_id=node_id, reason=reason)
+            if state["active_dispatches"]:
+                return {"rejected": True, "reason": reason, "token": active_token}
             raise HostBridgeError(reason)
         guard = ScopeGuard(self.project, node.write_scope)
         guard.assert_safe_before_dispatch(guard.snapshot())
         baseline = guard.snapshot()
         directory = self._dir(run_id)
-        (directory / "snapshot.json").write_bytes(_encode(baseline))
+        self._snapshot_path(run_id, call_id).write_bytes(_encode(baseline))
         self._append(run_id, "dispatch.started", node_id=node_id, role=role,
                      capability=node.capability, write_scope=list(node.write_scope), call_id=call_id)
-        return {"status": "running", "token": self._token(run_id), "node_id": node_id}
+        return {"status": "running", "token": self._token(run_id, call_id),
+                "node_id": node_id, "write_scope": list(node.write_scope)}
+
+    def bind(self, run_id: str, call_id: str, token: str,
+             child_session_id: str, write_scope: list[str]) -> dict:
+        """Record a host-verified child session permission binding."""
+        self._verify_token(run_id, call_id, token)
+        events = self.events(run_id)
+        start = next((event for event in events if event["type"] == "dispatch.started"
+                      and event.get("call_id") == call_id), None)
+        returned = next((event for event in events if event["type"] == "dispatch.returned"
+                         and event.get("call_id") == call_id), None)
+        if not start or not returned or returned.get("child_session_id") != child_session_id:
+            raise HostBridgeError("child session does not match dispatch")
+        node = self._graph(run_id).nodes[start["node_id"]]
+        if write_scope != list(node.write_scope):
+            raise HostBridgeError("child permission scope differs from plan")
+        prior = next((event for event in events if event["type"] == "dispatch.bound"
+                      and event.get("call_id") == call_id), None)
+        if prior:
+            if prior.get("child_session_id") != child_session_id:
+                raise HostBridgeError("dispatch already bound to another child")
+            return self.state(run_id)
+        self._append(run_id, "dispatch.bound", call_id=call_id,
+                     node_id=node.node_id, child_session_id=child_session_id,
+                     write_scope=write_scope)
+        return self.state(run_id)
+
+    def review_reject(self, run_id: str, call_id: str, token: str,
+                      child_session_id: str, affected_node_id: str,
+                      diagnostic: str) -> dict:
+        """Record a negative L2 finding from the bound native reviewer."""
+        self._verify_token(run_id, call_id, token)
+        if not isinstance(diagnostic, str) or not diagnostic.strip():
+            raise HostBridgeError("L2 rejection requires a diagnostic")
+        graph = self._graph(run_id)
+        starts = [event for event in self.events(run_id)
+                  if event["type"] == "dispatch.started" and event.get("call_id") == call_id]
+        bound = [event for event in self.events(run_id)
+                 if event["type"] == "dispatch.bound" and event.get("call_id") == call_id
+                 and event.get("child_session_id") == child_session_id]
+        if len(starts) != 1 or len(bound) != 1:
+            raise HostBridgeError("L2 review has no bound native child")
+        reviewer = graph.nodes[starts[0]["node_id"]]
+        if reviewer.kind != "review" or reviewer.capability != "review.l2":
+            raise HostBridgeError("only an L2 review node can reject")
+        if affected_node_id not in reviewer.depends_on:
+            raise HostBridgeError("rejected producer must be a direct review dependency")
+        if any(event["type"] == "review.rejected" and event.get("call_id") == call_id
+               for event in self.events(run_id)):
+            raise HostBridgeError("review call already rejected")
+        state = self.state(run_id)
+        producer = next(item for item in state["nodes"] if item["node_id"] == affected_node_id)
+        if producer["status"] != "completed":
+            raise HostBridgeError("rejected producer has not completed")
+        self._append(run_id, "review.rejected", node_id=reviewer.node_id,
+                     call_id=call_id, child_session_id=child_session_id,
+                     affected_node_id=affected_node_id, diagnostic=diagnostic.strip(),
+                     source="host")
+        return self.state(run_id)
 
     def after(self, run_id: str, call_id: str, token: str, child_session_id: str | None,
               tool_status: str, duration_ms: int, output_sha256: str | None = None) -> dict:
-        self._verify_token(run_id, token)
-        started = next((event for event in reversed(self.events(run_id)) if event["type"] == "dispatch.started"), None)
+        self._verify_token(run_id, call_id, token)
+        started = next((event for event in reversed(self.events(run_id))
+                        if event["type"] == "dispatch.started" and event.get("call_id") == call_id), None)
         if not started or started["call_id"] != call_id or any(
                 event["type"] == "dispatch.returned" and event.get("call_id") == call_id
                 for event in self.events(run_id)):
@@ -272,51 +403,133 @@ class V6HostBridge:
                      child_session_id=child_session_id, tool_status=tool_status,
                      duration_ms=duration_ms, output_sha256=output_sha256 or _hash(b""))
         if tool_status in {"error", "cancelled"}:
-            return self.finish(run_id, self._token(run_id), child_session_id)
-        return {"status": "running", "token": self._token(run_id),
-                "child_session_id": child_session_id}
+            return self.finish(run_id, token, child_session_id, call_id=call_id)
+        return {"status": "running", "token": token,
+                "child_session_id": child_session_id, "call_id": call_id}
 
-    def finish(self, run_id: str, token: str, child_session_id: str | None) -> dict:
-        self._verify_token(run_id, token)
+    def finish(self, run_id: str, token: str, child_session_id: str | None,
+               *, call_id: str | None = None) -> dict:
         state = self.state(run_id)
-        if state["status"] != "running" or state["child_session_id"] != child_session_id:
+        if call_id is None:
+            matches = [entry for entry in state["active_dispatches"]
+                       if entry["child_session_id"] == child_session_id]
+            if len(matches) != 1:
+                raise HostBridgeError("ambiguous or missing returned subagent")
+            call_id = matches[0]["call_id"]
+        self._verify_token(run_id, call_id, token)
+        if not any(entry["call_id"] == call_id and entry["child_session_id"] == child_session_id
+                   for entry in state["active_dispatches"]):
             raise HostBridgeError("no matching returned subagent")
-        returned = next(event for event in reversed(self.events(run_id)) if event["type"] == "dispatch.returned")
+        returned = next((event for event in reversed(self.events(run_id))
+                         if event["type"] == "dispatch.returned" and event.get("call_id") == call_id), None)
+        if returned is None:
+            raise HostBridgeError("subagent has not returned")
         started = next(event for event in reversed(self.events(run_id))
-                       if event["type"] == "dispatch.started" and event["call_id"] == returned["call_id"])
+                       if event["type"] == "dispatch.started" and event["call_id"] == call_id)
         node = self._graph(run_id).nodes[started["node_id"]]
+        all_events = self.events(run_id)
+        start_index = next(index for index, event in enumerate(all_events)
+                           if event["type"] == "dispatch.started" and event.get("call_id") == call_id)
+        concurrent_writers = any(
+            peer.node_id != node.node_id and peer.write_scope
+            and _peer_was_concurrent(all_events, peer.node_id, start_index)
+            for peer in self._graph(run_id).nodes.values())
+        if node.write_scope and concurrent_writers and not any(
+                event["type"] == "dispatch.bound" and event.get("call_id") == call_id
+                for event in all_events):
+            raise HostBridgeError("concurrent writer lacks host permission binding")
         guard = ScopeGuard(self.project, node.write_scope)
-        baseline = _decode((self._dir(run_id) / "snapshot.json").read_bytes())
+        baseline = _decode(self._snapshot_path(run_id, call_id).read_bytes())
         current = guard.snapshot()
         # These two files are written only by this bridge. Their bytes were
         # authenticated against the token held by the host plugin.
-        for name in ("snapshot.json", "events.jsonl"):
-            rel = f".cybertron/runs/{run_id}/{name}"
-            baseline.entries[rel] = current.entries[rel]
+        for rel in current.entries:
+            if rel.startswith(f".cybertron/runs/{run_id}/"):
+                baseline.entries[rel] = current.entries[rel]
+        # A concurrent peer has its own node scope and a host-bound narrow
+        # session permission. Exclude that peer's writes only while its active
+        # window overlaps this dispatch; a peer that finished earlier cannot
+        # mask an out-of-scope write here.
+        for peer in self._graph(run_id).nodes.values():
+            if peer.node_id == node.node_id or not peer.write_scope:
+                continue
+            if not _peer_was_concurrent(all_events, peer.node_id, start_index):
+                continue
+            peer_guard = ScopeGuard(self.project, peer.write_scope)
+            for rel, value in current.entries.items():
+                if peer_guard._allowed(rel, is_dir=value.kind == "directory"):
+                    baseline.entries[rel] = value
+            for rel in list(baseline.entries):
+                if rel not in current.entries and peer_guard._allowed(
+                        rel, is_dir=baseline.entries[rel].kind == "directory"):
+                    del baseline.entries[rel]
         report = guard.verify_and_rollback(baseline)
         if report.rejected_paths:
             self._append(run_id, "plan.op.rejected", node_id=node.node_id,
                          reason="write_scope violation", paths=list(report.rejected_paths))
         artifacts = {path: value.sha256 for path, value in guard.snapshot().entries.items()
                      if path in report.changed_paths and path not in report.rejected_paths and value.kind == "file"}
+        rejection = next((event for event in reversed(all_events)
+                          if event["type"] == "review.rejected" and event.get("call_id") == call_id), None)
         if returned["tool_status"] == "cancelled":
             status = "cancelled"
-        elif report.rejected_paths or returned["tool_status"] == "error":
+        elif rejection or report.rejected_paths or returned["tool_status"] == "error":
             status = "failed"
-        elif not artifacts:
+        elif not artifacts and node.write_scope:
             status = "blocked"
+        elif not node.write_scope and report.changed_paths:
+            status = "failed"
         else:
             status = "completed"
-        self._append(run_id, "node." + status, node_id=node.node_id,
+        diagnostic = (rejection["diagnostic"] if rejection else
+                      "write_scope violation: " + ", ".join(report.rejected_paths) if report.rejected_paths else
+                      "native subagent error" if returned["tool_status"] == "error" else
+                      "no accepted artifact" if status == "blocked" else None)
+        fingerprint = _hash(json.dumps({"status": status, "diagnostic": diagnostic,
+                                        "paths": report.rejected_paths}, sort_keys=True).encode())
+        self._append(run_id, "node." + status, node_id=node.node_id, call_id=call_id,
                      artifacts=artifacts, rejected_paths=list(report.rejected_paths),
+                     diagnostic=diagnostic, failure_fingerprint=fingerprint if status in {"failed", "blocked"} else None,
                      evidence={"source": "host", "command": "native.subagent",
                                "exit": 0 if returned["tool_status"] == "completed" else 1,
                                "utc": _utc(), "sha256": returned["output_sha256"],
                                "session_id": child_session_id})
-        if status == "completed":
+        if status == "completed" and artifacts:
             facts = diff_facts(baseline, guard.snapshot())
             risk, floor = risk_floor(facts)
             self._append(run_id, "gate.required", node_id=node.node_id,
                          risk=risk.name.lower(), gates=sorted(floor),
                          changed_paths=list(facts.paths), changed_lines=facts.changed_lines)
+        if rejection:
+            producer_id = rejection["affected_node_id"]
+            prior = [event for event in all_events if event["type"] == "review.rejected"
+                     and event.get("affected_node_id") == producer_id
+                     and event.get("diagnostic") == rejection["diagnostic"]
+                     and event.get("call_id") != call_id]
+            producer = self._graph(run_id).nodes[producer_id]
+            used = sum(event["type"] == "dispatch.started" and event.get("node_id") == producer_id
+                       for event in all_events)
+            if prior or used >= producer.budget["max_attempts"]:
+                self._append(run_id, "loop2.escalated", node_id=producer_id,
+                             reason="repeated L2 finding" if prior else "max_attempts exhausted",
+                             failure_fingerprint=fingerprint)
+            else:
+                for affected_id in affected_subgraph(self._graph(run_id), producer_id):
+                    self._append(run_id, "node.stale", node_id=affected_id,
+                                 cause="review.l2.reject", reviewer=node.node_id)
+        elif status in {"failed", "blocked"}:
+            failures = [event for event in self.events(run_id)
+                        if event["type"] in {"node.failed", "node.blocked"}
+                        and event.get("node_id") == node.node_id
+                        and event.get("failure_fingerprint") == fingerprint]
+            used = sum(event["type"] == "dispatch.started" and event.get("node_id") == node.node_id
+                       for event in self.events(run_id))
+            if len(failures) >= 2 or used >= node.budget["max_attempts"]:
+                self._append(run_id, "loop2.escalated", node_id=node.node_id,
+                             reason="repeated failure fingerprint" if len(failures) >= 2 else "max_attempts exhausted",
+                             failure_fingerprint=fingerprint)
+            else:
+                self._append(run_id, "node.retry", node_id=node.node_id,
+                             diagnostic=diagnostic, failure_fingerprint=fingerprint,
+                             attempt=used + 1)
         return self.state(run_id)

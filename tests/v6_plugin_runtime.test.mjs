@@ -25,12 +25,16 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
   const tools = new Map();
   const toolHooks = new Map();
   const sessionHooks = new Map();
+  const sessionUpdates = [];
   const ctx = {
     location: { project: { canonical: project } },
     storage: { get: async key => storage.get(key), set: async (key, value) => storage.set(key, value) },
     session: {
       hook: async (name, fn) => sessionHooks.set(name, fn),
-      get: async () => ({ agent: 'prima' }),
+      get: async ({ sessionID }) => sessionID === 'child-1'
+        ? { agent: 'alpha-trion', parentID: 'parent',
+            permissions: sessionUpdates.at(-1)?.permissions } : { agent: 'prima' },
+      update: async value => sessionUpdates.push(value),
       wait: async () => undefined,
     },
     tool: {
@@ -39,7 +43,11 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     },
   };
   await plugin.setup(ctx);
-  assert.deepEqual([...tools.keys()], ['cy_plan', 'cy_state', 'cy_ask', 'cy_check']);
+  assert.deepEqual([...tools.keys()], ['cy_plan', 'cy_state', 'cy_ask', 'cy_check', 'cy_review_reject']);
+  assert.deepEqual(tools.get('cy_plan').input.properties.nodes.items.properties.kind.enum,
+    ['task', 'review']);
+  assert.deepEqual(tools.get('cy_plan').input.properties.node.properties.kind.enum,
+    ['task', 'review']);
   assert.ok(toolHooks.has('execute.before'));
   assert.ok(toolHooks.has('execute.after'));
   const context = { agent: 'prima', tools: {}, system: [],
@@ -63,6 +71,12 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     /not ready/);
   await toolHooks.get('execute.after')({ ...event, status: 'completed',
     result: { metadata: { sessionID: 'child-1' } } });
+  await sessionHooks.get('context')({ agent: 'alpha-trion', sessionID: 'child-1',
+    tools: {}, system: [], model: { providerID: 'vendor', id: 'test' } });
+  assert.deepEqual(sessionUpdates[0].permissions.filter(rule => rule.action === 'edit'), [
+    { action: 'edit', resource: '*', effect: 'deny' },
+    { action: 'edit', resource: 'notes.md', effect: 'allow' },
+  ]);
   assert.equal(JSON.parse((await tools.get('cy_state').execute({},
     { agent: 'prima', sessionID: 'parent' })).content).status, 'running');
   writeFileSync(path.join(project, 'notes.md'), 'done');
@@ -74,6 +88,9 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
   assert.match(eventLog, /node.completed/);
   await assert.rejects(tools.get('cy_check').execute({ target: 'build' },
     { agent: 'prima', sessionID: 'parent' }), /cannot run cy_check/);
+  await assert.rejects(tools.get('cy_review_reject').execute({
+    affected_node_id: 'n1', diagnostic: 'finding',
+  }, { agent: 'prima', sessionID: 'parent' }), /Only the L2 reviewer/);
   writeFileSync(path.join(project, 'CMakeLists.txt'),
     'cmake_minimum_required(VERSION 3.20)\nproject(hello C)\nadd_executable(hello main.c)\n');
   writeFileSync(path.join(project, 'main.c'), 'int main(void){return 0;}\n');
