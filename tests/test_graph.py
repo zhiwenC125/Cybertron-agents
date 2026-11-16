@@ -44,6 +44,10 @@ class GraphTests(unittest.TestCase):
                 with self.assertRaises(GraphRejected):
                     PlanGraph([node(write_scope=(scope,))])
 
+    def test_doc_scope_cannot_exceed_generated_host_permissions(self):
+        with self.assertRaises(GraphRejected):
+            PlanGraph([node(role="alpha-trion", capability="doc.write", write_scope=("arbitrary.md",))])
+
     def test_add_node_rejection_preserves_revision_and_nodes(self):
         graph = PlanGraph([node()])
         before = graph.to_dict()["nodes"]

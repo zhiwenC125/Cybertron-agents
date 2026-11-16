@@ -17,6 +17,9 @@ permissions:
   - action: "read"
     resource: "docs/**"
     effect: "allow"
+  - action: "subagent"
+    resource: "*"
+    effect: "deny"
 ---
 
 # 第十三天尊 (The Thirteenth Prime) — 神器：Matrix of Leadership (领导模块)

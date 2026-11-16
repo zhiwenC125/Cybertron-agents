@@ -29,6 +29,9 @@ permissions:
   - action: "feishu_wiki_delete*"
     resource: "*"
     effect: "ask"
+  - action: "subagent"
+    resource: "*"
+    effect: "deny"
 ---
 
 # 震天尊 (Megatronus Prime) — 神器：Requiem Blaster (安魂曲火炮)

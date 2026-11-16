@@ -17,6 +17,9 @@ permissions:
   - action: "grep"
     resource: "*"
     effect: "allow"
+  - action: "subagent"
+    resource: "*"
+    effect: "deny"
 ---
 
 # 锐天骁 (Onyx Prime) — 神器：Triptych Mask (三面灵具)

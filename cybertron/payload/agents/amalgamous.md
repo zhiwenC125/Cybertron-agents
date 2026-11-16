@@ -26,6 +26,9 @@ permissions:
   - action: "edit"
     resource: "tests/**"
     effect: "deny"
+  - action: "subagent"
+    resource: "*"
+    effect: "deny"
 ---
 
 # 幻化天 (Amalgamous Prime) — 神器：Scythe of Transmutation (幻化之镰)

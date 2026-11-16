@@ -11,6 +11,9 @@ permissions:
   - action: "read"
     resource: "*"
     effect: "allow"
+  - action: "subagent"
+    resource: "*"
+    effect: "deny"
 ---
 
 # 微米天 (Micronus Prime) — 神器：Chimera Stone (奇美拉石)

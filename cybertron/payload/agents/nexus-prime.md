@@ -44,6 +44,9 @@ permissions:
   - action: "feishu_mcp_healthcheck*"
     resource: "*"
     effect: "allow"
+  - action: "subagent"
+    resource: "*"
+    effect: "deny"
 ---
 
 # 合体天 (Nexus Prime) — 神器：Enigma of Combination (合体之谜)
