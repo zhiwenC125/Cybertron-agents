@@ -1,13 +1,15 @@
 # Cybertron 安装与发布方案
 
-## 当前发布状态（2026-11-17）
+## 0.3.0 发布准备状态（2026-11-17）
 
-| 渠道 | 版本 | 地址 |
+| 渠道 | 版本 | 状态 |
 | --- | --- | --- |
-| npm | `cybertron-agents@0.3.0` | https://www.npmjs.com/package/cybertron-agents/v/0.3.0 |
-| PyPI | `cybertron-agents 0.3.0` | https://pypi.org/project/cybertron-agents/0.3.0/ |
-| GitHub tag | `v0.3.0` | https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.3.0 |
-| `install.sh` SHA-256 | 由 Release 的 `SHA256SUMS` 提供 | Release 附件 |
+| npm | `cybertron-agents@0.3.0` | 待发布 |
+| PyPI | `cybertron-agents 0.3.0` | 待发布 |
+| GitHub tag / Release | `v0.3.0` | 待创建 |
+| `install.sh` SHA-256 | 由 Release 的 `SHA256SUMS` 提供 | 发布后提供 |
+
+以下 0.3.0 安装命令需在各渠道发布完成后使用。
 
 > `0.3.0` 是 v6 动态任务图功能版本：M0–M5 全部通过门禁，运行时加入图计划、写范围守卫、风险门禁、并发调度、设备审批/回滚、模板与指标，并随包分发实验性 DSH 适配器。上一版 `0.2.1` 为协作治理补丁，`0.2.0` 包含阶段 A–E 与十三角色模型编队。渠道核验见[发布验收记录](stages/I-release-030.md)（发布后填写）。
 

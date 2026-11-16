@@ -114,7 +114,7 @@ python3 -m cybertron.installer workflow run <run_id> --project . --host fake
 
 `fake` 仅模拟九步与证据，不能作为真实开发完成的证明。`workflow resume <run_id>` 只恢复账本，不重放宿主调用。手动真实调用使用 `--host opencode --allow-external-model`；在 OpenCode 内通过插件调用时，模型调用由用户选择 `prima` 或 `/cybertron` 触发。详情见[阶段 E 记录](docs/stages/E-opencode-orchestration.md)。
 
-详见[安装与发布方案](docs/packaging-and-installation.md)、[v0.3.0 发布说明](docs/releases/v0.3.0.md)和[GitHub Release v0.3.0](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.3.0)。
+详见[安装与发布方案](docs/packaging-and-installation.md)和[待发布的 v0.3.0 发布说明](docs/releases/v0.3.0.md)。
 
 ## 飞书知识库（可选）
 
