@@ -1,0 +1,47 @@
+{
+  "release": "v0.3.0",
+  "tag_commit": "6142fbbf3ef23351c90e0391bc6d67e739324dc4",
+  "published_at_utc": "2026-11-16T18:52:32Z",
+  "workflow": {
+    "run_id": 43930849708,
+    "url": "https://github.com/zhiwenC125/Cybertron-agents/actions/runs/43930849708",
+    "conclusion": "success",
+    "jobs": {
+      "verify": "success",
+      "build": "success",
+      "npm": "success",
+      "pypi": "success",
+      "github_release": "success"
+    }
+  },
+  "pr_verify": {
+    "run_id": 43929043723,
+    "url": "https://github.com/zhiwenC125/Cybertron-agents/actions/runs/43929043723",
+    "conclusion": "success"
+  },
+  "channels": {
+    "github": {
+      "url": "https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.3.0",
+      "assets": {
+        "cybertron-agents-0.3.0.tgz": "e9f07826b9d767a9f11ac90708fb083bfdd173b23ae6d39d1ea1c008ed23c6b7",
+        "cybertron_agents-0.3.0-py3-none-any.whl": "dbec05455565a43bdf956d30ca348f9d15aadfba2b49330160d71b710f077e51",
+        "cybertron_agents-0.3.0.tar.gz": "788adefbc63c9f8312d106ff53af6495fa31f749af4c707cc3be813b26eecba8",
+        "install.sh": "3efab88774bb1def3f902df44ffcd290e42e01246bfcf3c3e4f3f1187ca4e5cf",
+        "SHA256SUMS": "b1614337ee3d0290838ada18a33093079ab01e48dd1fcf813091fcd4fedef88c"
+      }
+    },
+    "npm": {
+      "version": "0.3.0",
+      "url": "https://registry.npmjs.org/cybertron-agents/-/cybertron-agents-0.3.0.tgz",
+      "integrity": "sha512-uEmV3/bFy4lHCjrIQY7iof2KoH1Fc3jJMK/NgU4RPBWULWU2T1zbqamjN+f9ZIsfsgSzmk2QAnAHNyK6I1BlSw=="
+    },
+    "pypi": {
+      "version": "0.3.0",
+      "url": "https://pypi.org/project/cybertron-agents/0.3.0/",
+      "files_sha256": {
+        "cybertron_agents-0.3.0-py3-none-any.whl": "dbec05455565a43bdf956d30ca348f9d15aadfba2b49330160d71b710f077e51",
+        "cybertron_agents-0.3.0.tar.gz": "788adefbc63c9f8312d106ff53af6495fa31f749af4c707cc3be813b26eecba8"
+      }
+    }
+  }
+}
