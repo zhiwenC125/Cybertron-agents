@@ -1,7 +1,7 @@
 {
   "milestone": "M3",
   "host_acceptance": "passed",
-  "verified_at_utc": "2026-11-16T15:44:43.379111+00:00",
+  "verified_at_utc": "2026-11-16T15:45:18.613243+00:00",
   "required_gates": [
     "concurrent_write_isolation",
     "loop1_repair",
@@ -10,7 +10,7 @@
   ],
   "verification": {
     "path": "docs/stages/v6-m3-host-verification.json",
-    "sha256": "07d0b09eccdae3b002cb27ac4ca949e0d4c66514d91e9a270e3587a4d00f0288",
+    "sha256": "e44987ae6ae9aa4799afa7a97ab0954c715b0cbee0bd3eed10a1f929f6f4102e",
     "checks": 70,
     "all_passed": true
   },
