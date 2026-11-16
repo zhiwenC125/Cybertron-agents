@@ -71,11 +71,15 @@ class FlashPlan:
     rollback_procedure: str
     heartbeat_marker: str
     plan_digest: str
+    heartbeat_address: int | None = None
+    heartbeat_value: int | None = None
 
     @classmethod
     def prepare(cls, target: DeviceTarget, firmware: FirmwareArtifact,
                 rollback: FirmwareArtifact, *, erase_start: int, erase_end: int,
-                rollback_procedure: str, heartbeat_marker: str) -> FlashPlan:
+                rollback_procedure: str, heartbeat_marker: str,
+                heartbeat_address: int | None = None,
+                heartbeat_value: int | None = None) -> FlashPlan:
         target.validate()
         firmware.verify()
         rollback.verify()
@@ -88,17 +92,24 @@ class FlashPlan:
             raise ValueError("Rollback firmware does not fit target flash")
         procedure = _required(rollback_procedure, "rollback_procedure")
         marker = _required(heartbeat_marker, "heartbeat_marker")
+        if (heartbeat_address is None) != (heartbeat_value is None):
+            raise ValueError("heartbeat address and value must both be set or both be omitted")
+        if heartbeat_address is not None and (
+                type(heartbeat_address) is not int or heartbeat_address < 0
+                or type(heartbeat_value) is not int or not 0 <= heartbeat_value <= 0xFFFFFFFF):
+            raise ValueError("heartbeat address or value is invalid")
         if firmware.path == rollback.path or firmware.sha256 == rollback.sha256:
             raise ValueError("Rollback firmware must be a distinct verified image")
         values = {
             "target": asdict(target), "firmware": asdict(firmware),
             "rollback": asdict(rollback), "erase_start": erase_start,
             "erase_end": erase_end, "rollback_procedure": procedure,
-            "heartbeat_marker": marker,
+            "heartbeat_marker": marker, "heartbeat_address": heartbeat_address,
+            "heartbeat_value": heartbeat_value,
         }
         digest = hashlib.sha256(json.dumps(values, sort_keys=True).encode()).hexdigest()
         return cls(target, firmware, rollback, erase_start, erase_end,
-                   procedure, marker, digest)
+                   procedure, marker, digest, heartbeat_address, heartbeat_value)
 
     def verify(self) -> None:
         rebuilt = type(self).prepare(
@@ -106,6 +117,8 @@ class FlashPlan:
             erase_start=self.erase_start, erase_end=self.erase_end,
             rollback_procedure=self.rollback_procedure,
             heartbeat_marker=self.heartbeat_marker,
+            heartbeat_address=self.heartbeat_address,
+            heartbeat_value=self.heartbeat_value,
         )
         if rebuilt.plan_digest != self.plan_digest:
             raise ValueError("Flash plan changed after preparation")
@@ -121,6 +134,8 @@ class FlashPlan:
             "rollback": asdict(self.rollback),
             "rollback_procedure": self.rollback_procedure,
             "heartbeat_marker": self.heartbeat_marker,
+            "heartbeat_address": self.heartbeat_address,
+            "heartbeat_value": self.heartbeat_value,
             "requires_human_approval": True,
         }
 

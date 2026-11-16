@@ -1,0 +1,18 @@
+utc=2026-11-16T16:45:23Z
+arch=arm64
+--- renode ---
+/opt/homebrew/bin/renode
+Renode v1.17.0
+  build: 1.17.0+20261116git89ea9e587
+  build type: Release
+  runtime: .NET 10.0.14
+--- arm gcc ---
+arm-none-eabi-gcc (GCC) 16.2.0
+--- stlink ---
+v1.9.0
+v1.9.0
+--- openocd ---
+/opt/homebrew/bin/openocd
+Open On-Chip Debugger 0.12.0
+--- cmake ---
+cmake version 4.2.3

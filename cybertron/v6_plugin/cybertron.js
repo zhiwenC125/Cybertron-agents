@@ -151,9 +151,9 @@ export default Plugin.define({
         },
       });
       editor.add({
-        name: 'cy_check', description: 'Run a fixed lint, build, or test target in an isolated project copy and return tool receipts.',
+        name: 'cy_check', description: 'Run a fixed lint, build, test, or Renode simulation target in an isolated project copy and return tool receipts.',
         input: { type: 'object', properties: {
-          target: { type: 'string', enum: ['lint', 'build', 'test'] },
+          target: { type: 'string', enum: ['lint', 'build', 'test', 'sim'] },
           run_id: { type: 'string' },
         }, required: ['target'], additionalProperties: false },
         execute: async (input, context) => {
@@ -284,7 +284,7 @@ export default Plugin.define({
         throw new Error('Cybertron prima model differs from active session; run cybertron models doctor');
       }
       event.system.push({ type: 'text', text:
-        'Cybertron v6 M2: plan the smallest valid task graph for the user request with cy_plan. Use node for one task, nodes for a dependency graph, or the optional bug_fix template. For a single requested Markdown file within alpha-trion allowed paths, use capability doc.write, role alpha-trion, write_scope containing only that path, and scope_guard verifier; keep the requested content exact. Each task needs a registered capability and role, narrow write_scope, acceptance, and scope_guard verifier. Dispatch only a ready node through the native subagent tool; use its exact returned card as description and include node_id, capability, write_scope, objective, and run_id in the child prompt. Call cy_state with wait=true after each child returns. The kernel derives risk gates from the actual workspace diff; cy_check runs fixed lint/build/test targets for eligible roles, and a run_id binds its receipt to the run. Required gates cannot be removed; mark_not_applicable and complete_run remain fail-closed until trusted verifier facts exist. Background is still running; cancellation is terminal. Never claim model text as tool evidence.' });
+        'Cybertron v6 M2: plan the smallest valid task graph for the user request with cy_plan. Use node for one task, nodes for a dependency graph, or the optional bug_fix template. For a single requested Markdown file within alpha-trion allowed paths, use capability doc.write, role alpha-trion, write_scope containing only that path, and scope_guard verifier; keep the requested content exact. Each task needs a registered capability and role, narrow write_scope, acceptance, and scope_guard verifier. Dispatch only a ready node through the native subagent tool; use its exact returned card as description and include node_id, capability, write_scope, objective, and run_id in the child prompt. Call cy_state with wait=true after each child returns. The kernel derives risk gates from the actual workspace diff; cy_check runs fixed lint/build/test/sim targets for eligible roles, and a run_id binds its receipt to the run. Required gates cannot be removed; mark_not_applicable and complete_run remain fail-closed until trusted verifier facts exist. Background is still running; cancellation is terminal. Never claim model text as tool evidence.' });
     });
   },
 });

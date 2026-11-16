@@ -1,0 +1,243 @@
+{
+  "milestone": "M4",
+  "status": "passed",
+  "commit": null,
+  "checked_at_utc": "2026-11-16T16:45:23+00:00",
+  "required_gates": [
+    "unit_tests_all_green",
+    "device_approval_binding",
+    "rollback_image_binding",
+    "renode_profile",
+    "rejection_path_tests",
+    "real_hardware_operation"
+  ],
+  "gate_status": {
+    "unit_tests_all_green": "pass",
+    "device_approval_binding": "pass",
+    "rollback_image_binding": "pass",
+    "renode_profile": "pass",
+    "rejection_path_tests": "pass",
+    "real_hardware_operation": "pass"
+  },
+  "baseline": {
+    "git_status_short": "dirty M4 implementation and evidence; committed after the gates passed",
+    "python_tests": 206,
+    "javascript_tests": 4,
+    "python_result": "OK",
+    "javascript_result": "pass",
+    "unit_test_log": "docs/stages/v6-m4-unittest.log",
+    "unit_test_log_sha256": "5645d73df62e17c3547f41fb9454b3cf396aba31c000b6ff8700f95f1651b5b5"
+  },
+  "authorization": {
+    "path": "docs/stages/v6-m4-user-authorization.txt",
+    "sha256": "016a1a46a496b4b84d1ceb40aad732686c9abcb096c0b810da0813f569657ef7",
+    "source": "explicit user message in this session",
+    "scope": "Continue M4 with the developer-present STM32 target; approval prompts are disabled by the user.",
+    "stage7_approval_reused": false,
+    "note": "The stage 7 chat approval is not reused. The new M4 approval is bound to the new plan digest, device, firmware, erase range, and rollback image."
+  },
+  "offline_acceptance": {
+    "path": "docs/stages/v6-m4-acceptance.json",
+    "sha256": "fb7a24b4f5f69f59c7acaf2c3cdf62fdcc94f29a9ba909f5f6831ad45aee3bc7",
+    "status": "passed",
+    "fixture": {
+      "path": "local_backups/v6-m4-run-20261116T164233Z/build/heartbeat.bin",
+      "sha256": "62554f5a0043bc92d2cfc6456e0ab116348324a1b699af62891532559e00476d",
+      "bytes": 100,
+      "rebuilt_from_source": true,
+      "elf_text_bytes": 100
+    },
+    "renode": {
+      "version": "1.17.0+20261116git89ea9e587",
+      "receipt_source": "sandbox",
+      "exit": 0,
+      "receipt_sha256": "64b277d84a1159c36abe8bbb04e1746ee3f91d696a56693020c272861a275c2c",
+      "marker": "CYBERTRON_SIM_PASS marker=C7B70001 counter=0000001F..00000038"
+    }
+  },
+  "device_run": {
+    "run_id": "m4-20261116t164233z",
+    "plan_digest": "5d8bc0b74252c867869da93e3945a1027222d08fc96895108c889903b8ad63f7",
+    "approval_id": "m4-chat-016a1a46a496b4b8",
+    "target": {
+      "device_id": "ST-LINK:local/STM32F1xx_MD:0x410",
+      "board": "STM32F103C8T6",
+      "connection": "ST-LINK V2 SWD",
+      "flash_start": "0x08000000",
+      "flash_end_exclusive": "0x08010000"
+    },
+    "erase": {
+      "start": "0x08002000",
+      "end_exclusive": "0x0800FC00"
+    },
+    "firmware": {
+      "sha256": "62554f5a0043bc92d2cfc6456e0ab116348324a1b699af62891532559e00476d",
+      "bytes": 100
+    },
+    "rollback_image": {
+      "sha256": "bfa1af7bac39eb065979b8c05cb8f79ffae7260751ad3f06a019b309eebcd852",
+      "bytes": 56320
+    },
+    "preflight_full_flash": {
+      "sha256": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+      "bytes": 65536,
+      "matches_stage7_backup": true
+    },
+    "post_flash_full_flash": {
+      "sha256": "a61aeae691ee62a334c47de390ff046bfc9875a2b68ac76a449878b71f98a360",
+      "bytes": 65536,
+      "region_matches_fixture_and_erased_tail": true,
+      "bootloader_unchanged": true,
+      "ota_flag_page_unchanged": true
+    },
+    "heartbeat": {
+      "address": "0x20000000",
+      "expected_marker": "0xC7B70001",
+      "marker_1": "0xC7B70001",
+      "marker_2": "0xC7B70001",
+      "counter_1": 1,
+      "counter_2": 2,
+      "passed": true,
+      "sram_1_sha256": "d1ae83fac3bd7ac275452631324defc5feda4536dc2c798c93d2b84d4aba8a6a",
+      "sram_2_sha256": "e314d78b5b8536a9c640e93f5e7b887af5f27512269517c775c27a1905365488"
+    },
+    "rollback": {
+      "full_sha256": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252",
+      "full_bytes": 65536,
+      "matches_preflight": true,
+      "reset_performed": true
+    },
+    "receipts": 12,
+    "events_path": "docs/stages/v6-m4-device-events.jsonl",
+    "events_sha256": "f388a45024ab28081e0b7af8ce3674dca3197b834f4dd0c84cf4bcbe9237ff5a",
+    "events_count": 24,
+    "node_status": "completed",
+    "verification_path": "docs/stages/v6-m4-verification.json",
+    "verification_sha256": "bbf9e61812c419abe424f6b1f4d5d8bbb2b06c31fabdf5a3a065efb3c1152b33",
+    "verification_checks": 59,
+    "verification_all_passed": true,
+    "independent_readback_sha256": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252"
+  },
+  "host": null,
+  "commands": [
+    {
+      "cmd": "python3 -m unittest discover -s tests",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T16:45:07.560305+00:00",
+      "sha256": "5645d73df62e17c3547f41fb9454b3cf396aba31c000b6ff8700f95f1651b5b5",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m4-unittest.log"
+    },
+    {
+      "cmd": "node --test tests/v6_plugin_hook.test.mjs tests/v6_plugin_runtime.test.mjs",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T16:45:41.316875+00:00",
+      "sha256": "4f0696dae3b1918b0207d67ba1222d3c109742a956ed25336d6ba1093da2f03c",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m4-js.log"
+    },
+    {
+      "cmd": "python3 -m cybertron.stage5_verify",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T16:45:49.579027+00:00",
+      "sha256": "77dca2d4207c0e745448b28048cf9e381f768bbd79c360e0fccc4cfac978c49f",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m4-stage5.log"
+    },
+    {
+      "cmd": "python3 cybertron_primes_engine.py",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T16:45:49.664711+00:00",
+      "sha256": "6a765936bd6248befc8aa162b8f6660f1da1ed944c0b8e96077a6451e8d87ff4",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m4-engine.log"
+    },
+    {
+      "cmd": "opencode2 debug config",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T16:45:07.707913+00:00",
+      "sha256": "3c390bacadf1f95f6a725d01dfb6893be3fb873b479f4d03d1c9b1761ce59421",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m4-debug.log"
+    },
+    {
+      "cmd": "python3 -m scripts.v6_m4_acceptance",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T16:42:48.923708+00:00",
+      "sha256": "fb7a24b4f5f69f59c7acaf2c3cdf62fdcc94f29a9ba909f5f6831ad45aee3bc7",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m4-acceptance.json"
+    },
+    {
+      "cmd": "python3 -m scripts.v6_m4_verify_evidence",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T16:44:19.002375+00:00",
+      "sha256": "bbf9e61812c419abe424f6b1f4d5d8bbb2b06c31fabdf5a3a065efb3c1152b33",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m4-verification.json"
+    },
+    {
+      "cmd": "command -v renode; renode --version; arm-none-eabi-gcc --version; st-flash --version; st-info --version; command -v openocd; openocd --version; cmake --version",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T16:45:23.844013+00:00",
+      "sha256": "17eb994bda70041bfec75fbaade25b7938a8e474f51464d04c1384f79807dad9",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m4-toolchain-final.log"
+    },
+    {
+      "cmd": "openocd -f interface/stlink.cfg -f target/stm32f1x.cfg -c \"init; reset halt; exit\"",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T16:45:19.326497+00:00",
+      "sha256": "1b4f05114814d41eb9ab4f5db4218a49ebdda4198e91e7406ca334eb7bc0c7a3",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m4-stlink-recovery.log",
+      "note": "This OpenOCD connection recovered the ST-LINK after two identical libusb timeouts; the following st-flash read succeeded."
+    }
+  ],
+  "negative_cases": [
+    "Approval plan/device/firmware/erase/rollback mismatches are rejected before any destructive command; a reused approval is rejected.",
+    "A device flash that changes after the preflight snapshot is rejected before erase/write.",
+    "A current App slice that does not match the approved rollback image is rejected before erase/write.",
+    "A wrong SRAM heartbeat after flashing triggers rollback and leaves the preflight full-flash digest intact.",
+    "A timed-out fixture write is recorded as outcome_unknown and is not retried; rollback still runs.",
+    "A failed rollback is recorded as outcome_unknown rather than failed, so no automatic retry can occur.",
+    "The Renode sim profile fails unless the expected marker appears; a project without sim.resc/sim.expect is rejected.",
+    "The real ST-LINK libusb transport failure stopped the first attempts before any flash/erase; it was recorded as blocked, then recovered with OpenOCD, not silently retried."
+  ],
+  "implementation": {
+    "device_broker": "cybertron/device_broker.py",
+    "device_node": "cybertron/device_node.py",
+    "renode_profile": "cybertron/profiles.py",
+    "fixture_sim": "stage7_fixture/stm32_minimal/sim.resc",
+    "fixture_expect": "stage7_fixture/stm32_minimal/sim.expect",
+    "acceptance_script": "scripts/v6_m4_acceptance.py",
+    "verification_script": "scripts/v6_m4_verify_evidence.py",
+    "tests": [
+      "tests/test_device_broker_m4.py",
+      "tests/test_device_node_m4.py",
+      "tests/test_profiles_v6.py"
+    ],
+    "payload_rebuilt": true
+  },
+  "open_issues": [
+    "M4 restored the exact preflight 64 KiB image; the fixture is not left flashed.",
+    "External W25Q32 contents and option bytes remain unbacked up; full OTA App and ESP32-S3 are outside M4 and remain untested.",
+    "The ST-LINK needed one OpenOCD connection/reset after two identical libusb timeouts; the acceptance run then used st-flash normally."
+  ],
+  "next_action": "M4 required gates passed; stop this session. Continue with M5 in a new session without revisiting passed milestones.",
+  "notes": [
+    "The approval is a new user-authorized M4 operation, not a reuse of the stage 7 approval; it is single-use and is bound to the new plan digest.",
+    "The broker always attempted rollback after the first destructive command; the final full-flash read was byte-for-byte identical to the preflight backup.",
+    "The device node's event ledger has 24 events: plan creation, build/size/sim gate receipts, plan/approval/dispatch, 12 st-flash receipts, node completion, and the device/rollback/heartbeat gate conclusions.",
+    "The 59-check independent verification re-read the device after the run and matched the preflight 58e2a2... digest."
+  ]
+}

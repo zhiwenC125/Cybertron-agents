@@ -123,7 +123,7 @@ class V6HostBridge:
         return _hash(json.dumps(visible, sort_keys=True).encode())
 
     def check(self, run_id: str, target: str) -> dict:
-        if target not in {"lint", "build", "test"}:
+        if target not in {"lint", "build", "test", "sim"}:
             raise HostBridgeError("invalid check target")
         self._dir(run_id)
         result = run_check(self.project, target)

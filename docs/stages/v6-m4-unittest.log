@@ -1,0 +1,159 @@
+...............................................................................................模型配置错误: OpenCode 加载校验失败，已恢复切换前的模型编队
+...............................................................................................................
+----------------------------------------------------------------------
+Ran 206 tests in 12.865s
+
+OK
+模型编队: 继承全局
+  prima             deepseek/deepseek-flash#max
+  alpha-trion       deepseek/deepseek-flash
+  onyx-prime        deepseek/deepseek-flash
+  vector-prime      deepseek/deepseek-flash
+  quintus-prime     deepseek/deepseek-flash
+  solus-prime       deepseek/deepseek-flash
+  amalgamous        deepseek/deepseek-flash
+  micronus-prime    deepseek/deepseek-flash
+  liege-maximo      deepseek/deepseek-flash
+  alchemist         deepseek/deepseek-flash
+  nexus-prime       deepseek/deepseek-flash
+  megatronus        deepseek/deepseek-flash
+  thirteenth        deepseek/deepseek-flash
+
+变更预览:
+* prima             deepseek/deepseek-flash#max -> vendor/one
+* alpha-trion       deepseek/deepseek-flash -> vendor/one
+* onyx-prime        deepseek/deepseek-flash -> vendor/one
+* vector-prime      deepseek/deepseek-flash -> vendor/one
+* quintus-prime     deepseek/deepseek-flash -> vendor/one
+* solus-prime       deepseek/deepseek-flash -> vendor/one
+* amalgamous        deepseek/deepseek-flash -> vendor/one
+* micronus-prime    deepseek/deepseek-flash -> vendor/one
+* liege-maximo      deepseek/deepseek-flash -> vendor/one
+* alchemist         deepseek/deepseek-flash -> vendor/one
+* nexus-prime       deepseek/deepseek-flash -> vendor/one
+* megatronus        deepseek/deepseek-flash -> vendor/one
+* thirteenth        deepseek/deepseek-flash -> vendor/one
+已启用: /private/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-models-cxu4uxr2/.cybertron/models.json
+新任务使用新编队；进行中的 run 不会自动改模。
+模型编队: /private/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-models-cxu4uxr2/.cybertron/models.json
+  prima             vendor/one
+  alpha-trion       vendor/one
+  onyx-prime        vendor/one
+  vector-prime      vendor/one
+  quintus-prime     vendor/one
+  solus-prime       vendor/one
+  amalgamous        vendor/one
+  micronus-prime    vendor/one
+  liege-maximo      vendor/one
+  alchemist         vendor/one
+  nexus-prime       vendor/one
+  megatronus        vendor/one
+  thirteenth        vendor/one
+
+变更预览:
+* prima             vendor/one -> vendor/two
+  alpha-trion       vendor/one -> vendor/one
+  onyx-prime        vendor/one -> vendor/one
+  vector-prime      vendor/one -> vendor/one
+  quintus-prime     vendor/one -> vendor/one
+  solus-prime       vendor/one -> vendor/one
+  amalgamous        vendor/one -> vendor/one
+  micronus-prime    vendor/one -> vendor/one
+  liege-maximo      vendor/one -> vendor/one
+  alchemist         vendor/one -> vendor/one
+  nexus-prime       vendor/one -> vendor/one
+  megatronus        vendor/one -> vendor/one
+  thirteenth        vendor/one -> vendor/one
+在线能力检查通过: vendor/one
+模型编队: 继承全局
+  prima             deepseek/deepseek-flash#max
+  alpha-trion       deepseek/deepseek-flash
+  onyx-prime        deepseek/deepseek-flash
+  vector-prime      deepseek/deepseek-flash
+  quintus-prime     deepseek/deepseek-flash
+  solus-prime       deepseek/deepseek-flash
+  amalgamous        deepseek/deepseek-flash
+  micronus-prime    deepseek/deepseek-flash
+  liege-maximo      deepseek/deepseek-flash
+  alchemist         deepseek/deepseek-flash
+  nexus-prime       deepseek/deepseek-flash
+  megatronus        deepseek/deepseek-flash
+  thirteenth        deepseek/deepseek-flash
+
+变更预览:
+* prima             deepseek/deepseek-flash#max -> vendor/one
+* alpha-trion       deepseek/deepseek-flash -> vendor/one
+* onyx-prime        deepseek/deepseek-flash -> vendor/one
+* vector-prime      deepseek/deepseek-flash -> vendor/one
+* quintus-prime     deepseek/deepseek-flash -> vendor/one
+* solus-prime       deepseek/deepseek-flash -> vendor/one
+* amalgamous        deepseek/deepseek-flash -> vendor/one
+* micronus-prime    deepseek/deepseek-flash -> vendor/one
+* liege-maximo      deepseek/deepseek-flash -> vendor/one
+* alchemist         deepseek/deepseek-flash -> vendor/one
+* nexus-prime       deepseek/deepseek-flash -> vendor/one
+* megatronus        deepseek/deepseek-flash -> vendor/one
+* thirteenth        deepseek/deepseek-flash -> vendor/one
+已启用: /private/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-models-ddyc58_q/.cybertron/models.json
+新任务使用新编队；进行中的 run 不会自动改模。
+模型编队: /private/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-models-ddyc58_q/.cybertron/models.json
+  prima             vendor/one
+  alpha-trion       vendor/one
+  onyx-prime        vendor/one
+  vector-prime      vendor/one
+  quintus-prime     vendor/one
+  solus-prime       vendor/one
+  amalgamous        vendor/one
+  micronus-prime    vendor/one
+  liege-maximo      vendor/one
+  alchemist         vendor/one
+  nexus-prime       vendor/one
+  megatronus        vendor/one
+  thirteenth        vendor/one
+
+变更预览:
+* prima             vendor/one -> vendor/two
+  alpha-trion       vendor/one -> vendor/one
+  onyx-prime        vendor/one -> vendor/one
+  vector-prime      vendor/one -> vendor/one
+  quintus-prime     vendor/one -> vendor/one
+  solus-prime       vendor/one -> vendor/one
+  amalgamous        vendor/one -> vendor/one
+  micronus-prime    vendor/one -> vendor/one
+  liege-maximo      vendor/one -> vendor/one
+  alchemist         vendor/one -> vendor/one
+  nexus-prime       vendor/one -> vendor/one
+  megatronus        vendor/one -> vendor/one
+  thirteenth        vendor/one -> vendor/one
+已取消，未更改配置。
+模型编队: /private/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-models-ddyc58_q/.cybertron/models.json
+  prima             vendor/one
+  alpha-trion       vendor/one
+  onyx-prime        vendor/one
+  vector-prime      vendor/one
+  quintus-prime     vendor/one
+  solus-prime       vendor/one
+  amalgamous        vendor/one
+  micronus-prime    vendor/one
+  liege-maximo      vendor/one
+  alchemist         vendor/one
+  nexus-prime       vendor/one
+  megatronus        vendor/one
+  thirteenth        vendor/one
+
+变更预览:
+* prima             vendor/one -> vendor/two
+  alpha-trion       vendor/one -> vendor/one
+  onyx-prime        vendor/one -> vendor/one
+  vector-prime      vendor/one -> vendor/one
+  quintus-prime     vendor/one -> vendor/one
+  solus-prime       vendor/one -> vendor/one
+  amalgamous        vendor/one -> vendor/one
+  micronus-prime    vendor/one -> vendor/one
+  liege-maximo      vendor/one -> vendor/one
+  alchemist         vendor/one -> vendor/one
+  nexus-prime       vendor/one -> vendor/one
+  megatronus        vendor/one -> vendor/one
+  thirteenth        vendor/one -> vendor/one
+已启用: /private/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-models-ddyc58_q/.cybertron/models.json；上一版: /private/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-models-ddyc58_q/.cybertron/models.json.bak.1
+新任务使用新编队；进行中的 run 不会自动改模。

@@ -44,17 +44,24 @@ def detect_profile(project: Path) -> str:
         return "python"
     if (project / "package.json").is_file():
         return "node"
+    if (project / "sim.resc").is_file() and (project / "sim.expect").is_file():
+        return "renode"
     raise CheckRejected("no supported toolchain profile detected")
 
 
 def _sandbox_profile(scratch: Path) -> str:
     # CMake and Apple toolchain need OS services and the four inert /dev files.
+    # Renode keeps its own config/history under the macOS Application Support
+    # directory; that narrow tool-state write is allowed so the simulator can
+    # start while project and arbitrary home writes remain denied.
+    renode_support = Path.home() / "Library" / "Application Support" / "renode"
     # All other device reads, network access, and writes outside scratch are
     # denied.  /dev/null is also needed as a write sink by toolchain scripts.
     return (
         "(version 1)\n(allow default)\n(deny network*)\n"
         "(deny file-write*)\n"
         f'(allow file-write* (subpath "{scratch}"))\n'
+        f'(allow file-write* (subpath "{renode_support}"))\n'
         '(allow file-write* (literal "/dev/null"))\n'
         '(deny file-read* (subpath "/dev"))\n'
         '(allow file-read* (literal "/dev/null"))\n'
@@ -64,9 +71,11 @@ def _sandbox_profile(scratch: Path) -> str:
     )
 
 
-def _copy_project(project: Path, destination: Path) -> None:
+def _copy_project(project: Path, destination: Path, *, preserve_build: bool = False) -> None:
     def ignore(directory: str, names: list[str]) -> set[str]:
-        blocked = {".git", "node_modules", "build", ".venv", "__pycache__"}
+        blocked = {".git", "node_modules", ".venv", "__pycache__"}
+        if not preserve_build:
+            blocked.add("build")
         if Path(directory) == project:
             blocked.add(".cybertron")
         return blocked.intersection(names)
@@ -106,16 +115,35 @@ def _run(argv: list[str], cwd: Path, scratch: Path) -> CheckReceipt:
 
 def run_check(project: Path, target: str) -> dict:
     project = Path(project).resolve()
-    if not project.is_dir() or target not in {"lint", "build", "test"}:
+    if not project.is_dir() or target not in {"lint", "build", "test", "sim"}:
         raise CheckRejected("invalid project or check target")
-    profile = detect_profile(project)
+    if target == "sim":
+        if not (project / "sim.resc").is_file() or not (project / "sim.expect").is_file():
+            raise CheckRejected("sim target requires sim.resc and sim.expect")
+        profile = "renode"
+    else:
+        profile = detect_profile(project)
     if profile in {"cmake-c", "cmake-arm"} and target == "test":
         raise CheckRejected("CMake test target requires a declared test framework")
     with tempfile.TemporaryDirectory(prefix="cybertron-check-") as temporary:
         scratch = Path(temporary).resolve()
         copy = scratch / "project"
-        _copy_project(project, copy)
+        _copy_project(project, copy, preserve_build=(target == "sim"))
         receipts: list[CheckReceipt] = []
+        if profile == "renode":
+            if target != "sim":
+                raise CheckRejected(f"{profile} profile does not provide {target}")
+            expect = (copy / "sim.expect").read_text().strip()
+            if not expect:
+                raise CheckRejected("sim.expect is empty")
+            receipts.append(_run([_binary("renode"), "--config",
+                                  str(scratch / "renode-config.json"),
+                                  "--console", "--disable-gui", "--plain", "sim.resc"],
+                                 copy, scratch))
+            passed = receipts[-1].exit == 0 and expect in receipts[-1].output
+            return {"profile": profile, "target": target,
+                    "status": "pass" if passed else "fail",
+                    "receipts": [item.to_dict() for item in receipts]}
         if profile in {"cmake-c", "cmake-arm"}:
             if profile == "cmake-arm":
                 _binary("arm-none-eabi-gcc")

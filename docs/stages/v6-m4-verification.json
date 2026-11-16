@@ -1,0 +1,315 @@
+{
+  "checked_at_utc": "2026-11-16T16:44:19.001691+00:00",
+  "checks": 59,
+  "passed": 59,
+  "all_passed": true,
+  "failures": [],
+  "checks_detail": [
+    {
+      "name": "status passed",
+      "passed": true,
+      "detail": "passed"
+    },
+    {
+      "name": "offline false",
+      "passed": true,
+      "detail": false
+    },
+    {
+      "name": "authorization hash",
+      "passed": true,
+      "detail": "016a1a46a496b4b84d1ceb40aad732686c9abcb096c0b810da0813f569657ef7"
+    },
+    {
+      "name": "approval message hash",
+      "passed": true,
+      "detail": "016a1a46a496b4b84d1ceb40aad732686c9abcb096c0b810da0813f569657ef7"
+    },
+    {
+      "name": "approval plan",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "approval device",
+      "passed": true,
+      "detail": "ST-LINK:local/STM32F1xx_MD:0x410"
+    },
+    {
+      "name": "approval firmware",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "approval rollback",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "approval erase",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "preflight hash",
+      "passed": true,
+      "detail": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252"
+    },
+    {
+      "name": "preflight bytes",
+      "passed": true,
+      "detail": 65536
+    },
+    {
+      "name": "rollback app hash",
+      "passed": true,
+      "detail": "bfa1af7bac39eb065979b8c05cb8f79ffae7260751ad3f06a019b309eebcd852"
+    },
+    {
+      "name": "rollback app bytes",
+      "passed": true,
+      "detail": 56320
+    },
+    {
+      "name": "firmware hash",
+      "passed": true,
+      "detail": "62554f5a0043bc92d2cfc6456e0ab116348324a1b699af62891532559e00476d"
+    },
+    {
+      "name": "firmware bytes",
+      "passed": true,
+      "detail": 100
+    },
+    {
+      "name": "flash region",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "flash bootloader",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "flash ota flag",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "flash changed",
+      "passed": true,
+      "detail": "a61aeae691ee62a334c47de390ff046bfc9875a2b68ac76a449878b71f98a360"
+    },
+    {
+      "name": "heartbeat passed",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "heartbeat marker",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "heartbeat counter",
+      "passed": true,
+      "detail": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "rollback restored",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "rollback full hash",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "result restored",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "node completed",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "receipt count",
+      "passed": true,
+      "detail": 12
+    },
+    {
+      "name": "receipts are tools",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "receipt exits",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "receipt times",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "receipt hashes",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "receipt uses erase",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "receipt uses write",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "receipt uses reset",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "receipt uses read",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "event count",
+      "passed": true,
+      "detail": 24
+    },
+    {
+      "name": "event order",
+      "passed": true,
+      "detail": [
+        "plan.created",
+        "gate.check",
+        "gate.check",
+        "gate.check",
+        "device.planned",
+        "approval.granted",
+        "dispatch.started"
+      ]
+    },
+    {
+      "name": "one node completed",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "no retry",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "evidence source",
+      "passed": true,
+      "detail": "tool"
+    },
+    {
+      "name": "evidence exit",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "evidence hash",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "gate cross_compile",
+      "passed": true,
+      "detail": "pass"
+    },
+    {
+      "name": "gate size",
+      "passed": true,
+      "detail": "pass"
+    },
+    {
+      "name": "gate sim",
+      "passed": true,
+      "detail": "pass"
+    },
+    {
+      "name": "gate device.approval",
+      "passed": true,
+      "detail": "pass"
+    },
+    {
+      "name": "gate rollback.image",
+      "passed": true,
+      "detail": "pass"
+    },
+    {
+      "name": "gate heartbeat",
+      "passed": true,
+      "detail": "pass"
+    },
+    {
+      "name": "artifacts present",
+      "passed": true,
+      "detail": 7
+    },
+    {
+      "name": "artifact preflight-full.bin",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "artifact preflight-app.bin",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "artifact post-flash-full.bin",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "artifact post-flash-app.bin",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "artifact rollback-full.bin",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "artifact sram-1.bin",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "artifact sram-2.bin",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "stage7 backup hash",
+      "passed": true,
+      "detail": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252"
+    },
+    {
+      "name": "independent device read exit",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "name": "independent device read hash",
+      "passed": true,
+      "detail": "58e2a250b260adb75b3194142bc636e82adf5a27b2958dc8ce8b00368520c252"
+    }
+  ]
+}
