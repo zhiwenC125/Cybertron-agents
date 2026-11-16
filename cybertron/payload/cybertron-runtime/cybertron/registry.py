@@ -74,6 +74,8 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("cy_state", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_plan", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_ask", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_templates", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_metrics", "*", PermissionEffect.ALLOW),
             PermissionRule("subagent", "thirteenth", PermissionEffect.ALLOW),
             PermissionRule("subagent", "alpha-trion", PermissionEffect.ALLOW),
             PermissionRule("subagent", "onyx-prime", PermissionEffect.ALLOW),
@@ -594,7 +596,8 @@ PRIME_ROLES: Mapping[str, PrimeRole] = MappingProxyType({
                          if r.action == "read" and r.effect is PermissionEffect.ALLOW),
         write_roots=_ROLE_WRITE_ROOTS.get(spec.agent_id, ()),
         tool_mode="allow-list",
-        tool_classes=("task", "cy_state", "cy_plan", "cy_ask") if spec.agent_id == "prima" else
+        tool_classes=("task", "cy_state", "cy_plan", "cy_ask", "cy_templates", "cy_metrics")
+                     if spec.agent_id == "prima" else
                      tuple(sorted({rule.action for rule in spec.permissions if rule.effect is PermissionEffect.ALLOW and rule.action != "*"})),
         command_mode="git-allow-list" if spec.agent_id == "vector-prime" else
                      "kernel-check" if spec.agent_id in _CHECK_ROLES else "none",
@@ -613,7 +616,8 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
     if set(roles) != set(_ROLE_CAPABILITIES) or len(specs) != len(roles):
         raise ValueError("role catalogue must contain exactly thirteen unique agents")
     known_actions = {"*", "read", "glob", "grep", "edit", "shell", "subagent",
-                     "cy_state", "cy_plan", "cy_ask", "cy_check", "cy_review_reject", "feishu_mcp_healthcheck*",
+                     "cy_state", "cy_plan", "cy_ask", "cy_templates", "cy_metrics",
+                     "cy_check", "cy_review_reject", "feishu_mcp_healthcheck*",
                      "feishu_wiki_delete*", "feishu_wiki_docx_v1_document_rawContent",
                      "feishu_wiki_wiki_v2_space_getNode"}
     for spec in specs:
@@ -635,6 +639,10 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
         check_permission = any(r.action == "cy_check" for r in allowed)
         if check_permission != (spec.agent_id in _CHECK_ROLES) or ("cy_check" in role.tool_classes) != check_permission:
             raise ValueError("cy_check role permission drift")
+        for tool in ("cy_templates", "cy_metrics"):
+            permitted = any(r.action == tool for r in allowed)
+            if permitted != (spec.agent_id == "prima") or (tool in role.tool_classes) != permitted:
+                raise ValueError(f"{tool} role permission drift")
         review_permission = any(r.action == "cy_review_reject" for r in allowed)
         if review_permission != (spec.agent_id == "liege-maximo") or (
                 "cy_review_reject" in role.tool_classes) != review_permission:

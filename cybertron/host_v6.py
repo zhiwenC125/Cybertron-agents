@@ -20,6 +20,9 @@ from typing import Any
 
 from .graph import GraphRejected, PlanGraph, PlanNode
 from .gates import diff_facts, risk_floor
+from .learning import (TemplateRejected, distill_template, instantiate, is_request_class,
+                       list_templates, load_template, request_class_of, save_template)
+from .metrics import MetricsError, collect, render_panel, run_metrics, summarize, template_summary
 from .profiles import run_check
 from .scope_guard import FileState, ScopeGuard, Snapshot
 from .scheduler_v6 import affected_subgraph, dispatchable
@@ -134,32 +137,61 @@ class V6HostBridge:
                      }, workspace_sha256=self._workspace_digest())
         return {**result, "run_id": run_id, "state": self.state(run_id)}
 
-    def plan(self, node_data: dict | list[dict], host_session_id: str) -> dict:
-        try:
-            nodes = [PlanNode.from_dict(data) for data in
-                     (node_data if isinstance(node_data, list) else [node_data])]
-            graph = PlanGraph(nodes)
-        except (GraphRejected, TypeError) as exc:
-            raise HostBridgeError(str(exc)) from exc
-        if not nodes or any(node.status != "pending" or node.kind not in {"task", "review"} or node.role == "prima" for node in nodes):
-            raise HostBridgeError("plan requires pending subagent task or review nodes")
-        if any("scope_guard" not in node.verifiers or
-               set(node.verifiers) - {"scope_guard", "loop1"} for node in nodes):
-            raise HostBridgeError("unsupported host verifier")
+    def plan(self, node_data: dict | list[dict] | None, host_session_id: str, *,
+             request_class: str | None = None, template_id: str | None = None,
+             objective: str = "", write_scope: list[str] | None = None,
+             test_scope: list[str] | None = None, skip: list[str] | None = None) -> dict:
         if not isinstance(host_session_id, str) or not host_session_id:
             raise HostBridgeError("host session ID is required")
+        if template_id is not None:
+            try:
+                template = load_template(self.project, template_id)
+                graph_seed = instantiate(template, objective=objective,
+                                         target_scope=tuple(write_scope or ()),
+                                         test_scope=tuple(test_scope or ()),
+                                         skip=tuple(skip or ()))
+            except TemplateRejected as exc:
+                raise HostBridgeError(str(exc)) from exc
+            node_objects = list(graph_seed.nodes.values())
+            request_class = request_class or template["request_class"]
+        else:
+            try:
+                node_objects = [PlanNode.from_dict(data) for data in
+                                (node_data if isinstance(node_data, list) else [node_data])]
+                graph_seed = PlanGraph(node_objects)
+            except (GraphRejected, TypeError) as exc:
+                raise HostBridgeError(str(exc)) from exc
+        if not node_objects or any(node.status != "pending" or node.kind not in {"task", "review"} or node.role == "prima" for node in node_objects):
+            raise HostBridgeError("plan requires pending subagent task or review nodes")
+        if any("scope_guard" not in node.verifiers or
+               set(node.verifiers) - {"scope_guard", "loop1"} for node in node_objects):
+            raise HostBridgeError("unsupported host verifier")
+        if request_class is None:
+            request_class = request_class_of(graph_seed.nodes.values())
+        if request_class is not None and not is_request_class(request_class):
+            raise HostBridgeError("invalid request_class")
+        if not isinstance(objective, str):
+            raise HostBridgeError("objective must be a string")
+        nodes = [node.to_dict() for node in node_objects]
         # A run ID is an identifier, not a secret. The macOS verification
         # sandbox denies /dev/urandom, so uuid4 would make tests fail there.
         run_id = str(uuid.uuid5(uuid.NAMESPACE_URL,
                                 f"{self.project}:{time.time_ns()}:{os.getpid()}:{next(_run_counter)}"))
         directory = self.runs / run_id
         directory.mkdir(parents=True, exist_ok=False)
-        (directory / "plan.json").write_text(json.dumps(graph.to_dict(), ensure_ascii=False))
+        (directory / "plan.json").write_text(json.dumps(graph_seed.to_dict(), ensure_ascii=False))
         (directory / "events.jsonl").touch()
-        self._append(run_id, "plan.created", node_id=nodes[0].node_id if len(nodes) == 1 else None,
-                     node_ids=[node.node_id for node in nodes],
-                     host_session_id=host_session_id, plan_revision=graph.revision)
+        self._append(run_id, "plan.created", node_id=nodes[0]["node_id"] if len(nodes) == 1 else None,
+                     node_ids=[node["node_id"] for node in nodes],
+                     host_session_id=host_session_id, plan_revision=graph_seed.revision,
+                     request_class=request_class, template_id=template_id,
+                     skipped_capabilities=list(skip or ()),
+                     request=objective.strip())
         result = self.state(run_id)
+        result["template_reused"] = template_id is not None
+        result["request_class"] = request_class
+        result["skipped_capabilities"] = list(skip or ())
+        result["available_templates"] = self.template_hints(request_class)
         return result
 
     def state(self, run_id: str) -> dict:
@@ -225,6 +257,7 @@ class V6HostBridge:
                   "card": self._card(node), "role": node.role,
                   "write_scope": list(node.write_scope)} for node in graph.nodes.values()]
         active = next(iter(active_calls.values()), None)
+        created = next((event for event in events if event["type"] == "plan.created"), {})
         result = {"run_id": run_id, "status": "running" if active else
                   "ready" if ready else "completed" if all(v == "completed" for v in status.values())
                   and not pending_gates else "blocked",
@@ -232,6 +265,8 @@ class V6HostBridge:
                   "required_gates": sorted(required_gates), "passed_gates": sorted(passed_gates),
                   "pending_gates": pending_gates,
                   "repair_feedback": repair_feedback,
+                  "request_class": created.get("request_class"),
+                  "template_id": created.get("template_id"),
                   "child_session_id": active["child_session_id"] if active else None,
                   "active_dispatches": list(active_calls.values()),
                   "event_seq": len(events), "events_path": str(self._dir(run_id) / "events.jsonl")}
@@ -249,6 +284,74 @@ class V6HostBridge:
             raise HostBridgeError("cannot request human input during an active dispatch")
         self._append(run_id, "human.requested", question=question.strip())
         return self.state(run_id)
+
+    def template_hints(self, request_class: str | None) -> list[dict]:
+        if not isinstance(request_class, str) or not request_class:
+            return []
+        try:
+            templates = [template for template in list_templates(self.project)
+                         if template["request_class"] == request_class]
+        except TemplateRejected:
+            return []
+        return [{"template_id": template["template_id"],
+                 "node_count": len(template["nodes"]),
+                 "dispatch_count": template["metrics"]["dispatch_count"],
+                 "human_interventions": template["metrics"]["human_interventions"],
+                 "source_run_id": template["source_run_id"]} for template in templates]
+
+    def templates(self) -> dict:
+        try:
+            items = [{"template_id": template["template_id"],
+                      "request_class": template["request_class"],
+                      "node_count": len(template["nodes"]),
+                      "dispatch_count": template["metrics"]["dispatch_count"],
+                      "human_interventions": template["metrics"]["human_interventions"],
+                      "source_run_id": template["source_run_id"],
+                      "created_utc": template["created_utc"]}
+                     for template in list_templates(self.project)]
+        except TemplateRejected:
+            items = []
+        return {"templates": items, "summary": template_summary(self.project)}
+
+    def metrics(self, run_id: str | None = None) -> dict:
+        if run_id is not None:
+            try:
+                return {"run": run_metrics(self._dir(run_id))}
+            except MetricsError as exc:
+                raise HostBridgeError(str(exc)) from exc
+        runs = collect(self.project)
+        summary = summarize(runs)
+        templates = template_summary(self.project)
+        return {"runs": runs, "summary": summary, "templates": templates,
+                "panel": render_panel(runs, summary, templates)}
+
+    def _maybe_complete(self, run_id: str) -> None:
+        """Record completion once, then distill an advisory template."""
+        state = self.state(run_id)
+        if state["status"] != "completed":
+            return
+        events = self.events(run_id)
+        if any(event["type"] == "run.completed" for event in events):
+            return
+        self._append(run_id, "run.completed", node_count=len(state["nodes"]),
+                     dispatch_count=sum(event["type"] == "dispatch.started" for event in events),
+                     human_interventions=sum(event["type"] in {"human.requested", "approval.granted"}
+                                             for event in events))
+        graph = self._graph(run_id)
+        created = next((event for event in events if event["type"] == "plan.created"), {})
+        request_class = created.get("request_class") or request_class_of(graph.nodes.values())
+        completed = {event["node_id"] for event in events if event["type"] == "node.completed"}
+        try:
+            template = distill_template(graph, events,
+                                        completed_node_ids=completed,
+                                        request_class=request_class, run_id=run_id,
+                                        request=created.get("request") or "")
+            path = save_template(self.project, template)
+        except (TemplateRejected, OSError) as exc:
+            self._append(run_id, "template.distill_failed", reason=str(exc))
+            return
+        self._append(run_id, "template.distilled", template_id=template["template_id"],
+                     request_class=request_class, path=str(path))
 
     def plan_op(self, run_id: str, operation: dict) -> dict:
         if self.state(run_id)["status"] == "running":
@@ -532,4 +635,5 @@ class V6HostBridge:
                 self._append(run_id, "node.retry", node_id=node.node_id,
                              diagnostic=diagnostic, failure_fingerprint=fingerprint,
                              attempt=used + 1)
+        self._maybe_complete(run_id)
         return self.state(run_id)

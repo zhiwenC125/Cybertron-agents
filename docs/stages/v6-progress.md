@@ -9,7 +9,7 @@
 | M2 | passed | `docs/stages/v6-m2.json` | — | 本会话停止；下一会话从 M3 开始 |
 | M3 | passed | `docs/stages/v6-m3.json` | — | 本会话停止；下一会话从 M4 开始 |
 | M4 | passed | `docs/stages/v6-m4.json` | — | 本会话停止；下一会话从 M5 开始 |
-| M5 | pending | — | 等待 M5 门禁 | M4 已通过，可开始 M5 |
+| M5 | passed | `docs/stages/v6-m5.json` | — | v6 计划 M0–M5 完成；本会话停止 |
 
 启动检查（2026-11-16）：`git status --short` 仅有本里程碑的进度文件；`python3 -m unittest discover -s tests` 为 112 tests OK。
 
@@ -40,3 +40,11 @@ M3 最终验收（2026-11-16）：将单次 run 快照拆为每个 `call_id` 独
 M4 最终验收（2026-11-16）：Renode 1.17.0 与 OpenOCD 0.12.0 已安装；新增 `device_broker.py`（审批绑定设备/固件/擦写范围/回滚镜像、单次使用、超时记 `outcome_unknown` 且不自动重试、失败自动回滚）、`device_node.py`（`device_op` 节点事件链）、`profiles.py` 的 Renode `sim` 配置档，以及 `v6_m4_acceptance.py` 与独立核验脚本。206 项 Python 单测、4 项 JS 测试、阶段 5 隔离验证、引擎自检和 `opencode2 debug config` 通过。
 
 M4 真机门禁（2026-11-16）：ST-LINK 首次读取曾连续两次在 `GET_VERSION`/`ENTER_SWD` 上 USB 超时，按停止条件停止；用 OpenOCD 连接恢复后 `st-flash` 正常。真实 run `m4-20261116t164233z` 中，用户授权 `m4-chat-016a1a46a496b4b8` 绑定新计划 `5d8bc0b7...`；preflight 64 KiB 为 `58e2a250...`，100 字节夹具为 `62554f5a...`，回滚 App 为 `bfa1af7b...`，只擦写 `0x08002000..0x0800FBFF`。烧录后 Bootloader 与 OTA 标志页未变，SRAM 标记 `0xC7B70001`、计数 `1→2`；回滚后完整 64 KiB 与 preflight 逐字节一致，独立重读同样为 `58e2a250...`。共 12 条 `st-flash` 回执、24 条事件，独立核验脚本 59/59 通过；证据见 `v6-m4.json`、`v6-m4-acceptance.json`、`v6-m4-device-events.jsonl`、`v6-m4-verification.json`、`v6-m4-stlink-failure.log` 和 `v6-m4-stlink-recovery.log`。M4 声明的门禁全部通过，状态改为 `passed`；实现与证据提交 `7e5b47e`。本会话只完成 M4，M5 未开始。
+
+M5 本轮进展（2026-11-16）：新增 `cybertron/learning.py`（仅从全部节点 completed 的运行沉淀模板；复用经 `PlanGraph` 重新校验；多写者模板保留字面路径，单写者可用目标覆盖；`skip` 仅允许跳过只读分析节点并重接依赖）、`cybertron/metrics.py`（按事件账本计算节点、派发、重试、人工干预、门禁失败率与时长，输出面板和两次运行对比），并接入 `host_v6.py` 与 `host_v6_cli.py`：运行完成时记 `run.completed` 并沉淀模板，`cy_plan` 支持 `template_id`/`skip`，新增 `templates`/`metrics` 操作。`registry.py` 把 `cy_templates`/`cy_metrics` 授予 prima，导出器重生成根目录与 `cybertron_workspace_dist` 配置，`opencode2 debug config` 通过。OpenCode 插件新增 `cy_templates`/`cy_metrics` 与模板复用参数。
+
+真实宿主学习门禁（OpenCode + 真实 DeepSeek 路由）：冷启动计划 2 个节点（read-only scan → doc.write），派发 2 次，调用 `cy_ask` 1 次；运行完成后沉淀模板。同一 request_class 的热启动通过 `cy_templates` 取得模板，`cy_plan(template_id=..., skip=["scan.static"])` 只保留 1 个 doc 节点，0 次人工提问；两次运行均 `completed`。对比：节点 2→1，人工干预 1→0，模板复用并由内核记录 `skipped_capabilities`。证据见 `v6-m5-host-acceptance.json`、`v6-m5-host-cold/warm-receipt.json`、`v6-m5-metrics.json` 与日志。
+
+DSH 第二宿主：新增可安装 bundle `cybertron/dsh_adapter`（`@local/cybertron-dsh`），声明 `Cybertron v6` preset，仅在 preset 内挂载 `cy_plan`/`cy_state`/`cy_ask`/`cy_templates`/`cy_metrics`，通过 `bridge.js` 调用同一 Python 内核；manifest、patch、locale、图标、DETAIL 与真实内核桥接契约均有测试（`test_dsh_adapter_m5.py`、`dsh_adapter_bridge.test.mjs`）。用户授权继续后，`cybertron/dsh_adapter` 通过 `plugin_manager install_bundle` 安装进运行中的 desktop profile：`application=applied`、无 warnings，`preset-cybertron` 的 `fiberPhase=active`；临时 headless/web 测试 profile 验证组合后已删除。证据见 `v6-m5-dsh-load.json`。DSH 适配目前是单一 prima persona + cy_* 工具，尚未把 13 角色映射为 13 个 DSH preset，也未绑定 DSH 子会话写范围，该限制已写入 bundle 的 DETAIL。M5 门禁全部通过，状态改为 passed。
+
+本轮验证：232 项 Python 单测、7 项 JS 测试、阶段 5 隔离验证、引擎自检和 `opencode2 debug config` 全部通过；命令、退出码、UTC 与 SHA-256 见 `v6-m5.json`。M0–M4 未改动。提交：实现与证据随后提交，并在 `v6-progress.md` 记录提交哈希。用户可在工作区新建 DSH 会话并选择 `Cybertron v6` preset 做 GUI 验收；真实模型会话属于使用验收，不再阻塞 M5 的加载门禁。

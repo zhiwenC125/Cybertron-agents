@@ -43,7 +43,8 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     },
   };
   await plugin.setup(ctx);
-  assert.deepEqual([...tools.keys()], ['cy_plan', 'cy_state', 'cy_ask', 'cy_check', 'cy_review_reject']);
+  assert.deepEqual([...tools.keys()], ['cy_plan', 'cy_state', 'cy_ask', 'cy_templates',
+    'cy_metrics', 'cy_check', 'cy_review_reject']);
   assert.deepEqual(tools.get('cy_plan').input.properties.nodes.items.properties.kind.enum,
     ['task', 'review']);
   assert.deepEqual(tools.get('cy_plan').input.properties.node.properties.kind.enum,

@@ -34,12 +34,21 @@ class V6PermissionTests(unittest.TestCase):
 
     def test_prima_has_minimal_cy_tools_and_no_legacy_run_tool(self):
         prima = THIRTEEN_PRIMES_REGISTRY[0]
-        for tool in ("cy_state", "cy_plan", "cy_ask"):
+        for tool in ("cy_state", "cy_plan", "cy_ask", "cy_templates", "cy_metrics"):
             with self.subTest(tool=tool):
                 self.assertEqual(MegatronusCircuitBreaker(prima.permissions).verify_tool_call(tool, "*", tool)[0],
                                  PermissionEffect.ALLOW)
         self.assertEqual(MegatronusCircuitBreaker(prima.permissions).verify_tool_call(
             "cybertron_run", "*", "legacy")[0], PermissionEffect.DENY)
+
+    def test_learning_tools_are_prima_only(self):
+        for agent in THIRTEEN_PRIMES_REGISTRY:
+            for tool in ("cy_templates", "cy_metrics"):
+                with self.subTest(agent=agent.agent_id, tool=tool):
+                    effect, _ = MegatronusCircuitBreaker(agent.permissions).verify_tool_call(
+                        tool, "*", agent.agent_id)
+                    self.assertEqual(effect, PermissionEffect.ALLOW if agent.agent_id == "prima"
+                                     else PermissionEffect.DENY)
 
     def test_cy_check_is_granted_only_to_isolated_check_roles(self):
         allowed = {"micronus-prime", "nexus-prime", "alchemist", "solus-prime",

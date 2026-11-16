@@ -1,0 +1,175 @@
+{
+  "milestone": "M5",
+  "status": "passed",
+  "commit": null,
+  "checked_at_utc": "2026-11-16T17:39:28.571789+00:00",
+  "required_gates": [
+    "unit_tests_all_green",
+    "template_distillation",
+    "metrics_panel",
+    "second_run_reduction",
+    "rejection_path_tests",
+    "dsh_adapter_contract",
+    "dsh_real_host_load"
+  ],
+  "gate_status": {
+    "unit_tests_all_green": "pass",
+    "template_distillation": "pass",
+    "metrics_panel": "pass",
+    "second_run_reduction": "pass",
+    "rejection_path_tests": "pass",
+    "dsh_adapter_contract": "pass",
+    "dsh_real_host_load": "pass"
+  },
+  "gate_notes": {
+    "second_run_reduction": "Real OpenCode host with the configured DeepSeek route. Both runs completed; the warm run reused the distilled template and skipped one read-only discovery node: plan nodes 2->1, human questions 1->0.",
+    "dsh_adapter_contract": "Bundle manifest, preset patch, locales, icon, and the transport bridge are covered by tests/test_dsh_adapter_m5.py and tests/dsh_adapter_bridge.test.mjs against the real Python kernel.",
+    "dsh_real_host_load": "Bundle installed into the running desktop profile with plugin_manager install_bundle; application=applied, no warnings, and preset-cybertron reports enabled/fiberPhase=active. Temporary headless and web test profiles were removed after verification. A model-driven DSH session with the preset remains a user acceptance step, not a load gate."
+  },
+  "baseline": {
+    "git_status_short": "dirty M5 implementation and evidence; not committed while a gate is pending",
+    "python_tests": 232,
+    "javascript_tests": 7,
+    "python_result": "OK",
+    "javascript_result": "pass",
+    "unit_test_log": "docs/stages/v6-m5-unittest.log",
+    "unit_test_log_sha256": "8cb85bc29697fadb4ace06d7001707f96087878659b3cb4b3c5990c2a7e3f6a8"
+  },
+  "learning": {
+    "host": "opencode2 --standalone run --agent prima (real model)",
+    "acceptance_path": "docs/stages/v6-m5-host-acceptance.json",
+    "acceptance_sha256": "587bad9a08593085ae9c6c41e34e67b7e1f6c51e0d726b02550e0ab99903151d",
+    "metrics_path": "docs/stages/v6-m5-metrics.json",
+    "metrics_sha256": "789d41c9e46de984458234d1b8249913adf3af52568259fea9c8bdda4cb417d9",
+    "comparison": {
+      "cold_run_id": "99f9aee8-e980-5921-b67c-03b30d56b5e6",
+      "warm_run_id": "c9e759c0-00e1-549c-86eb-af112fba0a72",
+      "status": {
+        "cold": "completed",
+        "warm": "completed"
+      },
+      "node_count": {
+        "cold": 2,
+        "warm": 1
+      },
+      "interventions": {
+        "cold": 1,
+        "warm": 0
+      },
+      "skipped_capabilities": [
+        "scan.static"
+      ],
+      "nodes_reduced": true,
+      "interventions_reduced": true
+    },
+    "runs": {
+      "cold": {
+        "run_id": "99f9aee8-e980-5921-b67c-03b30d56b5e6",
+        "status": "completed",
+        "node_count": 2,
+        "dispatches": 2,
+        "human_interventions": 1,
+        "skipped_capabilities": [],
+        "receipt_path": "docs/stages/v6-m5-host-cold-receipt.json",
+        "receipt_sha256": "9c03cea20cebd2d6c0d6dee11ee828623cc945b1145304a5ba34ab77a15d2f8e",
+        "events_path": "docs/stages/v6-m5-host-cold-events.jsonl",
+        "events_sha256": "b21dc61a249ded1bfe7a227b6c71a1ebc06fa6dc264661600703202e3d7fd0b4",
+        "plan_path": "docs/stages/v6-m5-host-cold-plan.json",
+        "plan_sha256": "25880c10717c0e89057d4f575c6e32ea3b93d089c26d1393f0d6946af9a07fe8"
+      },
+      "warm": {
+        "run_id": "c9e759c0-00e1-549c-86eb-af112fba0a72",
+        "status": "completed",
+        "node_count": 1,
+        "dispatches": 1,
+        "human_interventions": 0,
+        "skipped_capabilities": [
+          "scan.static"
+        ],
+        "receipt_path": "docs/stages/v6-m5-host-warm-receipt.json",
+        "receipt_sha256": "37b2e671360fcdd6c972344c85bfa51c350ad3acaa251a48972848ea5a1920b4",
+        "events_path": "docs/stages/v6-m5-host-warm-events.jsonl",
+        "events_sha256": "0a4a51ed0610eae7451bb2bf45108e870798146a251d9b4384334fcbb5655747",
+        "plan_path": "docs/stages/v6-m5-host-warm-plan.json",
+        "plan_sha256": "2ae37289cb3457c0bd062c2bd4396de4d08805bdea3113d5cae6e8fea0221f15"
+      }
+    },
+    "templates_stored": 2
+  },
+  "dsh_adapter": {
+    "bundle": "cybertron/dsh_adapter",
+    "package": "@local/cybertron-dsh",
+    "preset": "cybertron",
+    "files": [
+      "package.json",
+      "cordis.patch.yml",
+      "index.js",
+      "bridge.js",
+      "locale/en.json",
+      "locale/zh.json",
+      "icon.svg",
+      "docs/DETAIL.md"
+    ],
+    "tests": [
+      "tests/test_dsh_adapter_m5.py",
+      "tests/dsh_adapter_bridge.test.mjs"
+    ],
+    "install_command": "dsh plugin --profile <profile> add /Users/alanbanana/Cybertron-Agent/cybertron/dsh_adapter",
+    "limitation": "No DSH child-session dispatch binding yet; the preset exposes cy_* tools and the validated kernel, not governed native dispatch."
+  },
+  "commands": [
+    {
+      "cmd": "python3 -m unittest discover -s tests",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T17:29:12.764800+00:00",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m5-unittest.log",
+      "sha256": "8cb85bc29697fadb4ace06d7001707f96087878659b3cb4b3c5990c2a7e3f6a8"
+    },
+    {
+      "cmd": "node --test tests/v6_plugin_hook.test.mjs tests/v6_plugin_runtime.test.mjs tests/dsh_adapter_bridge.test.mjs",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T17:29:13.954144+00:00",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m5-js.log",
+      "sha256": "ebfdd847fe4f398ee3d00e4c97dc4f09b945acb901ce0076cc921e7e9289ecec"
+    },
+    {
+      "cmd": "python3 -m cybertron.stage5_verify",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T17:29:22.698660+00:00",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m5-stage5.log",
+      "sha256": "badc0e8d7378f8744f0ab8ccb6849eb496f1ca1449a18edc4329474792c61a2e"
+    },
+    {
+      "cmd": "python3 cybertron_primes_engine.py",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T17:29:22.771357+00:00",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m5-engine.log",
+      "sha256": "6a765936bd6248befc8aa162b8f6660f1da1ed944c0b8e96077a6451e8d87ff4"
+    },
+    {
+      "cmd": "opencode2 debug config",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T17:29:22.829240+00:00",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m5-debug.log",
+      "sha256": "a34573ad02dab6af729a3785f00c7a4bacc5507eabc2fa4f507ead082ab308b6"
+    }
+  ],
+  "next_actions": [
+    "Start a new DSH session in this workspace and select the Cybertron v6 preset to exercise cy_plan/cy_state/cy_templates in the GUI.",
+    "Bind DSH child sessions to node write scopes before claiming full 13-role DSH parity."
+  ],
+  "dsh_load": {
+    "path": "docs/stages/v6-m5-dsh-load.json",
+    "sha256": "f291d4f622a2683553f48cc261bb24adaafa953c143417d98dd775aa1971226d"
+  }
+}

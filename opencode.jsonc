@@ -29,6 +29,16 @@
           "effect": "allow"
         },
         {
+          "action": "cy_templates",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "cy_metrics",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
           "action": "subagent",
           "resource": "thirteenth",
           "effect": "allow"
