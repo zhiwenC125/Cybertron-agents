@@ -23,6 +23,9 @@ permissions:
   - action: "subagent"
     resource: "*"
     effect: "deny"
+  - action: "cy_check"
+    resource: "*"
+    effect: "allow"
 ---
 
 # 炼金术士 (Alchemist Prime) — 神器：Lenses (洞察透镜)

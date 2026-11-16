@@ -35,6 +35,9 @@ permissions:
   - action: "edit"
     resource: "bsp/**"
     effect: "allow"
+  - action: "cy_check"
+    resource: "*"
+    effect: "allow"
 ---
 
 # 幻化天 (Amalgamous Prime) — 神器：Scythe of Transmutation (幻化之镰)

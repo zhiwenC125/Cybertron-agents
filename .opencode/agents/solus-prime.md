@@ -41,6 +41,9 @@ permissions:
   - action: "subagent"
     resource: "*"
     effect: "deny"
+  - action: "cy_check"
+    resource: "*"
+    effect: "allow"
 ---
 
 # 赛天骄 (Solus Prime) — 神器：Forge of Solus Prime (造物神锤)
