@@ -41,6 +41,9 @@ jobs:
           git merge-base --is-ancestor HEAD origin/main
           python scripts/bump_version.py "${RELEASE_TAG#v}" --check
           test -f "docs/releases/${RELEASE_TAG}.md"
+      - name: Install clang-tidy
+        run: brew install llvm
+
       - name: Run release gates
         run: |
           python -m unittest discover -s tests -v
