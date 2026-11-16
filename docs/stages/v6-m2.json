@@ -1,0 +1,274 @@
+{
+  "milestone": "M2",
+  "status": "passed",
+  "commit": "cb8aad7c627fd6e210e92e5bcb33b2ab10cd4888",
+  "required_gates": [
+    "unit_tests_all_green",
+    "real_clang_tidy_receipt",
+    "real_cmake_build_receipt",
+    "toolchain_availability",
+    "runtime_gate_policy",
+    "real_host_gate"
+  ],
+  "commands": [
+    {
+      "cmd": "/bin/zsh -c command -v clang-tidy",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 1,
+      "utc": "2026-11-16T04:24:12.631766+00:00",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-clang-tidy-path.log"
+    },
+    {
+      "cmd": "xcrun --find clang-tidy",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 72,
+      "utc": "2026-11-16T04:24:12.637891+00:00",
+      "sha256": "a13172ba743e8e1206c55da826c3c3e57de4126bc51cfbf83058a2a3f3408c01",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-clang-tidy-xcode.log"
+    },
+    {
+      "cmd": "cmake --version",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T04:24:12.643828+00:00",
+      "sha256": "a24e1ae7f8f715ef1f0121cd749052d73c6a4315dba5bb885c584553d826eb79",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-cmake-version.log"
+    },
+    {
+      "cmd": "cc --version",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T04:24:12.653652+00:00",
+      "sha256": "f6420d587cab9c66fc17767d47910d2c1387e140e66cdd4049cae295eb11872c",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-cc-version.log"
+    },
+    {
+      "cmd": "/Library/Developer/CommandLineTools/usr/bin/python3 -m cybertron.host_v6_cli check --project /var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-v6-m2-c-fmdeeeuw",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T05:27:17.713358+00:00",
+      "sha256": "329b0eee50263830ad56faf8e64a0657e4ee82c235d472624f9410f5347b237a",
+      "source": "tool",
+      "target": "lint",
+      "output_path": "docs/stages/v6-m2-lint.log",
+      "stdin_json": {
+        "target": "lint"
+      }
+    },
+    {
+      "cmd": "/Library/Developer/CommandLineTools/usr/bin/python3 -m cybertron.host_v6_cli check --project /var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-v6-m2-c-fmdeeeuw",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T05:27:18.102610+00:00",
+      "sha256": "a4e21625c131cf9d3ddb869da3190b0a9dfb42746e431683c465e5f4be9565d1",
+      "source": "tool",
+      "target": "build",
+      "output_path": "docs/stages/v6-m2-build.log",
+      "stdin_json": {
+        "target": "build"
+      }
+    },
+    {
+      "cmd": "/opt/homebrew/opt/llvm/bin/clang-tidy --version",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T08:43:24.095044+00:00",
+      "sha256": "a632fdc379fa60191413e553e1d01bd0089d9b7e9038eb7c61d198bd36648a4e",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-clang-tidy-version.log"
+    },
+    {
+      "cmd": "python3 -m unittest discover -s tests -q",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T08:42:05.367255+00:00",
+      "sha256": "0dbfdc4fcc99ef1409b5f8d4e3ed64f2a57ad3dfcdbc15d457c765af25b24570",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-unittest.log"
+    },
+    {
+      "cmd": "opencode2 --standalone run --agent nexus-prime --format json --auto 'Call cy_check with target build on this C project. Report the exact tool status and final receipt exit code. Do not edit files.'",
+      "cwd": "/private/tmp/cybertron-v6-m2-host-ml3wk9tn",
+      "exit": 1,
+      "utc": "2026-11-16T07:57:15.097000+00:00",
+      "sha256": "aa9e841c27658d20632a4996ca2f86a2a435649e5a9b7d9be2e4c8c408a0326b",
+      "source": "host",
+      "output_path": "docs/stages/v6-m2-host-provider-failure.jsonl"
+    },
+    {
+      "cmd": "python3 -m unittest discover -s tests",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T08:44:40.936834+00:00",
+      "sha256": "c48f11882e16daf0f219e476d71788ed5bcfb94f2e642b3e617dc87283a22060",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-baseline.log"
+    },
+    {
+      "cmd": "python3 -m unittest discover -s tests",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T08:51:47.848715+00:00",
+      "sha256": "a1f593d116fc1fe8c829e7b7d8b00365aea29a61a19359b9ca82f2bb72b93c97",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-final-unittest.log"
+    },
+    {
+      "cmd": "python3 -m cybertron.stage5_verify",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T08:51:17.389232+00:00",
+      "sha256": "565ffb5785be36b1b5832d6df5d38ea1f4e0d544d1d9422cfd3ee50c6b5167e7",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-stage5-final.log"
+    },
+    {
+      "cmd": "python3 cybertron_primes_engine.py",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T08:51:23.053361+00:00",
+      "sha256": "6a765936bd6248befc8aa162b8f6660f1da1ed944c0b8e96077a6451e8d87ff4",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-engine-final.log"
+    },
+    {
+      "cmd": "opencode2 debug config",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T08:51:32.951818+00:00",
+      "sha256": "a6c2af82832f0a76cbda1ee0f80d705ef49408fc50aebdb3fc3190d796564071",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-debug-final.log"
+    },
+    {
+      "cmd": "opencode2 --standalone run --agent nexus-prime --format json --auto Call cy_check with target build on this C project. Report only the actual tool result; do not edit files.",
+      "cwd": "/private/tmp/cybertron-v6-m2-host-ml3wk9tn",
+      "exit": 124,
+      "started_utc": "2026-11-16T08:50:10.643619+00:00",
+      "utc": "2026-11-16T08:50:55.704000+00:00",
+      "sha256": "42c07a2ab729457904ea7178906a2b4104d2a41f57212b620bcea65d60174bf5",
+      "source": "host",
+      "output_path": "docs/stages/v6-m2-host-retry.jsonl"
+    },
+    {
+      "cmd": "python3 -m unittest discover -s tests",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T09:01:08.726308+00:00",
+      "sha256": "db53f8a85ce9fb81d4d55fdea8502da7f7ad1e3e242a7b64514f9cbb017eb5ad",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-acceptance-unittest.log"
+    },
+    {
+      "cmd": "python3 -m cybertron.stage5_verify",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T09:01:26.950579+00:00",
+      "sha256": "1a2f27b77d6f04d28b4283f0d8487665729a96d73b25b1a8b292ca176a5c9d32",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-acceptance-stage5.log"
+    },
+    {
+      "cmd": "python3 cybertron_primes_engine.py",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T09:01:35.490592+00:00",
+      "sha256": "6a765936bd6248befc8aa162b8f6660f1da1ed944c0b8e96077a6451e8d87ff4",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-acceptance-engine.log"
+    },
+    {
+      "cmd": "opencode2 debug config",
+      "cwd": "/Users/alanbanana/Cybertron-Agent",
+      "exit": 0,
+      "utc": "2026-11-16T09:01:35.481372+00:00",
+      "sha256": "9e21988e03f67a6c54e631459930d96a0a9990bec4e4be7fd660164f39d2eef4",
+      "source": "tool",
+      "output_path": "docs/stages/v6-m2-acceptance-debug.log"
+    },
+    {
+      "cmd": "opencode2 --standalone run --agent nexus-prime --format json --auto [M2 build prompt]",
+      "cwd": "/private/tmp/cybertron-v6-m2-host-ml3wk9tn",
+      "proxy_env": "removed for this process",
+      "exit": 0,
+      "started_utc": "2026-11-16T08:53:34.605906+00:00",
+      "utc": "2026-11-16T08:53:47.068598+00:00",
+      "sha256": "762c22e3fdfedbca16b5f02fa3e3b924980fb11ad9ea6232dc12c345bb5b1098",
+      "source": "host",
+      "output_path": "docs/stages/v6-m2-host-direct-build.jsonl"
+    },
+    {
+      "cmd": "opencode2 --standalone run --agent nexus-prime --format json --auto [M2 build prompt]",
+      "cwd": "/private/tmp/cybertron-v6-m2-host-ml3wk9tn",
+      "proxy_env": "removed for this process",
+      "exit": 0,
+      "started_utc": "2026-11-16T08:56:12.716015+00:00",
+      "utc": "2026-11-16T08:56:19.007656+00:00",
+      "sha256": "351b9acfc458da463bb40cbcb4d01983dc24374cbf660a81ce2a3ffeabbb58e4",
+      "source": "host",
+      "output_path": "docs/stages/v6-m2-host-build-after-permission.jsonl"
+    },
+    {
+      "cmd": "opencode2 --standalone run --agent micronus-prime --format json --auto [M2 lint prompt]",
+      "cwd": "/private/tmp/cybertron-v6-m2-host-ml3wk9tn",
+      "proxy_env": "removed for this process",
+      "exit": 0,
+      "started_utc": "2026-11-16T08:56:35.007504+00:00",
+      "utc": "2026-11-16T08:56:45.807414+00:00",
+      "sha256": "d202e7c1bfc89ead730adaf934a59b3eb4694c870874f55b9f5d2a3b88192ca9",
+      "source": "host",
+      "output_path": "docs/stages/v6-m2-host-lint-after-permission.jsonl"
+    },
+    {
+      "cmd": "opencode2 --standalone run --agent prima --format json --auto [M2 risk prompt]",
+      "cwd": "/private/tmp/cybertron-v6-m2-risk-ggpikois",
+      "proxy_env": "removed for this process",
+      "exit": 0,
+      "started_utc": "2026-11-16T08:58:11.134982+00:00",
+      "utc": "2026-11-16T08:58:35.754910+00:00",
+      "sha256": "a8cb40c0b38dddb06eafd26e9b73bf19a0b9c076bf1d0b708f9d2203a36a9c12",
+      "source": "host",
+      "output_path": "docs/stages/v6-m2-host-risk.jsonl"
+    },
+    {
+      "cmd": "opencode2 --standalone run --agent micronus-prime --format json --auto [M2 bound lint prompt]",
+      "cwd": "/private/tmp/cybertron-v6-m2-risk-ggpikois",
+      "proxy_env": "removed for this process",
+      "exit": 0,
+      "started_utc": "2026-11-16T08:59:33.962691+00:00",
+      "utc": "2026-11-16T08:59:40.627713+00:00",
+      "sha256": "801abb4ca0ade7939107e7658ecfb94bca7f37036f19272944dbc5cce5174bae",
+      "source": "host",
+      "output_path": "docs/stages/v6-m2-host-bound-lint.jsonl"
+    }
+  ],
+  "host": {
+    "status": "passed",
+    "acceptance_path": "docs/stages/v6-m2-host-acceptance.json",
+    "run_id": "915ef866-d95f-5a9a-bb96-27eb386d13e3",
+    "build_receipts": 2,
+    "lint_receipts": 2,
+    "risk_floor_rejection": true,
+    "code_fixture_pending_gates": [
+      "review.l2.light",
+      "test"
+    ]
+  },
+  "negative_cases": [
+    "Model supplied receipt cannot pass GateLedger without kernel registration",
+    "Risk floor test gate cannot be marked not_applicable",
+    "Arbitrary cy_check target and symlink source are rejected",
+    "Python project with zero tests cannot pass the test target",
+    "Runtime actual C diff requires lint/test/L2; prima mark_not_applicable is rejected and stale lint receipt is ignored",
+    "Real prima mark_not_applicable operation rejected after code diff",
+    "Real host rejected fake run_id for cy_check before accepting a valid unbound lint call",
+    "Bound lint receipt becomes stale when source changes (local integration test)"
+  ],
+  "open_issues": [],
+  "next_action": "M2 required gates passed; stop this session. Continue with M3 in a new session without revisiting passed milestones."
+}

@@ -1,0 +1,10 @@
+{
+  "cmd": "opencode2 --standalone run --agent nexus-prime --format json --auto Call cy_check with target build on this C project. Report only the actual tool result; do not edit files.",
+  "cwd": "/private/tmp/cybertron-v6-m2-host-ml3wk9tn",
+  "exit": 124,
+  "started_utc": "2026-11-16T08:50:10.643619+00:00",
+  "utc": "2026-11-16T08:50:55.704000+00:00",
+  "sha256": "42c07a2ab729457904ea7178906a2b4104d2a41f57212b620bcea65d60174bf5",
+  "source": "host",
+  "output_path": "docs/stages/v6-m2-host-retry.jsonl"
+}

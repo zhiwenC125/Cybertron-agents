@@ -1,0 +1,105 @@
+{
+  "milestone": "M2",
+  "host_acceptance": "passed",
+  "verified_at_utc": "2026-11-16T09:02:32.849488+00:00",
+  "build": {
+    "event_log": "docs/stages/v6-m2-host-build-after-permission.jsonl",
+    "event_log_sha256": "351b9acfc458da463bb40cbcb4d01983dc24374cbf660a81ce2a3ffeabbb58e4",
+    "tool_call_id": "call_00_7dvcEARlGpzkI5njB6jK7551",
+    "session_id": "ses_e1c6dc887ffe4Z03KG0HoJJ5Hm",
+    "input": {
+      "target": "build"
+    },
+    "profile": "cmake-c",
+    "status": "pass",
+    "receipts": [
+      {
+        "source": "sandbox",
+        "command": "/opt/homebrew/bin/cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+        "exit": 0,
+        "utc": "2026-11-16T08:56:15.102424+00:00",
+        "sha256": "94e5ed17a1105834c395579d811aa0528444d17ca6fd9041d0e0d0d9b2b307b4"
+      },
+      {
+        "source": "sandbox",
+        "command": "/opt/homebrew/bin/cmake --build build",
+        "exit": 0,
+        "utc": "2026-11-16T08:56:15.228238+00:00",
+        "sha256": "d1f0a2a140a2ef3e76aca337a1b2ccddfc7db739d4af77eb053b2acb2c8ef834"
+      }
+    ],
+    "run_state": null
+  },
+  "lint": {
+    "event_log": "docs/stages/v6-m2-host-bound-lint.jsonl",
+    "event_log_sha256": "801abb4ca0ade7939107e7658ecfb94bca7f37036f19272944dbc5cce5174bae",
+    "tool_call_id": "call_00_t6YpYmnhZt6L3K5JK5ea2205",
+    "session_id": "ses_e1c6ab67effeRdoMJ6oKiejHhl",
+    "input": {
+      "target": "lint",
+      "run_id": "915ef866-d95f-5a9a-bb96-27eb386d13e3"
+    },
+    "profile": "cmake-c",
+    "status": "pass",
+    "receipts": [
+      {
+        "source": "sandbox",
+        "command": "/opt/homebrew/bin/cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+        "exit": 0,
+        "utc": "2026-11-16T08:59:36.640441+00:00",
+        "sha256": "d034f7c2f00272d65dcaed296596d96b9bf1a775d90e0d86d7975339a5ba4606"
+      },
+      {
+        "source": "sandbox",
+        "command": "/opt/homebrew/opt/llvm/bin/clang-tidy -p build --checks=clang-analyzer-*,bugprone-* --warnings-as-errors=* src/main.c",
+        "exit": 0,
+        "utc": "2026-11-16T08:59:36.685009+00:00",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "run_state": {
+      "status": "blocked",
+      "required_gates": [
+        "lint",
+        "review.l2.light",
+        "scope_guard",
+        "test"
+      ],
+      "passed_gates": [
+        "lint",
+        "scope_guard"
+      ],
+      "pending_gates": [
+        "review.l2.light",
+        "test"
+      ]
+    }
+  },
+  "risk_floor": {
+    "run_id": "915ef866-d95f-5a9a-bb96-27eb386d13e3",
+    "session_log": "docs/stages/v6-m2-host-risk.jsonl",
+    "session_log_sha256": "a8cb40c0b38dddb06eafd26e9b73bf19a0b9c076bf1d0b708f9d2203a36a9c12",
+    "events_log": "docs/stages/v6-m2-risk-events.jsonl",
+    "events_log_sha256": "48b1e14b3cd871de86a2ad1937a5680e37396d9dcc6714c14cae2f0d346588b1",
+    "risk": "code",
+    "required_gates": [
+      "lint",
+      "review.l2.light",
+      "scope_guard",
+      "test"
+    ],
+    "pending_before_lint": [
+      "lint",
+      "review.l2.light",
+      "test"
+    ],
+    "pending_after_lint": [
+      "review.l2.light",
+      "test"
+    ],
+    "artifact": "src/main.c",
+    "artifact_sha256": "238a3e7e61d7e5bc543d9d7b10b435b4174381486fa3008eed7285094b04c290",
+    "mark_not_applicable_rejected": true
+  },
+  "note": "The code run remains blocked on test and L2; M2 verifies risk-floor enforcement and real lint/build receipts, not completion of this code task."
+}

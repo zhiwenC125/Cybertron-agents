@@ -1,0 +1,11 @@
+{
+  "cmd": "opencode2 --standalone run --agent nexus-prime --format json --auto [M2 build prompt]",
+  "cwd": "/private/tmp/cybertron-v6-m2-host-ml3wk9tn",
+  "proxy_env": "removed for this process",
+  "exit": 0,
+  "started_utc": "2026-11-16T08:56:12.716015+00:00",
+  "utc": "2026-11-16T08:56:19.007656+00:00",
+  "sha256": "351b9acfc458da463bb40cbcb4d01983dc24374cbf660a81ce2a3ffeabbb58e4",
+  "source": "host",
+  "output_path": "docs/stages/v6-m2-host-build-after-permission.jsonl"
+}
