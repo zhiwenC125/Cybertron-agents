@@ -91,26 +91,39 @@ export default Plugin.define({
     });
     await ctx.tool.transform(editor => {
       editor.add({
-        name: 'cy_plan', description: 'Create a validated v6 task graph, use the optional bug_fix plan seed, or apply one revisioned graph operation. Returns ready native subagent cards.',
+        name: 'cy_plan', description: 'Create a validated v6 task graph, seed one from a learned template, use the optional bug_fix plan seed, or apply one revisioned graph operation. Returns ready native subagent cards.',
         input: { type: 'object', properties: {
           node: nodeInput, nodes: { type: 'array', items: nodeInput, minItems: 1 },
           template: { type: 'object', properties: {
             type: { type: 'string', enum: ['bug_fix'] }, objective: { type: 'string' },
             write_scope: { type: 'array', items: { type: 'string' }, minItems: 1 },
           }, required: ['type', 'objective', 'write_scope'], additionalProperties: false },
+          template_id: { type: 'string' },
+          objective: { type: 'string' },
+          write_scope: { type: 'array', items: { type: 'string' } },
+          test_scope: { type: 'array', items: { type: 'string' } },
+          skip: { type: 'array', items: { type: 'string' } },
+          request_class: { type: 'string' },
           operation: { type: 'object', additionalProperties: true },
         }, additionalProperties: false },
         execute: async (input, context) => {
           if (context.agent !== 'prima') throw new Error('Only prima may create plans');
           const run_id = await ctx.storage.get(`run/${context.sessionID}`);
-          if (run_id && (input.node || input.nodes || input.template || !input.operation))
+          if (run_id && (input.node || input.nodes || input.template || input.template_id || !input.operation))
             throw new Error('Existing run requires one graph operation');
-          if (!run_id && ([input.node, input.nodes, input.template].filter(Boolean).length !== 1 || input.operation))
-            throw new Error('New run requires exactly one node, nodes, or template');
+          if (!run_id && ([input.node, input.nodes, input.template, input.template_id].filter(Boolean).length !== 1 || input.operation))
+            throw new Error('New run requires exactly one node, nodes, template, or template_id');
+          if (input.template_id && !input.objective)
+            throw new Error('A template seed requires the new objective');
+          if (input.skip && !input.template_id)
+            throw new Error('skip is only valid with a template seed');
           const result = run_id
             ? await bridge('plan_op', project, { run_id, operation: input.operation }, context.signal)
             : await bridge('plan', project, { node: input.node, nodes: input.nodes,
-                template: input.template,
+                template: input.template, template_id: input.template_id,
+                objective: input.objective, write_scope: input.write_scope,
+                test_scope: input.test_scope, skip: input.skip,
+                request_class: input.request_class,
                 host_session_id: context.sessionID }, context.signal);
           if (!run_id) await ctx.storage.set(`run/${context.sessionID}`, result.run_id);
           return { content: JSON.stringify(result) };
@@ -147,6 +160,24 @@ export default Plugin.define({
           const run_id = await ctx.storage.get(`run/${context.sessionID}`);
           if (!run_id) throw new Error('No v6 run in this session');
           const result = await bridge('ask', project, { run_id, question: input.question }, context.signal);
+          return { content: JSON.stringify(result) };
+        },
+      });
+      editor.add({
+        name: 'cy_templates', description: 'List learned plan templates from completed runs, with their node, dispatch, and human-intervention counts.',
+        input: { type: 'object', properties: {}, additionalProperties: false },
+        execute: async (input, context) => {
+          if (context.agent !== 'prima') throw new Error('Only prima may read templates');
+          const result = await bridge('templates', project, {}, context.signal);
+          return { content: JSON.stringify(result) };
+        },
+      });
+      editor.add({
+        name: 'cy_metrics', description: 'Read the run metrics panel or one run ledger projection; pass run_id for a single run.',
+        input: { type: 'object', properties: { run_id: { type: 'string' } }, additionalProperties: false },
+        execute: async (input, context) => {
+          if (context.agent !== 'prima') throw new Error('Only prima may read metrics');
+          const result = await bridge('metrics', project, { run_id: input.run_id }, context.signal);
           return { content: JSON.stringify(result) };
         },
       });
@@ -270,6 +301,8 @@ export default Plugin.define({
         delete event.tools.cy_state;
         delete event.tools.cy_plan;
         delete event.tools.cy_ask;
+        delete event.tools.cy_templates;
+        delete event.tools.cy_metrics;
         delete event.tools.subagent;
         if (event.agent !== 'liege-maximo') delete event.tools.cy_review_reject;
         if (!['micronus-prime', 'nexus-prime', 'alchemist', 'solus-prime',
@@ -284,7 +317,7 @@ export default Plugin.define({
         throw new Error('Cybertron prima model differs from active session; run cybertron models doctor');
       }
       event.system.push({ type: 'text', text:
-        'Cybertron v6 M2: plan the smallest valid task graph for the user request with cy_plan. Use node for one task, nodes for a dependency graph, or the optional bug_fix template. For a single requested Markdown file within alpha-trion allowed paths, use capability doc.write, role alpha-trion, write_scope containing only that path, and scope_guard verifier; keep the requested content exact. Each task needs a registered capability and role, narrow write_scope, acceptance, and scope_guard verifier. Dispatch only a ready node through the native subagent tool; use its exact returned card as description and include node_id, capability, write_scope, objective, and run_id in the child prompt. Call cy_state with wait=true after each child returns. The kernel derives risk gates from the actual workspace diff; cy_check runs fixed lint/build/test/sim targets for eligible roles, and a run_id binds its receipt to the run. Required gates cannot be removed; mark_not_applicable and complete_run remain fail-closed until trusted verifier facts exist. Background is still running; cancellation is terminal. Never claim model text as tool evidence.' });
+        'Cybertron v6 M5: plan the smallest valid task graph for the user request with cy_plan. Use node for one task, nodes for a dependency graph, template_id for a learned template, or the optional bug_fix template. cy_templates lists templates distilled from completed runs; reuse one with cy_plan template_id, objective, write_scope, and request_class when the request matches that class, then add nodes only if the seed is insufficient. cy_metrics reports ledger facts for this project. For a single requested Markdown file within alpha-trion allowed paths, use capability doc.write, role alpha-trion, write_scope containing only that path, and scope_guard verifier; keep the requested content exact. Each task needs a registered capability and role, narrow write_scope, acceptance, and scope_guard verifier. Dispatch only a ready node through the native subagent tool; use its exact returned card as description and include node_id, capability, write_scope, objective, and run_id in the child prompt. Call cy_state with wait=true after each child returns. The kernel derives risk gates from the actual workspace diff; cy_check runs fixed lint/build/test/sim targets for eligible roles, and a run_id binds its receipt to the run. Required gates cannot be removed; mark_not_applicable and complete_run remain fail-closed until trusted verifier facts exist. Background is still running; cancellation is terminal. Never claim model text as tool evidence.' });
     });
   },
 });

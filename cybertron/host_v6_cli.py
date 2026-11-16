@@ -14,7 +14,9 @@ from .profiles import CheckRejected, run_check
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cybertron-v6-host")
-    parser.add_argument("operation", choices=("plan", "plan_op", "state", "ask", "before", "after", "bind", "review_reject", "finish", "check"))
+    parser.add_argument("operation", choices=("plan", "plan_op", "state", "ask", "before", "after",
+                                             "bind", "review_reject", "finish", "check",
+                                             "templates", "metrics"))
     parser.add_argument("--project", type=Path, required=True)
     args = parser.parse_args(argv)
     data = json.load(sys.stdin)
@@ -23,16 +25,33 @@ def main(argv: list[str] | None = None) -> int:
         if args.operation == "check":
             result = (V6HostBridge(args.project).check(data["run_id"], data["target"])
                       if data.get("run_id") else run_check(args.project, data["target"]))
+        elif args.operation == "templates":
+            result = V6HostBridge(args.project).templates()
+        elif args.operation == "metrics":
+            result = V6HostBridge(args.project).metrics(data.get("run_id"))
         elif args.operation == "plan":
-            if "template" in data:
+            if "template_id" in data:
+                result = bridge.plan(None, data["host_session_id"],
+                                     request_class=data.get("request_class"),
+                                     template_id=data["template_id"],
+                                     objective=data.get("objective", ""),
+                                     write_scope=data.get("write_scope"),
+                                     test_scope=data.get("test_scope"),
+                                     skip=data.get("skip"))
+            elif "template" in data:
                 template = data["template"]
                 if template.get("type") != "bug_fix":
                     raise ValueError("unknown plan template")
                 graph = bug_fix_template(template["objective"], tuple(template["write_scope"]))
                 nodes = [node.to_dict() for node in graph.nodes.values()]
+                result = bridge.plan(nodes, data["host_session_id"],
+                                     request_class="bug-fix",
+                                     objective=template["objective"])
             else:
                 nodes = data.get("nodes", data.get("node"))
-            result = bridge.plan(nodes, data["host_session_id"])
+                result = bridge.plan(nodes, data["host_session_id"],
+                                     request_class=data.get("request_class"),
+                                     objective=data.get("objective", ""))
         elif args.operation == "plan_op":
             result = bridge.plan_op(data["run_id"], data["operation"])
         elif args.operation == "state":

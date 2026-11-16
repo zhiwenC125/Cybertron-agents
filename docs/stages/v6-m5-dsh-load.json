@@ -1,0 +1,42 @@
+{
+  "host": "DeepSeek Harness desktop profile (running Electron app)",
+  "utc": "2026-11-16T17:39:28.571218+00:00",
+  "bundle": "@local/cybertron-dsh",
+  "version": "0.1.0",
+  "source": "cybertron/dsh_adapter",
+  "install": {
+    "action": "plugin_manager install_bundle",
+    "stage": "enable",
+    "changed": true,
+    "application": "applied",
+    "warnings": [],
+    "package_exit": 0,
+    "operation_log": "/Users/alanbanana/.dsh/profiles/desktop/.plugin-manager/logs/operation-NG2fa8/pnpm.log",
+    "operation_log_sha256": "0143eea3dfdf285d1aa2e8e8a3799daacd3d31cb1a3f40ced2575682c6224807"
+  },
+  "profile_bundles": [
+    "@deepseek-ai/dsh-base",
+    "@deepseek-ai/dsh-web-app",
+    "dsh-context",
+    "@local/cybertron-dsh"
+  ],
+  "preset_entry": {
+    "entryId": "include:preset-cybertron",
+    "moduleName": "@deepseek-ai/dsh-agent-preset",
+    "enabled": true,
+    "fiberPhase": "active"
+  },
+  "temporary_profiles": {
+    "created": [
+      "cybertron-m5 (headless)",
+      "cybertron-m5-web (web)"
+    ],
+    "purpose": "isolated composition checks before the live desktop install",
+    "removed_after_verification": true
+  },
+  "limitations": [
+    "The preset exposes a single prima persona with cy_* tools; it does not map the 13 roles to 13 DSH presets or bind DSH child sessions to node write scopes.",
+    "cy_* tools resolve the Cybertron checkout from the session working directory; select the preset in a session whose working directory contains the cybertron package."
+  ],
+  "remove_command": "plugin_manager remove_bundle @local/cybertron-dsh (or the Plugins page)"
+}
