@@ -375,6 +375,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("read", ".opencode/**", PermissionEffect.ALLOW),
             PermissionRule("read", "opencode.jsonc", PermissionEffect.ALLOW),
             PermissionRule("glob", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_review_reject", "*", PermissionEffect.ALLOW),
         ],
     ),
 
@@ -612,7 +613,7 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
     if set(roles) != set(_ROLE_CAPABILITIES) or len(specs) != len(roles):
         raise ValueError("role catalogue must contain exactly thirteen unique agents")
     known_actions = {"*", "read", "glob", "grep", "edit", "shell", "subagent",
-                     "cy_state", "cy_plan", "cy_ask", "cy_check", "feishu_mcp_healthcheck*",
+                     "cy_state", "cy_plan", "cy_ask", "cy_check", "cy_review_reject", "feishu_mcp_healthcheck*",
                      "feishu_wiki_delete*", "feishu_wiki_docx_v1_document_rawContent",
                      "feishu_wiki_wiki_v2_space_getNode"}
     for spec in specs:
@@ -634,6 +635,10 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
         check_permission = any(r.action == "cy_check" for r in allowed)
         if check_permission != (spec.agent_id in _CHECK_ROLES) or ("cy_check" in role.tool_classes) != check_permission:
             raise ValueError("cy_check role permission drift")
+        review_permission = any(r.action == "cy_review_reject" for r in allowed)
+        if review_permission != (spec.agent_id == "liege-maximo") or (
+                "cy_review_reject" in role.tool_classes) != review_permission:
+            raise ValueError("L2 rejection permission drift")
         if spec.agent_id == "prima" and any(r.action in {"read", "glob", "grep", "edit", "shell"} for r in allowed):
             raise ValueError("prima cannot use file or command tools")
         if spec.agent_id != "prima" and not any(r.action == "subagent" and r.resource == "*" and r.effect is PermissionEffect.DENY for r in spec.permissions):

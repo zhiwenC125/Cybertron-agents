@@ -51,6 +51,14 @@ class V6PermissionTests(unittest.TestCase):
                 self.assertEqual(effect, PermissionEffect.ALLOW if agent.agent_id in allowed
                                  else PermissionEffect.DENY)
 
+    def test_only_l2_reviewer_can_record_rejection(self):
+        for agent in THIRTEEN_PRIMES_REGISTRY:
+            with self.subTest(agent=agent.agent_id):
+                effect, _ = MegatronusCircuitBreaker(agent.permissions).verify_tool_call(
+                    "cy_review_reject", "*", agent.agent_id)
+                self.assertEqual(effect, PermissionEffect.ALLOW if agent.agent_id == "liege-maximo"
+                                 else PermissionEffect.DENY)
+
     def test_alpha_can_write_root_notes_but_not_role_config(self):
         alpha = next(agent for agent in THIRTEEN_PRIMES_REGISTRY if agent.agent_id == "alpha-trion")
         breaker = MegatronusCircuitBreaker(alpha.permissions)

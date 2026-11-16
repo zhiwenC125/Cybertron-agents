@@ -1,0 +1,47 @@
+{
+  "scenario": "concurrency",
+  "fixture": "/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-v6-m3-host-bem4lu1p",
+  "started_utc": "2026-11-16T15:34:43.628393+00:00",
+  "utc": "2026-11-16T15:34:55.998564+00:00",
+  "exit": 0,
+  "run_id": "d2452c93-1b0e-5f1c-b07f-92138d8b0a5b",
+  "output_path": "docs/stages/v6-m3-host-concurrency-r2.jsonl",
+  "output_sha256": "ff34cc3e945ab252b9cf47b81c1f1af1fe107e56973e6a8e98152c289d8c31c8",
+  "parent_session_id": "ses_e1b00ee8fffeC2TdDTLbl1yvOe",
+  "child_sessions": {
+    "a": "ses_e1b00d2f4ffe3CgJxIz7jrYesn",
+    "b": "ses_e1b00d2f4ffdQexya8tvCZTKFI"
+  },
+  "sessions": [
+    {
+      "node_id": "parent",
+      "session_id": "ses_e1b00ee8fffeC2TdDTLbl1yvOe",
+      "path": "docs/stages/v6-m3-host-concurrency-r2-parent-session.json",
+      "sha256": "df77ff1549210ee7bc1f52a29f03d0c5c890c7a681be9688c758862e00fde4c5"
+    },
+    {
+      "node_id": "a",
+      "session_id": "ses_e1b00d2f4ffe3CgJxIz7jrYesn",
+      "path": "docs/stages/v6-m3-host-concurrency-r2-a-session.json",
+      "sha256": "8bea50ff1e2ce8926b2159b8beb905971c2dc08beb7e16eb81a1ceb7aa95d27b"
+    },
+    {
+      "node_id": "b",
+      "session_id": "ses_e1b00d2f4ffdQexya8tvCZTKFI",
+      "path": "docs/stages/v6-m3-host-concurrency-r2-b-session.json",
+      "sha256": "b35bfebf5334fd24e8426bff283fc603d6794e5c170c0d068810b6c01e8a1eb0"
+    }
+  ],
+  "artifacts": {
+    "docs/a.md": {
+      "sha256": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+      "size": 1
+    },
+    "docs/b.md": {
+      "sha256": "3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d",
+      "size": 1
+    }
+  },
+  "events_path": "docs/stages/v6-m3-host-concurrency-r2-events.jsonl",
+  "events_sha256": "bc60b816bc743abf6ba19d033d6bbbf155d382b5c5572233b0b581d70e096813"
+}

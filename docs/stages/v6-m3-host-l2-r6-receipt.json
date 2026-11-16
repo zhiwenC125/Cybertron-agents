@@ -1,0 +1,109 @@
+{
+  "scenario": "l2",
+  "fixture": "/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-v6-m3-host-oyt2t5jj",
+  "started_utc": "2026-11-16T15:40:59.696433+00:00",
+  "utc": "2026-11-16T15:41:56.553281+00:00",
+  "exit": 0,
+  "run_id": "1052784c-c8fe-58f0-a71a-63bd37aab547",
+  "output_path": "docs/stages/v6-m3-host-l2-r6.jsonl",
+  "output_sha256": "8256c7febacac2d562103c7872d036e519469f833e3415d6cfc5b190894f0238",
+  "parent_session_id": "ses_e1afb3173ffeDqcTa36V5btnRF",
+  "child_sessions": [
+    {
+      "node_id": "fix",
+      "call_id": "call_00_JKh8Xy11FKCebcRIyJ4k1243",
+      "session_id": "ses_e1afb0bbfffeF0cetltDuo56Uy"
+    },
+    {
+      "node_id": "unrelated",
+      "call_id": "call_01_rqKg1Kl7cEwP8LPqVNwl9279",
+      "session_id": "ses_e1afb0bbeffeVbiZ2ABB1pYKrO"
+    },
+    {
+      "node_id": "review",
+      "call_id": "call_00_HufpEomQKkECnMWy6YCi2143",
+      "session_id": "ses_e1afaebe7ffeaCg2nRINu5mnqJ"
+    },
+    {
+      "node_id": "fix",
+      "call_id": "call_00_aK4pv2IW3qbC2PneBbJR0169",
+      "session_id": "ses_e1afaba22ffe0hfBpgjvUBVo81"
+    },
+    {
+      "node_id": "review",
+      "call_id": "call_00_fHG3lnT6PThi6VMIbuhf5689",
+      "session_id": "ses_e1afa9c29ffe8ndVVGSzU31MJA"
+    },
+    {
+      "node_id": "deliver",
+      "call_id": "call_00_P0cAfQWKqBL0gLAj1RUE5259",
+      "session_id": "ses_e1afa7e27ffeTaI09Q2yqNmqHb"
+    }
+  ],
+  "sessions": [
+    {
+      "node_id": "parent",
+      "session_id": "ses_e1afb3173ffeDqcTa36V5btnRF",
+      "path": "docs/stages/v6-m3-host-l2-r6-parent-session.json",
+      "sha256": "40e11ef1eb48292ebfe2d5a9f2e544a2c1f42afcdd74ee7f634d58d3b4913f19"
+    },
+    {
+      "node_id": "fix",
+      "call_id": "call_00_JKh8Xy11FKCebcRIyJ4k1243",
+      "session_id": "ses_e1afb0bbfffeF0cetltDuo56Uy",
+      "path": "docs/stages/v6-m3-host-l2-r6-fix-session.json",
+      "sha256": "680fb4210739cbba4786b85eb847dfed853030c1ec14152e0fad8a7ef049f8cb"
+    },
+    {
+      "node_id": "unrelated",
+      "call_id": "call_01_rqKg1Kl7cEwP8LPqVNwl9279",
+      "session_id": "ses_e1afb0bbeffeVbiZ2ABB1pYKrO",
+      "path": "docs/stages/v6-m3-host-l2-r6-unrelated-session.json",
+      "sha256": "04471ef448192dd8dac9ae91abd7ac89a8ff73418598d7ae0de785c041490f6d"
+    },
+    {
+      "node_id": "review",
+      "call_id": "call_00_HufpEomQKkECnMWy6YCi2143",
+      "session_id": "ses_e1afaebe7ffeaCg2nRINu5mnqJ",
+      "path": "docs/stages/v6-m3-host-l2-r6-review-session.json",
+      "sha256": "46c7dc122f94966a22424f1011709da8352629dfe3cfda8dd49840ce3eff9115"
+    },
+    {
+      "node_id": "fix",
+      "call_id": "call_00_aK4pv2IW3qbC2PneBbJR0169",
+      "session_id": "ses_e1afaba22ffe0hfBpgjvUBVo81",
+      "path": "docs/stages/v6-m3-host-l2-r6-fix-attempt2-session.json",
+      "sha256": "f1f89e92d88a16755644ce90cc56c061d4d141bd4abd8faeef324a8f2a7e3210"
+    },
+    {
+      "node_id": "review",
+      "call_id": "call_00_fHG3lnT6PThi6VMIbuhf5689",
+      "session_id": "ses_e1afa9c29ffe8ndVVGSzU31MJA",
+      "path": "docs/stages/v6-m3-host-l2-r6-review-attempt2-session.json",
+      "sha256": "c96f3b1b2c9f829ff0e7fdbb23bd3fdb7c250ee4fa75fd886c721f5456b33a65"
+    },
+    {
+      "node_id": "deliver",
+      "call_id": "call_00_P0cAfQWKqBL0gLAj1RUE5259",
+      "session_id": "ses_e1afa7e27ffeTaI09Q2yqNmqHb",
+      "path": "docs/stages/v6-m3-host-l2-r6-deliver-session.json",
+      "sha256": "ca20f17067a02b15f81113d3ceff14e0676be7714eadf961cf815888b730f4dc"
+    }
+  ],
+  "artifacts": {
+    "docs/deliver.md": {
+      "sha256": "373e0712c83cffe15ff427b60e788b549f82496fe5fd5391f7921832b04c6b20",
+      "size": 9
+    },
+    "docs/fix.md": {
+      "sha256": "3baf75ce884746c426cafdff7e0a3ed3a52b4d70fb6dbf94bc754be4273a868a",
+      "size": 8
+    },
+    "docs/other.md": {
+      "sha256": "7cb42e561c843a61805fd85f0481396a766f2229be9e5c5a2111b6f435dc16e7",
+      "size": 12
+    }
+  },
+  "events_path": "docs/stages/v6-m3-host-l2-r6-events.jsonl",
+  "events_sha256": "9364060e383fab61423dcce3714ab91c26d28476d8810637fd8a13b6b4e7d561"
+}

@@ -1,0 +1,53 @@
+{
+  "scenario": "loop1",
+  "fixture": "/var/folders/1_/kfv0_rrs7_136k218xrbr38c0000gn/T/cybertron-v6-m3-host-hag62s8g",
+  "started_utc": "2026-11-16T15:35:28.306954+00:00",
+  "utc": "2026-11-16T15:35:50.595672+00:00",
+  "exit": 0,
+  "run_id": "7d31815e-8a54-5c33-a323-9219c33eabcf",
+  "output_path": "docs/stages/v6-m3-host-loop1-r5.jsonl",
+  "output_sha256": "85e98d6cf27a0dcb548c0ba3c09e0c4bd1fcd938ebe17faffb1e03602e3d3464",
+  "parent_session_id": "ses_e1b003ff8ffeGJZwPtCIb6y3qI",
+  "child_sessions": [
+    {
+      "node_id": "n1",
+      "call_id": "call_00_shwS3eiZ02387528a2vu4606",
+      "session_id": "ses_e1b002f49ffeIWTA0UNQY8AHQC"
+    },
+    {
+      "node_id": "n1",
+      "call_id": "call_00_vZxOveCIUwb7fx66980H1899",
+      "session_id": "ses_e1b001445ffeJDUH9T7yGwbWXK"
+    }
+  ],
+  "sessions": [
+    {
+      "node_id": "parent",
+      "session_id": "ses_e1b003ff8ffeGJZwPtCIb6y3qI",
+      "path": "docs/stages/v6-m3-host-loop1-r5-parent-session.json",
+      "sha256": "9fc9d105282d5b2450eee62c00ed62e0d4c51d286db7c014a3da41bfbcbddce5"
+    },
+    {
+      "node_id": "n1",
+      "call_id": "call_00_shwS3eiZ02387528a2vu4606",
+      "session_id": "ses_e1b002f49ffeIWTA0UNQY8AHQC",
+      "path": "docs/stages/v6-m3-host-loop1-r5-n1-session.json",
+      "sha256": "3abb245aad890a72652439936f8d657d4c17a8c84fd5b4266b356f6e49ffdfe7"
+    },
+    {
+      "node_id": "n1",
+      "call_id": "call_00_vZxOveCIUwb7fx66980H1899",
+      "session_id": "ses_e1b001445ffeJDUH9T7yGwbWXK",
+      "path": "docs/stages/v6-m3-host-loop1-r5-n1-attempt2-session.json",
+      "sha256": "d83841f7057e78c6e658c6d927114d420e1a67f621d04377e89bc45b7d79499f"
+    }
+  ],
+  "artifacts": {
+    "docs/n1.md": {
+      "sha256": "dc51b8c96c2d745df3bd5590d990230a482fd247123599548e0632fdbf97fc22",
+      "size": 3
+    }
+  },
+  "events_path": "docs/stages/v6-m3-host-loop1-r5-events.jsonl",
+  "events_sha256": "1ad60221efeb6707d97db7f2b2190c4e0dea213d06b8a0a4d1f12dc4f499cdc6"
+}
