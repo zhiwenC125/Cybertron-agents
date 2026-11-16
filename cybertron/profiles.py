@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -98,6 +99,17 @@ def _binary(name: str) -> str:
     raise CheckRejected(f"required tool is unavailable: {name}")
 
 
+def _clang_tidy_sdk_args() -> list[str]:
+    if sys.platform != "darwin":
+        return []
+    result = subprocess.run([_binary("xcrun"), "--sdk", "macosx", "--show-sdk-path"],
+                            capture_output=True, text=True, check=False)
+    sdk = Path(result.stdout.strip())
+    if result.returncode != 0 or not sdk.is_dir():
+        raise CheckRejected("macOS SDK is unavailable for clang-tidy")
+    return ["--extra-arg=-isysroot", f"--extra-arg={sdk}"]
+
+
 def _run(argv: list[str], cwd: Path, scratch: Path) -> CheckReceipt:
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(scratch),
            "TMPDIR": str(scratch), "TMP": str(scratch), "TEMP": str(scratch),
@@ -164,7 +176,8 @@ def run_check(project: Path, target: str) -> dict:
                         raise CheckRejected("CMake compile database contains no C sources")
                     receipts.append(_run([_binary("clang-tidy"), "-p", "build",
                                           "--checks=clang-analyzer-*,bugprone-*",
-                                          "--warnings-as-errors=*", *sources], copy, scratch))
+                                          "--warnings-as-errors=*", *_clang_tidy_sdk_args(),
+                                          *sources], copy, scratch))
                 else:
                     receipts.append(_run([cmake, "--build", "build"], copy, scratch))
         elif profile == "python":
