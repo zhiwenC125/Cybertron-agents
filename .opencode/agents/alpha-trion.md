@@ -35,6 +35,9 @@ permissions:
   - action: "subagent"
     resource: "*"
     effect: "deny"
+  - action: "edit"
+    resource: ".cybertron/knowledge/**"
+    effect: "allow"
 ---
 
 # 钛师傅 (Alpha Trion) — 神器：Quill & Covenant of Primus (契约之笔与元始圣约)

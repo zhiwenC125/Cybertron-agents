@@ -1,4 +1,4 @@
-"""M0c OpenCode host bridge for a single native subagent dispatch.
+"""OpenCode host bridge for validated native subagent dispatch.
 
 The host owns child sessions. This module owns plan validation, workspace diff,
 and the event ledger. A returned background tool call never completes a node.
@@ -85,16 +85,17 @@ class V6HostBridge:
         path = self._dir(run_id) / "events.jsonl"
         return [json.loads(line) for line in path.read_text().splitlines() if line]
 
-    def plan(self, node_data: dict, host_session_id: str) -> dict:
+    def plan(self, node_data: dict | list[dict], host_session_id: str) -> dict:
         try:
-            node = PlanNode.from_dict(node_data)
-            graph = PlanGraph([node])
+            nodes = [PlanNode.from_dict(data) for data in
+                     (node_data if isinstance(node_data, list) else [node_data])]
+            graph = PlanGraph(nodes)
         except (GraphRejected, TypeError) as exc:
             raise HostBridgeError(str(exc)) from exc
-        if node.status != "pending" or node.kind != "task" or node.role == "prima":
-            raise HostBridgeError("M0c requires one pending subagent task")
-        if set(node.verifiers) != {"scope_guard"}:
-            raise HostBridgeError("M0c only supports scope_guard")
+        if not nodes or any(node.status != "pending" or node.kind not in {"task", "review"} or node.role == "prima" for node in nodes):
+            raise HostBridgeError("plan requires pending subagent task or review nodes")
+        if any(set(node.verifiers) != {"scope_guard"} for node in nodes):
+            raise HostBridgeError("M1 host only supports scope_guard until M2")
         if not isinstance(host_session_id, str) or not host_session_id:
             raise HostBridgeError("host session ID is required")
         # A run ID is an identifier, not a secret. The macOS verification
@@ -105,24 +106,45 @@ class V6HostBridge:
         directory.mkdir(parents=True, exist_ok=False)
         (directory / "plan.json").write_text(json.dumps(graph.to_dict(), ensure_ascii=False))
         (directory / "events.jsonl").touch()
-        self._append(run_id, "plan.created", node_id=node.node_id,
+        self._append(run_id, "plan.created", node_id=nodes[0].node_id if len(nodes) == 1 else None,
+                     node_ids=[node.node_id for node in nodes],
                      host_session_id=host_session_id, plan_revision=graph.revision)
-        return {"run_id": run_id, "node_id": node.node_id, "card": self._card(node),
-                "status": "ready", "write_scope": list(node.write_scope)}
+        result = self.state(run_id)
+        return result
 
     def state(self, run_id: str) -> dict:
         graph = self._graph(run_id)
-        node = next(iter(graph.nodes.values()))
         events = self.events(run_id)
-        terminal = next((event for event in reversed(events)
-                         if event["type"] in {"node.completed", "node.failed", "node.blocked", "node.cancelled"}), None)
-        started = any(event["type"] == "dispatch.started" for event in events)
-        returned = next((event for event in reversed(events) if event["type"] == "dispatch.returned"), None)
-        return {"run_id": run_id, "node_id": node.node_id,
-                "status": terminal["type"].split(".", 1)[1] if terminal else "running" if started else "ready",
-                "card": self._card(node),
-                "child_session_id": returned.get("child_session_id") if returned else None,
-                "event_seq": len(events), "events_path": str(self._dir(run_id) / "events.jsonl")}
+        status = {node_id: "pending" for node_id in graph.nodes}
+        child = {}
+        starts = {}
+        for event in events:
+            node_id = event.get("node_id")
+            if event["type"] == "dispatch.started" and node_id in status:
+                status[node_id] = "running"
+                starts[event["call_id"]] = node_id
+            elif event["type"] == "dispatch.returned" and event.get("call_id"):
+                if event["call_id"] in starts:
+                    child[starts[event["call_id"]]] = event.get("child_session_id")
+            elif event["type"].startswith("node.") and node_id in status:
+                status[node_id] = "pending" if event["type"] == "node.retry" else event["type"].split(".", 1)[1]
+        for node_id, value in status.items():
+            graph.nodes[node_id].status = value
+        ready = [node.node_id for node in graph.ready_nodes()]
+        nodes = [{"node_id": node.node_id, "status": status[node.node_id],
+                  "card": self._card(node), "role": node.role,
+                  "write_scope": list(node.write_scope)} for node in graph.nodes.values()]
+        active = next((node for node in nodes if node["status"] == "running"), None)
+        result = {"run_id": run_id, "status": "running" if active else
+                  "ready" if ready else "completed" if all(v == "completed" for v in status.values()) else "blocked",
+                  "plan_revision": graph.revision, "nodes": nodes, "ready_nodes": ready,
+                  "child_session_id": child.get(active["node_id"]) if active else None,
+                  "event_seq": len(events), "events_path": str(self._dir(run_id) / "events.jsonl")}
+        if len(nodes) == 1:
+            result.update({"node_id": nodes[0]["node_id"], "card": nodes[0]["card"],
+                           "write_scope": nodes[0]["write_scope"],
+                           "status": "ready" if ready else nodes[0]["status"]})
+        return result
 
     def ask(self, run_id: str, question: str) -> dict:
         if not isinstance(question, str) or not question.strip():
@@ -132,10 +154,35 @@ class V6HostBridge:
         self._append(run_id, "human.requested", question=question.strip())
         return self.state(run_id)
 
+    def plan_op(self, run_id: str, operation: dict) -> dict:
+        if self.state(run_id)["status"] == "running":
+            raise HostBridgeError("cannot replan during active dispatch")
+        graph = self._graph(run_id)
+        state = self.state(run_id)
+        for item in state["nodes"]:
+            graph.nodes[item["node_id"]].status = item["status"]
+        prior = len(graph.events)
+        try:
+            graph.apply_op(operation)
+        except GraphRejected as exc:
+            for event in graph.events[prior:]:
+                self._append(run_id, event["type"], **{k: v for k, v in event.items() if k != "type"})
+            raise HostBridgeError(str(exc)) from exc
+        for event in graph.events[prior:]:
+            self._append(run_id, event["type"], **{k: v for k, v in event.items() if k != "type"})
+        if operation.get("op") == "retry_node":
+            self._append(run_id, "node.retry", node_id=operation["node_id"])
+        # Runtime state belongs to the event ledger, not the plan projection.
+        for node in graph.nodes.values():
+            node.status = "pending"
+        (self._dir(run_id) / "plan.json").write_text(json.dumps(graph.to_dict(), ensure_ascii=False))
+        return self.state(run_id)
+
     def _token(self, run_id: str) -> str:
         directory = self._dir(run_id)
         return _hash((directory / "snapshot.json").read_bytes() + b"\0" +
-                     (directory / "events.jsonl").read_bytes())
+                     (directory / "events.jsonl").read_bytes() + b"\0" +
+                     (directory / "plan.json").read_bytes())
 
     def _verify_token(self, run_id: str, token: str) -> None:
         if not isinstance(token, str) or self._token(run_id) != token:
@@ -144,18 +191,17 @@ class V6HostBridge:
     def before(self, run_id: str, node_id: str, role: str, card: str, call_id: str,
                active_token: str | None = None) -> dict:
         graph = self._graph(run_id)
-        if len(graph.nodes) != 1:
-            raise HostBridgeError("M0c requires one node")
-        node = next(iter(graph.nodes.values()))
+        node = graph.nodes.get(node_id)
         reason = None
-        if self.state(run_id)["status"] != "ready":
+        state = self.state(run_id)
+        if node is None or node_id not in state["ready_nodes"] or state["status"] == "running":
             reason = "node is not ready"
-        elif node_id != node.node_id or role != node.role or card != self._card(node):
+        elif role != node.role or card != self._card(node):
             reason = "node, role, capability, or write_scope differs from plan"
         elif not isinstance(call_id, str) or not call_id:
             reason = "host tool call ID is required"
         if reason:
-            if self.state(run_id)["status"] == "running":
+            if state["status"] == "running":
                 self._verify_token(run_id, active_token)
                 self._append(run_id, "plan.op.rejected", node_id=node_id, reason=reason)
                 return {"rejected": True, "reason": reason, "token": self._token(run_id)}
@@ -175,7 +221,8 @@ class V6HostBridge:
         self._verify_token(run_id, token)
         started = next((event for event in reversed(self.events(run_id)) if event["type"] == "dispatch.started"), None)
         if not started or started["call_id"] != call_id or any(
-                event["type"] == "dispatch.returned" for event in self.events(run_id)):
+                event["type"] == "dispatch.returned" and event.get("call_id") == call_id
+                for event in self.events(run_id)):
             raise HostBridgeError("no matching active dispatch")
         if tool_status not in {"completed", "error", "cancelled"} or type(duration_ms) is not int or duration_ms < 0:
             raise HostBridgeError("invalid host tool result")
@@ -195,7 +242,9 @@ class V6HostBridge:
         if state["status"] != "running" or state["child_session_id"] != child_session_id:
             raise HostBridgeError("no matching returned subagent")
         returned = next(event for event in reversed(self.events(run_id)) if event["type"] == "dispatch.returned")
-        node = next(iter(self._graph(run_id).nodes.values()))
+        started = next(event for event in reversed(self.events(run_id))
+                       if event["type"] == "dispatch.started" and event["call_id"] == returned["call_id"])
+        node = self._graph(run_id).nodes[started["node_id"]]
         guard = ScopeGuard(self.project, node.write_scope)
         baseline = _decode((self._dir(run_id) / "snapshot.json").read_bytes())
         current = guard.snapshot()

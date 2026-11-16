@@ -8,18 +8,29 @@ import sys
 from pathlib import Path
 
 from .host_v6 import HostBridgeError, V6HostBridge
+from .templates import bug_fix_template
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cybertron-v6-host")
-    parser.add_argument("operation", choices=("plan", "state", "ask", "before", "after", "finish"))
+    parser.add_argument("operation", choices=("plan", "plan_op", "state", "ask", "before", "after", "finish"))
     parser.add_argument("--project", type=Path, required=True)
     args = parser.parse_args(argv)
     data = json.load(sys.stdin)
     bridge = V6HostBridge(args.project)
     try:
         if args.operation == "plan":
-            result = bridge.plan(data["node"], data["host_session_id"])
+            if "template" in data:
+                template = data["template"]
+                if template.get("type") != "bug_fix":
+                    raise ValueError("unknown plan template")
+                graph = bug_fix_template(template["objective"], tuple(template["write_scope"]))
+                nodes = [node.to_dict() for node in graph.nodes.values()]
+            else:
+                nodes = data.get("nodes", data.get("node"))
+            result = bridge.plan(nodes, data["host_session_id"])
+        elif args.operation == "plan_op":
+            result = bridge.plan_op(data["run_id"], data["operation"])
         elif args.operation == "state":
             result = bridge.state(data["run_id"])
         elif args.operation == "ask":

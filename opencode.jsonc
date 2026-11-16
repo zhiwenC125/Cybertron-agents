@@ -14,21 +14,6 @@
           "effect": "deny"
         },
         {
-          "action": "read",
-          "resource": "AGENTS.md",
-          "effect": "allow"
-        },
-        {
-          "action": "read",
-          "resource": "README.md",
-          "effect": "allow"
-        },
-        {
-          "action": "read",
-          "resource": "docs/**",
-          "effect": "allow"
-        },
-        {
           "action": "cy_state",
           "resource": "*",
           "effect": "allow"
@@ -161,6 +146,11 @@
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": ".cybertron/knowledge/**",
+          "effect": "allow"
         }
       ]
     },
@@ -338,6 +328,11 @@
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": ".cybertron/plans/**",
+          "effect": "allow"
         }
       ]
     },
@@ -456,6 +451,16 @@
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "app/**",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
+          "resource": "bsp/**",
+          "effect": "allow"
         }
       ]
     },
