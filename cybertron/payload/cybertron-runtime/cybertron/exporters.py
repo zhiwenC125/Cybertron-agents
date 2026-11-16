@@ -5,13 +5,14 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, List
-from .registry import THIRTEEN_PRIMES_REGISTRY
+from .registry import THIRTEEN_PRIMES_REGISTRY, assert_catalog
 
 # ============================================================================
 
 def compile_opencode_v2_assets(target_dir: Path, *, include_feishu: bool = False,
                                disable_legacy_cybertron: bool = False) -> List[Path]:
     """Generates OpenCode V2 native configuration files for all 13 Primes."""
+    assert_catalog()
     generated: List[Path] = []
     agents_dir = target_dir / ".opencode" / "agents"
     agents_dir.mkdir(parents=True, exist_ok=True)
@@ -108,6 +109,7 @@ def compile_opencode_v2_assets(target_dir: Path, *, include_feishu: bool = False
 
 def compile_deepseek_harness_assets(target_dir: Path) -> List[Path]:
     """Generates DeepSeek Harness (dsh) Cordis plugin and preset files."""
+    assert_catalog()
     dsh_dir = target_dir / ".dsh"
     dsh_dir.mkdir(parents=True, exist_ok=True)
     generated: List[Path] = []

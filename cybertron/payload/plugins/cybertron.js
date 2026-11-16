@@ -91,14 +91,28 @@ export default Plugin.define({
     });
     await ctx.tool.transform(editor => {
       editor.add({
-        name: 'cy_plan', description: 'Create one validated v6 plan node; returns the exact native subagent card description.',
-        input: { type: 'object', properties: { node: nodeInput }, required: ['node'], additionalProperties: false },
+        name: 'cy_plan', description: 'Create a validated v6 task graph, use the optional bug_fix plan seed, or apply one revisioned graph operation. Returns ready native subagent cards.',
+        input: { type: 'object', properties: {
+          node: nodeInput, nodes: { type: 'array', items: nodeInput, minItems: 1 },
+          template: { type: 'object', properties: {
+            type: { type: 'string', enum: ['bug_fix'] }, objective: { type: 'string' },
+            write_scope: { type: 'array', items: { type: 'string' }, minItems: 1 },
+          }, required: ['type', 'objective', 'write_scope'], additionalProperties: false },
+          operation: { type: 'object', additionalProperties: true },
+        }, additionalProperties: false },
         execute: async (input, context) => {
           if (context.agent !== 'prima') throw new Error('Only prima may create plans');
-          if (await ctx.storage.get(`run/${context.sessionID}`)) throw new Error('This session already has a v6 run');
-          const result = await bridge('plan', project,
-            { node: input.node, host_session_id: context.sessionID }, context.signal);
-          await ctx.storage.set(`run/${context.sessionID}`, result.run_id);
+          const run_id = await ctx.storage.get(`run/${context.sessionID}`);
+          if (run_id && (input.node || input.nodes || input.template || !input.operation))
+            throw new Error('Existing run requires one graph operation');
+          if (!run_id && ([input.node, input.nodes, input.template].filter(Boolean).length !== 1 || input.operation))
+            throw new Error('New run requires exactly one node, nodes, or template');
+          const result = run_id
+            ? await bridge('plan_op', project, { run_id, operation: input.operation }, context.signal)
+            : await bridge('plan', project, { node: input.node, nodes: input.nodes,
+                template: input.template,
+                host_session_id: context.sessionID }, context.signal);
+          if (!run_id) await ctx.storage.set(`run/${context.sessionID}`, result.run_id);
           return { content: JSON.stringify(result) };
         },
       });
@@ -184,7 +198,7 @@ export default Plugin.define({
         throw new Error('Cybertron prima model differs from active session; run cybertron models doctor');
       }
       event.system.push({ type: 'text', text:
-        'Cybertron v6 M0c: translate the user\'s ordinary request into one task node with cy_plan. For a single requested Markdown file within alpha-trion\'s allowed paths, use capability doc.write, role alpha-trion, write_scope containing only the requested path, and verifiers containing only scope_guard. Keep the requested file content exact. Dispatch the returned role through the native subagent tool. Use the exact returned card as description and include node_id, capability, write_scope, and objective in the child prompt. Call cy_state with wait=true after the child returns. Background is still running; cancellation is terminal. Rejected dispatches expose their reason. Never claim model text as tool evidence.' });
+        'Cybertron v6 M1: plan the smallest valid task graph for the user request with cy_plan. Use node for one task, nodes for a dependency graph, or the optional bug_fix template for a four-node investigation, fix, and review seed. For a single requested Markdown file within alpha-trion allowed paths, use capability doc.write, role alpha-trion, write_scope containing only that path, and scope_guard verifier; keep the requested content exact. Each task needs a registered capability and role, narrow write_scope, acceptance, and scope_guard verifier. Use cy_plan with a revisioned operation to add, split, or reassign nodes when needed. Dispatch only a ready node through the native subagent tool; use its exact returned card as description and include node_id, capability, write_scope, and objective in the child prompt. Call cy_state with wait=true after each child returns. Background is still running; cancellation is terminal. Gate N/A and complete_run remain unavailable until M2 verifier facts. Never claim model text as tool evidence.' });
     });
   },
 });

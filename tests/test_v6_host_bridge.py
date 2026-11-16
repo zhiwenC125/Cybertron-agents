@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -82,6 +84,56 @@ class V6HostBridgeTests(unittest.TestCase):
         returned = self.bridge.after(plan["run_id"], "call1", started["token"],
                                      "child-session", "completed", 1)
         self.assertEqual(returned["status"], "running")
+
+    def test_m1_multi_node_plan_dispatches_ready_nodes_in_order(self):
+        nodes = []
+        for index in range(4):
+            item = dict(self.node)
+            item["node_id"] = f"n{index}"
+            item["objective"] = f"Write docs/n{index}.md"
+            item["write_scope"] = [f"docs/n{index}.md"]
+            item["depends_on"] = [f"n{index - 1}"] if index else []
+            nodes.append(item)
+        plan = self.bridge.plan(nodes, "parent")
+        self.assertEqual(plan["ready_nodes"], ["n0"])
+        for index in range(4):
+            current = self.bridge.state(plan["run_id"])
+            self.assertEqual(current["ready_nodes"], [f"n{index}"])
+            card = current["nodes"][index]["card"]
+            started = self.bridge.before(plan["run_id"], f"n{index}", "alpha-trion", card, f"call-{index}")
+            returned = self.bridge.after(plan["run_id"], f"call-{index}", started["token"],
+                                         f"child-{index}", "completed", 1)
+            (self.root / "docs").mkdir(exist_ok=True)
+            (self.root / "docs" / f"n{index}.md").write_text(f"{index}")
+            settled = self.bridge.finish(plan["run_id"], returned["token"], f"child-{index}")
+            self.assertEqual(settled["nodes"][index]["status"], "completed")
+        self.assertEqual(settled["status"], "completed")
+        self.assertEqual(sum(event["type"] == "dispatch.started" for event in self.bridge.events(plan["run_id"])), 4)
+
+    def test_m1_replan_adds_node_and_rejects_stale_revision(self):
+        plan = self.bridge.plan(self.node, "parent")
+        second = dict(self.node, node_id="n2", objective="Write docs/n2.md",
+                      write_scope=["docs/n2.md"], depends_on=["n1"])
+        operation = {"op_id": "add-n2", "plan_revision": 0, "op": "add_node", "node": second}
+        changed = self.bridge.plan_op(plan["run_id"], operation)
+        self.assertEqual(changed["plan_revision"], 1)
+        self.assertEqual(len(changed["nodes"]), 2)
+        with self.assertRaises(HostBridgeError):
+            self.bridge.plan_op(plan["run_id"], {**operation, "op_id": "stale"})
+        self.assertIn("plan.op.rejected", [e["type"] for e in self.bridge.events(plan["run_id"])])
+
+    def test_m1_bug_template_is_available_through_cli(self):
+        command = [sys.executable, "-m", "cybertron.host_v6_cli", "plan",
+                   "--project", str(self.root)]
+        result = subprocess.run(command, input=json.dumps({
+            "template": {"type": "bug_fix", "objective": "Fix parser null dereference",
+                         "write_scope": ["src/parser.py"]},
+            "host_session_id": "parent",
+        }), text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        state = json.loads(result.stdout)
+        self.assertEqual(len(state["nodes"]), 4)
+        self.assertEqual(set(state["ready_nodes"]), {"scan-static", "scan-history"})
 
 
 if __name__ == "__main__":

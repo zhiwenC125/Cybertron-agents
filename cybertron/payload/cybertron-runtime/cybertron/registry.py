@@ -3,7 +3,8 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List
+from typing import List, Mapping
+from types import MappingProxyType
 from .policy import PermissionEffect, PermissionRule
 
 # MODULE 5: The Thirteen Primes v5.0 Full-SDLC & Hardware Deployment Registry
@@ -70,9 +71,6 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
-            PermissionRule("read", "AGENTS.md", PermissionEffect.ALLOW),
-            PermissionRule("read", "README.md", PermissionEffect.ALLOW),
-            PermissionRule("read", "docs/**", PermissionEffect.ALLOW),
             PermissionRule("cy_state", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_plan", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_ask", "*", PermissionEffect.ALLOW),
@@ -526,3 +524,133 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
 for _prime in THIRTEEN_PRIMES_REGISTRY:
     if _prime.agent_id != "prima":
         _prime.permissions.append(PermissionRule("subagent", "*", PermissionEffect.DENY))
+
+
+@dataclass(frozen=True)
+class PrimeRole:
+    agent_id: str
+    capabilities: tuple[str, ...]
+    lifecycle: str
+    read_roots: tuple[str, ...]
+    write_roots: tuple[str, ...]
+    tool_mode: str
+    tool_classes: tuple[str, ...]
+    command_mode: str
+    network: bool
+    device: str | None
+    external_write: tuple[str, ...]
+    can_dispatch: bool
+    model_tier: str
+
+
+# The v6 capability and scope source of truth. The v5 metadata above remains
+# available to old runs; the exporter verifies its host rules against this map.
+_ROLE_CAPABILITIES: Mapping[str, tuple[str, ...]] = {
+    "prima": ("plan", "route"),
+    "thirteenth": ("intake.clarify", "evidence.external", "accept"),
+    "onyx-prime": ("scan.static", "context.map", "audit.inventory"),
+    "vector-prime": ("scan.history", "diagnose", "analysis.special"),
+    "quintus-prime": ("design", "plan.draft"),
+    "solus-prime": ("code.write",),
+    "amalgamous": ("code.refactor", "code.port", "code.transform"),
+    "micronus-prime": ("review.l1",),
+    "liege-maximo": ("review.l2",),
+    "alchemist": ("test.write",),
+    "nexus-prime": ("build.config", "toolchain"),
+    "megatronus": ("device.op",),
+    "alpha-trion": ("doc.write", "knowledge.sync"),
+}
+_ROLE_WRITE_ROOTS: Mapping[str, tuple[str, ...]] = {
+    "quintus-prime": (".cybertron/plans/**",),
+    "solus-prime": ("src/**", "app/**", "firmware/**", "drivers/**", "bsp/**"),
+    "amalgamous": ("src/**", "app/**", "lib/**", "firmware/**", "drivers/**", "bsp/**"),
+    "alchemist": ("tests/**",),
+    "nexus-prime": ("CMakeLists.txt", "Makefile", "platformio.ini", "Dockerfile*",
+                    "docker-compose*", "**/*.ld", "**/*.dts*"),
+    "alpha-trion": ("docs/**", "AGENTS.md", "README.md", "CHANGELOG.md", "notes.md", ".cybertron/knowledge/**"),
+}
+
+# Newly introduced v6 roots are granted at the host layer from this registry.
+for _prime in THIRTEEN_PRIMES_REGISTRY:
+    _host_edits = {r.resource for r in _prime.permissions
+                   if r.action == "edit" and r.effect is PermissionEffect.ALLOW}
+    for _root in _ROLE_WRITE_ROOTS.get(_prime.agent_id, ()):
+        if _root not in _host_edits:
+            _prime.permissions.append(PermissionRule("edit", _root, PermissionEffect.ALLOW))
+
+PRIME_ROLES: Mapping[str, PrimeRole] = MappingProxyType({
+    spec.agent_id: PrimeRole(
+        agent_id=spec.agent_id,
+        capabilities=_ROLE_CAPABILITIES[spec.agent_id],
+        lifecycle="persistent" if spec.agent_id == "prima" else "per-node",
+        read_roots=tuple(r.resource for r in spec.permissions
+                         if r.action == "read" and r.effect is PermissionEffect.ALLOW),
+        write_roots=_ROLE_WRITE_ROOTS.get(spec.agent_id, ()),
+        tool_mode="allow-list",
+        tool_classes=("task", "cy_state", "cy_plan", "cy_ask") if spec.agent_id == "prima" else
+                     tuple(sorted({rule.action for rule in spec.permissions if rule.effect is PermissionEffect.ALLOW and rule.action != "*"})),
+        command_mode="git-allow-list" if spec.agent_id == "vector-prime" else
+                     "kernel-check" if spec.agent_id == "nexus-prime" else "none",
+        network=spec.agent_id in {"thirteenth", "alpha-trion"},
+        device="broker" if spec.agent_id == "megatronus" else None,
+        external_write=("feishu",) if spec.agent_id == "alpha-trion" else (),
+        can_dispatch=spec.agent_id == "prima",
+        model_tier="high" if spec.agent_id in {"prima", "solus-prime"} else "middle",
+    ) for spec in THIRTEEN_PRIMES_REGISTRY
+})
+
+
+def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
+                   specs: List[PrimeAgentSpec] = THIRTEEN_PRIMES_REGISTRY) -> None:
+    """Fail closed on role, capability and exported host permission drift."""
+    if set(roles) != set(_ROLE_CAPABILITIES) or len(specs) != len(roles):
+        raise ValueError("role catalogue must contain exactly thirteen unique agents")
+    known_actions = {"*", "read", "glob", "grep", "edit", "shell", "subagent",
+                     "cy_state", "cy_plan", "cy_ask", "feishu_mcp_healthcheck*",
+                     "feishu_wiki_delete*", "feishu_wiki_docx_v1_document_rawContent",
+                     "feishu_wiki_wiki_v2_space_getNode"}
+    for spec in specs:
+        role = roles.get(spec.agent_id)
+        if role is None or role.agent_id != spec.agent_id or not role.capabilities:
+            raise ValueError("role identity or capability missing")
+        if set(role.capabilities) != set(_ROLE_CAPABILITIES[spec.agent_id]):
+            raise ValueError("unknown or missing role capability")
+        allowed = [r for r in spec.permissions if r.effect is PermissionEffect.ALLOW]
+        if any(r.action not in known_actions for r in spec.permissions) or any(
+            tool not in known_actions - {"subagent"} | {"task"} for tool in role.tool_classes
+        ):
+            raise ValueError("unknown tool must be denied")
+        dispatch = [r for r in allowed if r.action == "subagent"]
+        if role.can_dispatch != (spec.agent_id == "prima") or bool(dispatch) != role.can_dispatch:
+            raise ValueError("only prima may dispatch")
+        if ("task" in role.tool_classes) != (spec.agent_id == "prima"):
+            raise ValueError("only prima may have task tool")
+        if spec.agent_id == "prima" and any(r.action in {"read", "glob", "grep", "edit", "shell"} for r in allowed):
+            raise ValueError("prima cannot use file or command tools")
+        if spec.agent_id != "prima" and not any(r.action == "subagent" and r.resource == "*" and r.effect is PermissionEffect.DENY for r in spec.permissions):
+            raise ValueError("subagent task must be explicitly denied")
+        if role.device and spec.agent_id != "megatronus" or role.external_write and spec.agent_id != "alpha-trion":
+            raise ValueError("device or external write owner mismatch")
+        if role.command_mode == "git-write" and spec.agent_id != "nexus-prime":
+            raise ValueError("git write owner mismatch")
+        if any(r.action == "shell" and r.resource.startswith(("git commit", "git push", "git add", "git reset")) for r in allowed) and spec.agent_id != "nexus-prime":
+            raise ValueError("git write command owner mismatch")
+        if spec.agent_id in {"solus-prime", "amalgamous"} and any(root.startswith("tests/") for root in role.write_roots):
+            raise ValueError("implementation roles cannot write tests")
+        if spec.agent_id == "alchemist" and any(not (root.startswith("tests/") or root.startswith("sim/")) for root in role.write_roots):
+            raise ValueError("test role write roots exceed tests and simulation")
+        if spec.agent_id in {"micronus-prime", "liege-maximo", "thirteenth"} and any(not root.startswith(".cybertron/artifacts/") for root in role.write_roots):
+            raise ValueError("review and acceptance roles may only write node artifacts")
+        if any(root.startswith((".git/", ".cybertron/runs/")) or root in {"**", "*"} for root in role.write_roots):
+            raise ValueError("reserved state or broad write root")
+        if "code.write" in role.capabilities and any(c.startswith("review.") for c in role.capabilities):
+            raise ValueError("writer and reviewer capabilities cannot combine")
+        host_writes = [r.resource for r in allowed if r.action == "edit"]
+        if any(path in {"*", "**", "opencode.jsonc", ".opencode/**",
+                        ".git/**", ".cybertron/runs/**"}
+               or path.startswith((".opencode/", ".git/", ".cybertron/runs/"))
+               for path in host_writes):
+            raise ValueError("host may not write generated config or run state")
+        for root in role.write_roots:
+            if not any(root == host or (host.endswith("/**") and root.startswith(host[:-3] + "/")) for host in host_writes):
+                raise ValueError(f"{spec.agent_id}: write root {root} exceeds host permission")
