@@ -78,7 +78,7 @@ class KernelTests(unittest.TestCase):
     def test_multiple_nodes_are_rejected_before_dispatch(self):
         graph = PlanGraph.from_dict(json.loads(self.plan_path.read_text()))
         graph.apply_op({"op_id": "n2", "plan_revision": 0, "op": "add_node",
-                        "node": PlanNode("n2", "task", "doc.write", "alpha-trion", "Other", write_scope=("other.md",)).to_dict()})
+                        "node": PlanNode("n2", "task", "doc.write", "alpha-trion", "Other", write_scope=("README.md",)).to_dict()})
         self.plan_path.write_text(json.dumps(graph.to_dict()))
         with self.assertRaises(ValueError):
             SingleNodeKernel(self.root, self.plan_path, "run4").run(lambda *_: self.fail("dispatched"))

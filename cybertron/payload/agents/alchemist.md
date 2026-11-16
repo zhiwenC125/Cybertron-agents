@@ -20,6 +20,9 @@ permissions:
   - action: "edit"
     resource: "firmware/**"
     effect: "deny"
+  - action: "subagent"
+    resource: "*"
+    effect: "deny"
 ---
 
 # 炼金术士 (Alchemist Prime) — 神器：Lenses (洞察透镜)

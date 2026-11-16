@@ -29,7 +29,17 @@
           "effect": "allow"
         },
         {
-          "action": "cybertron_run",
+          "action": "cy_state",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "cy_plan",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "cy_ask",
           "resource": "*",
           "effect": "allow"
         },
@@ -129,6 +139,11 @@
         },
         {
           "action": "edit",
+          "resource": "notes.md",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
           "resource": "docs/**",
           "effect": "allow"
         },
@@ -141,6 +156,11 @@
           "action": "feishu_wiki_docx_v1_document_rawContent",
           "resource": "*",
           "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
         }
       ]
     },
@@ -170,6 +190,11 @@
           "action": "grep",
           "resource": "*",
           "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
         }
       ]
     },
@@ -219,6 +244,11 @@
           "action": "shell",
           "resource": "git diff --no-ext-diff --stat",
           "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
         }
       ]
     },
@@ -303,6 +333,11 @@
           "action": "shell",
           "resource": "mkdir -p *",
           "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
         }
       ]
     },
@@ -367,6 +402,11 @@
           "action": "edit",
           "resource": "tests/**",
           "effect": "deny"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
         }
       ]
     },
@@ -411,6 +451,11 @@
           "action": "edit",
           "resource": "tests/**",
           "effect": "deny"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
         }
       ]
     },
@@ -430,6 +475,11 @@
           "action": "read",
           "resource": "*",
           "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
         }
       ]
     },
@@ -509,6 +559,11 @@
           "action": "glob",
           "resource": "*",
           "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
         }
       ]
     },
@@ -542,6 +597,11 @@
         {
           "action": "edit",
           "resource": "firmware/**",
+          "effect": "deny"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
           "effect": "deny"
         }
       ]
@@ -617,6 +677,11 @@
           "action": "feishu_mcp_healthcheck*",
           "resource": "*",
           "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
         }
       ]
     },
@@ -666,6 +731,11 @@
           "action": "feishu_wiki_delete*",
           "resource": "*",
           "effect": "ask"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
         }
       ]
     },
@@ -695,6 +765,11 @@
           "action": "read",
           "resource": "docs/**",
           "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
         }
       ]
     }

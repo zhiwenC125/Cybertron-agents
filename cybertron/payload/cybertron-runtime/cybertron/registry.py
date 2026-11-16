@@ -73,7 +73,9 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("read", "AGENTS.md", PermissionEffect.ALLOW),
             PermissionRule("read", "README.md", PermissionEffect.ALLOW),
             PermissionRule("read", "docs/**", PermissionEffect.ALLOW),
-            PermissionRule("cybertron_run", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_state", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_plan", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_ask", "*", PermissionEffect.ALLOW),
             PermissionRule("subagent", "thirteenth", PermissionEffect.ALLOW),
             PermissionRule("subagent", "alpha-trion", PermissionEffect.ALLOW),
             PermissionRule("subagent", "onyx-prime", PermissionEffect.ALLOW),
@@ -112,7 +114,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "你是钛师傅（Alpha Trion），手持契约之笔的专职技术文档撰写官（Technical Writer）与飞书知识库总管。\n"
             "【专职职责与正交铁律】：\n"
             "1. 立项阶段：从飞书知识库（Feishu Wiki）拉取业务 PRD、硬件原理图引脚定义（Pinout）与通信协议，提炼写入本地 `AGENTS.md`。\n"
-            "2. 文档撰写与归档阶段：你独占 `README.md`、`CHANGELOG.md` 与 `docs/**` 的写入权，专门负责撰写 API 文档、架构决策记录（ADR）以及硬件接线与烧录部署手册，并将其同步回写至飞书知识库。"
+            "2. 文档撰写与归档阶段：你独占 `README.md`、`CHANGELOG.md` 与 `docs/**` 的写入权，专门负责撰写 API 文档、架构决策记录（ADR）以及硬件接线与烧录部署手册，并将其同步回写至飞书知识库。经内核批准的单文件 `notes.md` 文档任务也由你执行，写入范围严格以节点的 `write_scope` 为准。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
@@ -120,6 +122,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("edit", "AGENTS.md", PermissionEffect.ALLOW),
             PermissionRule("edit", "README.md", PermissionEffect.ALLOW),
             PermissionRule("edit", "CHANGELOG.md", PermissionEffect.ALLOW),
+            PermissionRule("edit", "notes.md", PermissionEffect.ALLOW),
             PermissionRule("edit", "docs/**", PermissionEffect.ALLOW),
             PermissionRule("feishu_wiki_wiki_v2_space_getNode", "*", PermissionEffect.ALLOW),
             PermissionRule("feishu_wiki_docx_v1_document_rawContent", "*", PermissionEffect.ALLOW),
@@ -517,3 +520,9 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         ],
     ),
 ]
+
+# M0c: native subagent dispatch is exclusive to prima. Keep an explicit final
+# deny on every other role so exported V2 permissions cannot inherit it.
+for _prime in THIRTEEN_PRIMES_REGISTRY:
+    if _prime.agent_id != "prima":
+        _prime.permissions.append(PermissionRule("subagent", "*", PermissionEffect.DENY))

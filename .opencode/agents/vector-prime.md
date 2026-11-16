@@ -29,6 +29,9 @@ permissions:
   - action: "shell"
     resource: "git diff --no-ext-diff --stat"
     effect: "allow"
+  - action: "subagent"
+    resource: "*"
+    effect: "deny"
 ---
 
 # 维克多 (Vector Prime) — 神器：Blades of Time (时空之剑)

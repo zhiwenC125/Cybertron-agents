@@ -1,0 +1,47 @@
+[
+  {
+    "cmd": "python3 -m unittest discover -s tests -v",
+    "cwd": "/Users/alanbanana/Cybertron-Agent",
+    "exit": 0,
+    "utc": "2026-11-16T03:30:25.745684+00:00",
+    "sha256": "7ef6fdccd7a6eeab98d9de782cba38046e77a783f3db4f0ea746b6a8a10767e7",
+    "source": "tool",
+    "output_path": "docs/stages/v6-m0c-unittest.log"
+  },
+  {
+    "cmd": "node --test tests/v6_plugin_hook.test.mjs tests/v6_plugin_runtime.test.mjs",
+    "cwd": "/Users/alanbanana/Cybertron-Agent",
+    "exit": 0,
+    "utc": "2026-11-16T03:30:26.298007+00:00",
+    "sha256": "1e92d693b92ab7d2e1bea7148d007462aaac7b4ed111a0ff5780e670fb4f3a94",
+    "source": "tool",
+    "output_path": "docs/stages/v6-m0c-plugin-hooks.log"
+  },
+  {
+    "cmd": "python3 -m cybertron.stage5_verify",
+    "cwd": "/Users/alanbanana/Cybertron-Agent",
+    "exit": 0,
+    "utc": "2026-11-16T03:30:37.007424+00:00",
+    "sha256": "c33600528c7e8cfa8e65acf07a2fce13db12601efc870485aaa8807c0cfb6f4f",
+    "source": "tool",
+    "output_path": "docs/stages/v6-m0c-stage5.log"
+  },
+  {
+    "cmd": "python3 cybertron_primes_engine.py",
+    "cwd": "/Users/alanbanana/Cybertron-Agent",
+    "exit": 0,
+    "utc": "2026-11-16T03:30:37.062129+00:00",
+    "sha256": "6a765936bd6248befc8aa162b8f6660f1da1ed944c0b8e96077a6451e8d87ff4",
+    "source": "tool",
+    "output_path": "docs/stages/v6-m0c-engine.log"
+  },
+  {
+    "cmd": "opencode2 debug config",
+    "cwd": "/private/tmp/cybertron-v6-m0c-host-gate-20261116-r4",
+    "exit": 0,
+    "utc": "2026-11-16T03:30:37.107499+00:00",
+    "sha256": "f15f60171a794cd8b2ba6e28b88885e093d0db13517ddd6fa25fc83c7d45bcc7",
+    "source": "tool",
+    "output_path": "docs/stages/v6-m0c-host-config.log"
+  }
+]

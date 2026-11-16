@@ -46,7 +46,7 @@ CAPABILITY_CATALOG: Mapping[str, Mapping[str, Tuple[str, ...]]] = MappingProxyTy
     "build.config": MappingProxyType({"nexus-prime": ("CMakeLists.txt", "Makefile", "platformio.ini", "Dockerfile*", "**/*.ld", "**/*.dts*")}),
     "toolchain": MappingProxyType({"nexus-prime": ("CMakeLists.txt", "Makefile", "platformio.ini", "Dockerfile*", "**/*.ld", "**/*.dts*")}),
     "device.op": MappingProxyType({"megatronus": ()}),
-    "doc.write": MappingProxyType({"alpha-trion": ("docs/**", "*.md")}),
+    "doc.write": MappingProxyType({"alpha-trion": ("docs/**", "AGENTS.md", "README.md", "CHANGELOG.md", "notes.md")}),
     "knowledge.sync": MappingProxyType({"alpha-trion": (".cybertron/knowledge/**",)}),
 })
 

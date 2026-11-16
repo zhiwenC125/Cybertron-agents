@@ -47,6 +47,9 @@ permissions:
   - action: "glob"
     resource: "*"
     effect: "allow"
+  - action: "subagent"
+    resource: "*"
+    effect: "deny"
 ---
 
 # 谎言天尊 (Liege Maximo) — 神器：Staff of Apex (巅峰权杖)

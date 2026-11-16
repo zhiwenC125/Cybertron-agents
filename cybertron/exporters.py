@@ -9,7 +9,8 @@ from .registry import THIRTEEN_PRIMES_REGISTRY
 
 # ============================================================================
 
-def compile_opencode_v2_assets(target_dir: Path, *, include_feishu: bool = False) -> List[Path]:
+def compile_opencode_v2_assets(target_dir: Path, *, include_feishu: bool = False,
+                               disable_legacy_cybertron: bool = False) -> List[Path]:
     """Generates OpenCode V2 native configuration files for all 13 Primes."""
     generated: List[Path] = []
     agents_dir = target_dir / ".opencode" / "agents"
@@ -62,6 +63,8 @@ def compile_opencode_v2_assets(target_dir: Path, *, include_feishu: bool = False
         "$schema": "https://opencode.ai/config.json",
         "agents": agents_json_map,
     }
+    if disable_legacy_cybertron:
+        opencode_jsonc["plugins"] = ["-cybertron.runtime"]
     if include_feishu:
         opencode_jsonc["mcp"] = {
             "timeout": {

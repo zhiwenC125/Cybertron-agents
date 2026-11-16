@@ -50,6 +50,9 @@ permissions:
   - action: "shell"
     resource: "mkdir -p *"
     effect: "allow"
+  - action: "subagent"
+    resource: "*"
+    effect: "deny"
 ---
 
 # 昆图斯 (Quintus Prime) — 神器：Ember of Genesis (创世余烬)
