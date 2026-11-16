@@ -6,7 +6,7 @@
 | M0b | passed | `docs/stages/v6-m0b.json` | — | 本会话停止；下一会话从 M0c 开始 |
 | M0c | passed | `docs/stages/v6-m0c.json` | — | 本会话停止；下一会话从 M1 开始 |
 | M1 | passed | `docs/stages/v6-m1.json` | — | 本会话停止；下一会话从 M2 开始 |
-| M2 | pending | — | M1 未通过 | 等待 M1 门禁 |
+| M2 | pending | — | 尚未开始 | 下一会话从 M2 开始 |
 | M3 | pending | — | M2 未通过 | 等待 M2 门禁 |
 | M4 | pending | — | M3 未通过 | 等待 M3 门禁 |
 | M5 | pending | — | M4 未通过 | 等待 M4 门禁 |
