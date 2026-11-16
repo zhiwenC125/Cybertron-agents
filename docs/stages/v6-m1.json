@@ -1,7 +1,7 @@
 {
   "milestone": "M1",
   "status": "passed",
-  "commit": null,
+  "commit": "36923cd702c1137a413b83a581b8de62547da2d1",
   "required_gates": [
     "unit_tests_all_green",
     "plugin_hooks",
