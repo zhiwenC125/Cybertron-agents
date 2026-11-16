@@ -1,0 +1,11 @@
+{
+  "cmd": "opencode2 --standalone run --agent micronus-prime --format json --auto [M2 lint prompt]",
+  "cwd": "/private/tmp/cybertron-v6-m2-host-ml3wk9tn",
+  "proxy_env": "removed for this process",
+  "exit": 0,
+  "started_utc": "2026-11-16T08:56:35.007504+00:00",
+  "utc": "2026-11-16T08:56:45.807414+00:00",
+  "sha256": "d202e7c1bfc89ead730adaf934a59b3eb4694c870874f55b9f5d2a3b88192ca9",
+  "source": "host",
+  "output_path": "docs/stages/v6-m2-host-lint-after-permission.jsonl"
+}
