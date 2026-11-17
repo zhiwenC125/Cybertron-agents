@@ -96,13 +96,13 @@ export default Plugin.define({
           await ctx.storage.set(`access/${event.sessionID}`, 'read-only');
         } else if (fullAccessRequested(prompt)) {
           await ctx.storage.set(`read-only/${event.sessionID}`, false);
-          await ctx.storage.set(`access/${event.sessionID}`, 'full');
+          await ctx.storage.set(`access/${event.sessionID}`, 'danger-full-access');
         } else if (writeNowRequested(prompt)) {
           await ctx.storage.set(`read-only/${event.sessionID}`, false);
           if (await ctx.storage.get(`access/${event.sessionID}`) === 'read-only')
-            await ctx.storage.set(`access/${event.sessionID}`, 'workspace');
+            await ctx.storage.set(`access/${event.sessionID}`, 'workspace-write');
         } else if (!await ctx.storage.get(`access/${event.sessionID}`)) {
-          await ctx.storage.set(`access/${event.sessionID}`, 'workspace');
+          await ctx.storage.set(`access/${event.sessionID}`, 'workspace-write');
         }
         const model = primaryModel(project);
         if (model) {
@@ -130,7 +130,7 @@ export default Plugin.define({
     });
     await ctx.tool.transform(editor => {
       editor.add({
-        name: 'cy_plan', description: 'Create a validated v6 task graph. For a read-only inspection use template {type:"read_only_scan",objective:"..."} (write_scope=[]). For fixes use bug_fix or explicit nodes. Pass access_mode read-only/workspace/full; full is only for explicit user authorization of Desktop/Downloads/paths outside the project. Returns ready native subagent cards.',
+        name: 'cy_plan', description: 'Create a validated v6 task graph. For a read-only inspection use template {type:"read_only_scan",objective:"..."} (write_scope=[]). For fixes use bug_fix or explicit nodes. Pass access_mode read-only/workspace-write/danger-full-access; danger-full-access is only for explicit user authorization of Desktop/Downloads/paths outside the project. Pass an English slug for the on-disk run folder. Returns ready native subagent cards.',
         input: { type: 'object', properties: {
           node: nodeInput, nodes: { type: 'array', items: nodeInput, minItems: 1 },
           template: { type: 'object', properties: {
@@ -139,11 +139,12 @@ export default Plugin.define({
           }, required: ['type', 'objective'], additionalProperties: false },
           template_id: { type: 'string' },
           objective: { type: 'string' },
+          slug: { type: 'string' },
           write_scope: { type: 'array', items: { type: 'string' } },
           test_scope: { type: 'array', items: { type: 'string' } },
           skip: { type: 'array', items: { type: 'string' } },
           request_class: { type: 'string' },
-          access_mode: { type: 'string', enum: ['read-only', 'workspace', 'full'] },
+          access_mode: { type: 'string', enum: ['read-only', 'workspace-write', 'danger-full-access'] },
           operation: { type: 'object', properties: {
             op: { type: 'string', enum: ['add_node', 'add_edge', 'reassign_role', 'split_node',
               'retry_node', 'insert_gate', 'mark_not_applicable', 'request_human', 'complete_run'] },
@@ -155,7 +156,7 @@ export default Plugin.define({
           if (context.agent !== 'prima') throw new Error('Only prima may create plans');
           const run_id = await ctx.storage.get(`run/${context.sessionID}`);
           const session = await ctx.session.get({ sessionID: context.sessionID });
-          let access_mode = input.access_mode || await ctx.storage.get(`access/${context.sessionID}`) || 'workspace';
+          let access_mode = input.access_mode || await ctx.storage.get(`access/${context.sessionID}`) || 'workspace-write';
           if (input.template?.type === 'read_only_scan') access_mode = 'read-only';
           if (run_id && (input.node || input.nodes || input.template || input.template_id || !input.operation))
             throw new Error('Existing run requires one graph operation');
@@ -183,7 +184,7 @@ export default Plugin.define({
                 test_scope: input.test_scope, skip: input.skip,
                 request_class: input.request_class,
                 access_mode, session_title: session?.title || input.objective || '',
-                host_session_id: context.sessionID }, context.signal);
+                slug: input.slug || '', host_session_id: context.sessionID }, context.signal);
           if (!run_id) await ctx.storage.set(`run/${context.sessionID}`, result.run_id);
           return { content: JSON.stringify(result) };
         },
@@ -310,7 +311,7 @@ export default Plugin.define({
       }
       await ctx.storage.set(`dispatch/${callID}`, { run_id, token: result.token,
         node_id: result.node_id, write_scope: result.write_scope,
-        access_mode: result.access_mode || 'workspace',
+        access_mode: result.access_mode || 'workspace-write',
         started_ms: Date.now(), parent_session_id: event.sessionID });
       await ctx.storage.set(`active/${run_id}`, callID);
       await ctx.storage.set(`token/${run_id}`, result.token);
@@ -356,7 +357,7 @@ export default Plugin.define({
       if (child_session_id && tool_status === 'completed') {
         await ctx.storage.set(`child/${child_session_id}`, {
           run_id: started.run_id, call_id, node_id: started.node_id,
-          write_scope: started.write_scope, access_mode: started.access_mode || 'workspace',
+          write_scope: started.write_scope, access_mode: started.access_mode || 'workspace-write',
           parent_session_id: started.parent_session_id,
         });
       }
@@ -377,7 +378,7 @@ export default Plugin.define({
             throw new Error('Native child has no verified Cybertron node binding');
           }
           if (!await ctx.storage.get(`bound/${event.sessionID}`)) {
-            const permissions = binding.access_mode === 'full'
+            const permissions = binding.access_mode === 'danger-full-access'
               ? [
                   { action: 'edit', resource: '*', effect: 'allow' },
                   { action: 'external_directory', resource: '*', effect: 'allow' },
@@ -439,7 +440,7 @@ export default Plugin.define({
       event.system.push({ type: 'text', text:
         'When the user requests a read-only inspection or says not to modify files, create the read_only_scan template with a short objective. It uses onyx-prime / scan.static and write_scope=[]. Do not substitute doc.write or any writing node. Plan first, then ask with the native question tool if the user asks for approval before execution; do not dispatch until the answer approves. If cy_plan rejects an explicit capability, use the registered capability in its error instead of guessing names.' });
       event.system.push({ type: 'text', text:
-        'Access modes mirror the host: read-only (no writes), workspace (default; writes only inside the project and node write_scope), and full (only when the user explicitly authorizes Desktop/Downloads/paths outside the project). Pass access_mode to cy_plan. In full mode, role write roots are relaxed but generated config (.git, .opencode, .cybertron/runs, opencode.jsonc) stays forbidden. If an outside-project write is ambiguous, ask with the native question tool before planning. Never select full mode without the user explicitly requesting an outside path.' });
+        'Use a short English slug (for example hello-doc) for cy_plan.slug; the on-disk run folder uses only that slug and stores the UUID inside run.json. Access modes are the host-native sandbox modes: read-only (no writes), workspace-write (default; writes only inside the project and node write_scope), and danger-full-access (only when the user explicitly authorizes Desktop/Downloads/paths outside the project). Pass access_mode to cy_plan. In danger-full-access mode, role write roots are relaxed but generated config (.git, .opencode, .cybertron/runs, opencode.jsonc) stays forbidden. If an outside-project write is ambiguous, ask with the native question tool before planning. Never select danger-full-access without the user explicitly requesting an outside path.' });
     });
   },
 });

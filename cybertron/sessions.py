@@ -110,10 +110,10 @@ class SessionStore:
             if any(slug == session["slug"] or slug in session["aliases"] for session in self._all()):
                 raise RunStoreError("Session slug already exists")
             session_id = str(uuid.uuid4())
-            directory = self.root / f"{slug}--{session_id[:8]}"
+            directory = self.root / slug
             suffix = 2
             while directory.exists() or directory.is_symlink():
-                directory = self.root / f"{slug}--{session_id[:8]}-{suffix}"
+                directory = self.root / f"{slug}-{suffix}"
                 suffix += 1
             directory.mkdir(exist_ok=False)
             data = {
@@ -165,7 +165,7 @@ class SessionStore:
             if title is not None:
                 session["title"] = title
             current = self._session_path(session)
-            target = self.root / f"{slug}--{session['session_id'][:8]}"
+            target = self.root / slug
             if current.name != session["session_id"] and current != target:
                 if target.exists() or target.is_symlink():
                     raise RunStoreError("Session directory already exists")

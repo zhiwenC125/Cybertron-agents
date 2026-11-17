@@ -64,9 +64,9 @@ class ScopeGuard:
         for scope in self.write_scope:
             if not isinstance(scope, str) or not scope:
                 raise ScopeGuardError("invalid write_scope")
-            if self.access_mode == "workspace" and (
+            if self.access_mode == "workspace-write" and (
                     scope.startswith("/") or scope.startswith("~") or ".." in scope.split("/")):
-                raise ScopeGuardError("workspace access mode requires project-relative write_scope")
+                raise ScopeGuardError("workspace-write access mode requires project-relative write_scope")
             if hard_denied(scope):
                 raise ScopeGuardError("write_scope targets generated config, VCS, or run state")
 
@@ -79,7 +79,7 @@ class ScopeGuard:
             return False
         if self.access_mode == "read-only":
             return False
-        if self.access_mode == "full":
+        if self.access_mode == "danger-full-access":
             return True
         for scope in self.write_scope:
             if scope == "**":
@@ -98,7 +98,7 @@ class ScopeGuard:
         # Read-only has no writes to verify, and full access is explicitly
         # user-authorized; do not walk an unbounded home directory or pretend
         # to constrain it. Declared artifacts are hashed by the host instead.
-        if self.access_mode in {"read-only", "full"}:
+        if self.access_mode in {"read-only", "danger-full-access"}:
             return Snapshot({})
         entries: Dict[str, FileState] = {}
         for current, dirs, files in os.walk(self.workspace, topdown=True, followlinks=False):

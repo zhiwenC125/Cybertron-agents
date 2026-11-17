@@ -28,7 +28,9 @@ export function apply(ctx, config = {}) {
     description: 'Create or revise a validated Cybertron v6 plan graph. Provide a JSON payload: '
       + 'one of {"node": {...}}, {"nodes": [...]}, {"template_id": ..., "objective": ...}, '
       + 'or {"operation": {...}} with "run_id". Optional fields: write_scope, test_scope, '
-      + 'skip (read-only capabilities), request_class. Returns the run state as JSON.',
+      + 'skip (read-only capabilities), request_class, access_mode '
+      + '(read-only | workspace-write | danger-full-access), slug (English folder name), '
+      + 'session_title. Returns the run state as JSON.',
     parameters: {
       payload: { type: 'string', required: true, description: 'JSON object describing the plan or one graph operation.' },
     },
@@ -51,6 +53,8 @@ export function apply(ctx, config = {}) {
           template_id: payload.template_id, objective: payload.objective,
           write_scope: payload.write_scope, test_scope: payload.test_scope,
           skip: payload.skip, request_class: payload.request_class,
+          access_mode: payload.access_mode, slug: payload.slug,
+          session_title: payload.session_title,
           host_session_id: hostIdOf(exec),
         }, exec.signal, config)
       }

@@ -94,7 +94,7 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
       objective: 'Write hello.c to the Desktop', write_scope: ['Desktop/hello.c'],
       acceptance: ['hello.c exists'], verifiers: ['scope_guard'] },
   }, { agent: 'prima', sessionID: 'full-parent' })).content);
-  assert.equal(fullPlan.access_mode, 'full');
+  assert.equal(fullPlan.access_mode, 'danger-full-access');
   assert.equal(readonlyPlan.nodes[0].role, 'onyx-prime');
   assert.equal(readonlyPlan.nodes[0].card, '[scan] scan.static | (read only)');
   const plan = JSON.parse((await tools.get('cy_plan').execute({ node: {

@@ -3,9 +3,9 @@
 Three modes mirror the host permission model:
 
 * ``read-only``: no writes at all.
-* ``workspace``: writes stay inside the project and inside the node scope.
-* ``full``: the user explicitly authorized writes anywhere, including paths
-  outside the project.  Hard-denied configuration and run-state paths still
+* ``workspace-write``: writes stay inside the project and inside the node scope.
+* ``danger-full-access``: the user explicitly authorized writes anywhere, including
+  paths outside the project.  Hard-denied configuration and run-state paths still
   remain off limits.
 """
 
@@ -15,8 +15,8 @@ import re
 import unicodedata
 from pathlib import Path
 
-ACCESS_MODES = ("read-only", "workspace", "full")
-DEFAULT_ACCESS_MODE = "workspace"
+ACCESS_MODES = ("read-only", "workspace-write", "danger-full-access")
+DEFAULT_ACCESS_MODE = "workspace-write"
 
 _HARD_PARTS = {".git", ".cybertron/runs", ".opencode", "opencode.jsonc"}
 _SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$")
@@ -26,7 +26,7 @@ def normalize_access_mode(value: str | None) -> str:
     if value is None:
         return DEFAULT_ACCESS_MODE
     if value not in ACCESS_MODES:
-        raise ValueError("access_mode must be read-only, workspace, or full")
+        raise ValueError("access_mode must be read-only, workspace-write, or danger-full-access")
     return value
 
 
