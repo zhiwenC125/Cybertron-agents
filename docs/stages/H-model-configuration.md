@@ -4,7 +4,7 @@
 
 ## 用户路径
 
-三种安装方式完成后，运行 `cybertron models setup`。交互向导展示当前十三角色映射，支持只改一个角色、重新指定高/中/低三档、统一模型或退出。再次运行同一命令即可切换；`show` 查看最终映射，`doctor` 对照 OpenCode 模型目录、角色文件、命令文件与实际加载的角色，`rollback` 恢复上一份配置。`--project DIR` 配置公司项目；项目完整编队覆盖用户全局编队。
+三种安装方式完成后，按渠道运行模型配置：npm 用 `npx -y cybertron-agents@0.3.0 models setup`；pipx 用 `cybertron models setup`（必要时先 `pipx ensurepath`）；Shell 安装用 `./.opencode/bin/cybertron models setup`（或安装器打印的绝对路径）。交互向导展示当前十三角色映射，支持只改一个角色、重新指定高/中/低三档、统一模型或退出。再次运行同一命令即可切换；`show` 查看最终映射，`doctor` 对照 OpenCode 模型目录、角色文件、命令文件与实际加载的角色，`rollback` 恢复上一份配置。`--project DIR` 配置公司项目；项目完整编队覆盖用户全局编队。
 
 已有 OpenCode 认证由 OpenCode 继续管理。`provider-add` 只登记 OpenAI 兼容网关的地址、环境变量名称和模型 ID，不读取或保存 Key；模型选择必须能从 OpenCode 模型目录中查到。可选 `--probe` 在只有合成文件的临时目录检查所选模型的读取工具和结构化回复，可能产生费用。公司网关如只配置在项目局部，在线探测需要先将该网关登记到全局 OpenCode 作用域。
 

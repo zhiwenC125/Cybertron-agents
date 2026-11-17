@@ -39,6 +39,7 @@ npx -y cybertron-agents@0.3.0 init --apply --global    # 装到全局
 ```
 
 - **不要在本仓库目录内运行 `npx`**：npm 会向上命中本地同名 `package.json`，从而不安装 registry 包，报 `cybertron: command not found`。请在你自己的项目目录运行。
+- `npx` 不会留下全局 `cybertron` 命令。后续 `models`、`doctor` 仍使用 `npx -y cybertron-agents@0.3.0 <command>`；只有执行 `npm install -g cybertron-agents@0.3.0` 后才有全局 `cybertron`。全局安装后仍找不到时，将 `npm config get prefix` 下的 `bin` 加入 `PATH`。
 - `--project DIR`：安装到 `DIR/.opencode/agents` 与 `DIR/.opencode/commands`。
 - `--global`：安装到 `${XDG_CONFIG_HOME:-~/.config}/opencode/agents|commands`。
 - 目标缺少 `opencode.jsonc` 时写入仅含 `$schema` 的最小配置，保留 OpenCode 的 Build/Plan 默认行为。已有配置保持原字节，包括注释和未知字段；若无法安全解析则拒绝安装。用户通过 Shift+Tab 选择 `prima`。
@@ -66,11 +67,15 @@ bash install.sh --apply --version v0.3.0 --sha256 <归档文件的 SHA-256>
 
 ```bash
 pipx install cybertron-agents==0.3.0
+pipx ensurepath
+exec zsh
 cybertron init --dry-run
 cybertron init --apply --project .
 cybertron init --apply --global
 cybertron doctor
 ```
+
+`pipx` 会把命令装到 `~/.local/bin`；该目录不在 zsh 的 `PATH` 时，安装成功后仍会报 `zsh: command not found: cybertron`。可先用 `~/.local/bin/cybertron --version` 验证，或临时使用 `pipx run --spec cybertron-agents==0.3.0 cybertron ...`。
 
 - 源码分支中的新版 wheel 内置与 npm 一致的角色、命令、插件和运行时，默认无需下载 GitHub `main`。`--payload DIR` 可显式使用本地目录；`--ref` 可显式选择远程版本。
 - 固定版本：`pipx install cybertron-agents==<version>`。
@@ -82,6 +87,20 @@ cybertron doctor
 - `pipx` 是 **Python** 生态工具（PyPI + 隔离 venv）。
 - `npm` 是 **Node** 生态（registry.npmjs.org）。
 - 二者互不相干，`pipx install` 不是 npm 的安装方式，只是第三条独立路径。
+
+## 命令找不到（`zsh: command not found: cybertron`）
+
+这是 PATH 与安装渠道不匹配，不是 Cybertron 安装失败。按渠道处理：
+
+| 渠道 | 原因 | 立即验证 |
+| --- | --- | --- |
+| `npx` | npx 只运行一次，不安装全局命令 | `npx -y cybertron-agents@0.3.0 --version` |
+| `npm install -g` | npm 全局 `bin` 不在 zsh PATH | `$(npm config get prefix)/bin/cybertron --version` |
+| `pipx` | `~/.local/bin` 不在 zsh PATH | `~/.local/bin/cybertron --version`，然后 `pipx ensurepath` |
+| `pip install` | user bin（macOS 常在 `~/Library/Python/3.x/bin`）不在 PATH | `python3 -m cybertron.installer --version` |
+| Shell `install.sh` | 脚本按设计不改 PATH | `./.opencode/bin/cybertron --version` |
+
+修改 `PATH` 后执行 `exec zsh` 或重开终端；不要重复安装来“修复”命令找不到。
 
 ## 安装到 DeepSeek Harness（实验性）
 
@@ -99,7 +118,7 @@ dsh plugin --profile desktop add "$BUNDLE"
 
 ## 安装后使用
 
-三条安装路径都会提示 `cybertron models setup`。npm、pipx 用安装后的 CLI；Shell 路径会打印 `${目标 .opencode}/bin/cybertron` 启动器的完整路径，不修改 PATH。`setup` 默认写用户全局编队；`--project DIR` 写项目编队。重复运行 `setup` 可逐角色切换，`rollback` 恢复上一版；`doctor` 校验 OpenCode 加载结果。公司自定义网关可用 `models provider-add` 登记接口与模型 ID，Key 只交给 OpenCode 认证或其服务环境，详见[模型编队说明](../README.md#配置十三角色模型编队020)。
+三条安装路径都会提示模型配置入口，但命令不同：npm 用 `npx -y cybertron-agents@0.3.0 models setup`；pipx 用 `cybertron models setup`（必要时先 `pipx ensurepath`）；Shell 路径会打印 `${目标 .opencode}/bin/cybertron` 启动器的完整路径，不修改 PATH，后续请直接使用该绝对路径。`setup` 默认写用户全局编队；`--project DIR` 写项目编队。重复运行 `setup` 可逐角色切换，`rollback` 恢复上一版；`doctor` 校验 OpenCode 加载结果。公司自定义网关可用 `models provider-add` 登记接口与模型 ID，Key 只交给 OpenCode 认证或其服务环境，详见[模型编队说明](../README.md#配置十三角色模型编队020)。
 
 ```bash
 opencode2 debug agents          # 确认 13 个角色已加载

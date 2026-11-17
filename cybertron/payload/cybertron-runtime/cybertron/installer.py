@@ -334,7 +334,9 @@ def run_init(args) -> int:
         (lambda: apply_to_install(base, profile)) if profile else None)
     print(f"\n新增 {created}，更新 {updated}，未变 {same}")
     print("安装完成。运行: opencode2 debug agents")
-    print("模型编队配置入口: cybertron models setup")
+    launcher = base / "bin" / "cybertron"
+    entry = str(launcher) if launcher.is_file() else "cybertron"
+    print(f"模型编队配置入口: {entry} models setup")
     return 0
 
 
@@ -388,7 +390,7 @@ def run_doctor(args) -> int:
     healthy = len(agents) == expected and len(commands) == 1 and config.is_file() \
         and plugin.is_file() and plugin_helper.is_file() and runtime.is_file()
     if not healthy:
-        print("提示: 角色数量不符，运行 cybertron init --apply 重新安装。")
+        print("提示: 角色数量不符，重新运行当前安装入口的 init --apply。")
     return 0 if healthy else 1
 
 

@@ -29,7 +29,7 @@
 | `cybertron models rollback` | 查看本机历史编队并恢复上一份可用配置 | 否 |
 | OpenCode `/connect` 或 OpenCode 服务环境 | 由 OpenCode 建立供应商认证 | 是，仅在 OpenCode 的认证流程中 |
 
-三种安装方式（npm、Python/pipx、GitHub Shell）安装后均打印同一条 `cybertron models setup` 引导。Shell 安装须提供可运行的同名本地启动器，并明确其路径；不得假设用户已经安装 npm 或 pipx 的 CLI，也不得悄悄修改用户的 PATH。未配置时，`doctor` 说明角色仍采用发行包默认模型，不把“已安装”误报为“公司模型已配置”。
+三种安装方式（npm、Python/pipx、GitHub Shell）安装后必须按渠道打印可执行入口：npm 打印 `npx -y cybertron-agents@<version> models setup`，pipx 打印 `cybertron models setup`，Shell 打印 `${目标}/bin/cybertron models setup` 的绝对路径；不得统一假设 `cybertron` 已在 PATH，也不得悄悄修改用户的 PATH。未配置时，`doctor` 说明角色仍采用发行包默认模型，不把“已安装”误报为“公司模型已配置”。
 
 日常 OpenCode 对话中不要求用户再次选择模型。`/cybertron` 是开发工作流快捷入口，不承担收集 Key 的职责。若编队未就绪，工作流在调用任何角色模型之前提示具体缺项及 `models setup` 入口。
 
