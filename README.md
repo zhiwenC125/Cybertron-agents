@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Cybertron neon banner](assets/cybertron-banner.svg)
+![Cybertron Agents — Multi-Agent Framework for Intelligent Tasks](assets/cybertron-banner.jpg)
 
 [![Release](https://img.shields.io/badge/release-v0.3.0-8b8cff?style=for-the-badge)](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.3.0)
 [![CI](https://img.shields.io/github/actions/workflow/status/zhiwenC125/Cybertron-agents/verify.yml?branch=main&style=for-the-badge&label=verify)](https://github.com/zhiwenC125/Cybertron-agents/actions/workflows/verify.yml)
