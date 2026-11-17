@@ -135,7 +135,7 @@ v6 的 M0–M5 已完成验收；真实 OpenCode 宿主中的模板复用案例�
 ## 🪐 两个宿主
 
 - **OpenCode V2**：主集成路径。十三角色由 [`cybertron/registry.py`](cybertron/registry.py) 定义，配置由导出器生成；原生子代理卡片、权限、运行账本和工具回执共同构成执行证据。
-- **DeepSeek Harness**：随包分发的实验性 `Cybertron v6` preset。可用安装入口的 `dsh path` 找到 bundle（npm：`npx -y cybertron-agents@0.3.0 dsh path`；pipx：`cybertron dsh path`；Shell：`./.opencode/bin/cybertron dsh path`）；目前是单一 `prima` persona 与 `cy_*` 工具，尚未提供与 OpenCode 相同的十三角色子会话写范围绑定。[查看限制 →](cybertron/dsh_adapter/docs/DETAIL.md)
+- **DeepSeek Harness**：随包分发的实验性 `Cybertron` preset。可用安装入口的 `dsh path` 找到 bundle（npm：`npx -y cybertron-agents@0.3.0 dsh path`；pipx：`cybertron dsh path`；Shell：`./.opencode/bin/cybertron dsh path`）；preset 名称为 `Cybertron`；目前是单一 `prima` persona 与 `cy_*` 工具，尚未提供与 OpenCode 相同的十三角色子会话写范围绑定。[查看限制 →](cybertron/dsh_adapter/docs/DETAIL.md)
 
 ## 🛡️ 安全边界
 

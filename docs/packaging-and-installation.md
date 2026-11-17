@@ -111,7 +111,7 @@ BUNDLE="$(cybertron dsh path)"          # npm: npx cybertron-agents dsh path
 dsh plugin --profile desktop add "$BUNDLE"
 ```
 
-- 只会新增 `Cybertron v6` preset，不改变默认 preset；在新建会话时选择它。
+- 只会新增 `Cybertron` preset，不改变默认 preset；在新建会话时选择它。
 - preset 内只挂载 `cy_plan`/`cy_state`/`cy_ask`/`cy_templates`/`cy_metrics` 和原生 subagent 工具。
 - 目前是单一 prima persona，DSH 子会话尚未绑定节点 `write_scope`；定位为实验性第二宿主。
 - 移除：`plugin_manager remove_bundle @local/cybertron-dsh` 或 Plugins 页。

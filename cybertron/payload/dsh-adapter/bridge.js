@@ -4,8 +4,22 @@
  * Python bridge.
  */
 import { spawn } from 'node:child_process'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const MAX_OUTPUT = 2 * 1024 * 1024
+const ADAPTER_DIR = path.dirname(fileURLToPath(import.meta.url))
+
+export function pythonPathRoots(project) {
+  // A linked/source bundle lives beside `cybertron/`; a packed npm bundle
+  // exposes the Python runtime as a sibling `cybertron-runtime/` directory.
+  // Resolve both before falling back to the caller's project or environment.
+  return [...new Set([
+    path.resolve(ADAPTER_DIR, '..', 'cybertron-runtime'),
+    path.resolve(ADAPTER_DIR, '..', '..'),
+    project,
+  ].filter(Boolean))]
+}
 
 export function callBridge(operation, project, payload, signal, config = {}) {
   const python = config.python || process.env.CYBERTRON_PYTHON || 'python3'
@@ -14,7 +28,9 @@ export function callBridge(operation, project, payload, signal, config = {}) {
     const child = spawn(python, ['-m', 'cybertron.host_v6_cli', operation, '--project', project], {
       cwd: project,
       shell: false,
-      env: { ...process.env, PYTHONPATH: [project, process.env.PYTHONPATH].filter(Boolean).join(':') },
+      env: { ...process.env,
+        PYTHONPATH: [...pythonPathRoots(project), process.env.PYTHONPATH]
+          .filter(Boolean).join(path.delimiter) },
       stdio: ['pipe', 'pipe', 'pipe'],
     })
     let stdout = ''
