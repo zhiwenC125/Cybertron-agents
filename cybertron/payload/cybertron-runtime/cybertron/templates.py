@@ -14,7 +14,7 @@ def read_only_scan_template(objective: str) -> PlanGraph:
         write_scope=(),
         acceptance=("Report the requested inspection findings without changing project files",),
         verifiers=("scope_guard",),
-    )])
+    )], access_mode="read-only")
 
 
 def bug_fix_template(objective: str, write_scope: tuple[str, ...]) -> PlanGraph:

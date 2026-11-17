@@ -59,14 +59,17 @@ class SessionStore:
                 continue
             if directory.is_symlink() or not directory.is_dir():
                 raise RunCorrupt("Unsafe session directory")
-            self.runs._id(directory.name)
             path = self.runs._safe_file(directory / "session.json")
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
                 raise RunCorrupt("Session metadata is unreadable") from exc
-            if data.get("schema_version") != SCHEMA_VERSION or data.get("session_id") != directory.name:
+            if data.get("schema_version") != SCHEMA_VERSION or not isinstance(data.get("session_id"), str):
                 raise RunCorrupt("Session metadata identity or schema is invalid")
+            self.runs._id(data["session_id"])
+            data.setdefault("directory", directory.name)
+            if data["directory"] != directory.name:
+                raise RunCorrupt("Session directory metadata differs from the folder name")
             data.setdefault("slug", None)  # Sessions created before stage C.
             data.setdefault("title", None)
             data.setdefault("aliases", [])
@@ -79,6 +82,9 @@ class SessionStore:
                 raise RunCorrupt("Session aliases are invalid")
             result.append(data)
         return result
+
+    def _session_path(self, session: dict) -> Path:
+        return self.root / session.get("directory", session["session_id"])
 
     def _resolve(self, reference: str) -> dict:
         sessions = self._all()
@@ -104,11 +110,16 @@ class SessionStore:
             if any(slug == session["slug"] or slug in session["aliases"] for session in self._all()):
                 raise RunStoreError("Session slug already exists")
             session_id = str(uuid.uuid4())
-            directory = self.root / session_id
+            directory = self.root / f"{slug}--{session_id[:8]}"
+            suffix = 2
+            while directory.exists() or directory.is_symlink():
+                directory = self.root / f"{slug}--{session_id[:8]}-{suffix}"
+                suffix += 1
             directory.mkdir(exist_ok=False)
             data = {
                 "schema_version": SCHEMA_VERSION,
                 "session_id": session_id,
+                "directory": directory.name,
                 "slug": slug,
                 "title": title,
                 "aliases": [],
@@ -124,7 +135,7 @@ class SessionStore:
 
     def show(self, reference: str) -> dict:
         session = self._resolve(reference)
-        runs = self.root / session["session_id"] / "runs"
+        runs = self._session_path(session) / "runs"
         if runs.is_symlink():
             raise RunCorrupt("Unsafe runs directory")
         children = list(runs.iterdir()) if runs.is_dir() else []
@@ -153,14 +164,22 @@ class SessionStore:
             session["slug"] = slug
             if title is not None:
                 session["title"] = title
-            self.runs._atomic_json(self.root / session["session_id"] / "session.json", session)
+            current = self._session_path(session)
+            target = self.root / f"{slug}--{session['session_id'][:8]}"
+            if current.name != session["session_id"] and current != target:
+                if target.exists() or target.is_symlink():
+                    raise RunStoreError("Session directory already exists")
+                current.rename(target)
+                session["directory"] = target.name
+                current = target
+            self.runs._atomic_json(current / "session.json", session)
         return self.show(session["session_id"])
 
     def archive(self, reference: str, archived: bool = True) -> dict:
         with self._index_lock():
             session = self._resolve(reference)
             session["archived"] = archived
-            self.runs._atomic_json(self.root / session["session_id"] / "session.json", session)
+            self.runs._atomic_json(self._session_path(session) / "session.json", session)
         return self.show(session["session_id"])
 
     def create_run(self, reference: str, request: str) -> dict:
@@ -170,7 +189,7 @@ class SessionStore:
 
     def list_runs(self, reference: str) -> list[dict]:
         session = self._resolve(reference)
-        directory = self.root / session["session_id"] / "runs"
+        directory = self._session_path(session) / "runs"
         if directory.is_symlink():
             raise RunCorrupt("Unsafe runs directory")
         if not directory.is_dir():

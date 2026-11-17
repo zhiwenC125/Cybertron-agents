@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .access import (DEFAULT_ACCESS_MODE, normalize_access_mode, resolve_scope,
+                     slugify_title)
 from .graph import GraphRejected, PlanGraph, PlanNode
 from .gates import diff_facts, risk_floor
 from .learning import (TemplateRejected, distill_template, instantiate, is_request_class,
@@ -32,7 +34,7 @@ class HostBridgeError(RuntimeError):
     pass
 
 
-def require_isolated_workspace(project: Path) -> None:
+def require_isolated_workspace(project: Path, access_mode: str = DEFAULT_ACCESS_MODE) -> None:
     """Reject a user-home workspace before it can create an undispatchable run.
 
     A whole-home snapshot is both unbounded and semantically wrong: every
@@ -40,6 +42,10 @@ def require_isolated_workspace(project: Path) -> None:
     socket or unreadable file under the home directory used to abort every
     dispatch.  The supported setup is one isolated project directory.
     """
+    if access_mode in {"read-only", "full"}:
+        # Read-only never writes and full mode is explicitly user-authorized;
+        # neither needs a bounded workspace snapshot, so home is acceptable.
+        return
     resolved = Path(project).resolve()
     if resolved == Path("/").resolve() or resolved == Path.home().resolve():
         raise HostBridgeError(
@@ -109,10 +115,23 @@ class V6HostBridge:
                 raise ValueError("noncanonical run ID")
         except (TypeError, ValueError) as exc:
             raise HostBridgeError("invalid run ID") from exc
-        directory = self.runs / run_id
-        if directory.is_symlink() or not directory.is_dir():
-            raise HostBridgeError("run does not exist or is unsafe")
-        return directory
+        direct = self.runs / run_id
+        if direct.is_dir() and not direct.is_symlink():
+            return direct
+        if self.runs.is_dir() and not self.runs.is_symlink():
+            for candidate in self.runs.iterdir():
+                if candidate.is_symlink() or not candidate.is_dir():
+                    continue
+                metadata = candidate / "run.json"
+                if not metadata.is_file() or metadata.is_symlink():
+                    continue
+                try:
+                    data = json.loads(metadata.read_text())
+                except (OSError, ValueError):
+                    continue
+                if data.get("run_id") == run_id:
+                    return candidate
+        raise HostBridgeError("run does not exist or is unsafe")
 
     @staticmethod
     def _card(node: PlanNode) -> str:
@@ -157,10 +176,15 @@ class V6HostBridge:
     def plan(self, node_data: dict | list[dict] | None, host_session_id: str, *,
              request_class: str | None = None, template_id: str | None = None,
              objective: str = "", write_scope: list[str] | None = None,
-             test_scope: list[str] | None = None, skip: list[str] | None = None) -> dict:
+             test_scope: list[str] | None = None, skip: list[str] | None = None,
+             access_mode: str | None = None, session_title: str = "") -> dict:
         if not isinstance(host_session_id, str) or not host_session_id:
             raise HostBridgeError("host session ID is required")
-        require_isolated_workspace(self.project)
+        try:
+            mode = normalize_access_mode(access_mode)
+        except ValueError as exc:
+            raise HostBridgeError(str(exc)) from exc
+        requested_mode = access_mode
         if template_id is not None:
             try:
                 template = load_template(self.project, template_id)
@@ -171,14 +195,18 @@ class V6HostBridge:
             except TemplateRejected as exc:
                 raise HostBridgeError(str(exc)) from exc
             node_objects = list(graph_seed.nodes.values())
+            if requested_mode is None:
+                mode = graph_seed.access_mode
+            graph_seed = PlanGraph(node_objects, access_mode=mode)
             request_class = request_class or template["request_class"]
         else:
             try:
                 node_objects = [PlanNode.from_dict(data) for data in
                                 (node_data if isinstance(node_data, list) else [node_data])]
-                graph_seed = PlanGraph(node_objects)
+                graph_seed = PlanGraph(node_objects, access_mode=mode)
             except (GraphRejected, TypeError) as exc:
                 raise HostBridgeError(str(exc)) from exc
+        require_isolated_workspace(self.project, mode)
         if not node_objects or any(node.status != "pending" or node.kind not in {"task", "review"} or node.role == "prima" for node in node_objects):
             raise HostBridgeError("plan requires pending subagent task or review nodes")
         if any("scope_guard" not in node.verifiers or
@@ -195,21 +223,37 @@ class V6HostBridge:
         # sandbox denies /dev/urandom, so uuid4 would make tests fail there.
         run_id = str(uuid.uuid5(uuid.NAMESPACE_URL,
                                 f"{self.project}:{time.time_ns()}:{os.getpid()}:{next(_run_counter)}"))
-        directory = self.runs / run_id
+        title = (session_title or "").strip() or objective.strip()
+        slug = slugify_title(title, fallback="run")
+        stem = f"{slug}--{run_id[:8]}"
+        directory = self.runs / stem
+        suffix = 2
+        while directory.exists() or directory.is_symlink():
+            directory = self.runs / f"{stem}-{suffix}"
+            suffix += 1
         directory.mkdir(parents=True, exist_ok=False)
         (directory / "plan.json").write_text(json.dumps(graph_seed.to_dict(), ensure_ascii=False))
+        (directory / "run.json").write_text(json.dumps({
+            "run_id": run_id, "title": title[:200], "slug": slug,
+            "host_session_id": host_session_id, "access_mode": mode,
+            "created_utc": _utc(),
+        }, ensure_ascii=False))
         (directory / "events.jsonl").touch()
         self._append(run_id, "plan.created", node_id=nodes[0]["node_id"] if len(nodes) == 1 else None,
                      node_ids=[node["node_id"] for node in nodes],
                      host_session_id=host_session_id, plan_revision=graph_seed.revision,
                      request_class=request_class, template_id=template_id,
                      skipped_capabilities=list(skip or ()),
+                     access_mode=mode, title=title[:200], slug=slug,
                      request=objective.strip())
         result = self.state(run_id)
         result["template_reused"] = template_id is not None
         result["request_class"] = request_class
         result["skipped_capabilities"] = list(skip or ())
         result["available_templates"] = self.template_hints(request_class)
+        result["access_mode"] = mode
+        result["title"] = title[:200]
+        result["slug"] = slug
         return result
 
     def state(self, run_id: str) -> dict:
@@ -276,6 +320,13 @@ class V6HostBridge:
                   "write_scope": list(node.write_scope)} for node in graph.nodes.values()]
         active = next(iter(active_calls.values()), None)
         created = next((event for event in events if event["type"] == "plan.created"), {})
+        run_dir = self._dir(run_id)
+        metadata = {}
+        if (run_dir / "run.json").is_file() and not (run_dir / "run.json").is_symlink():
+            try:
+                metadata = json.loads((run_dir / "run.json").read_text())
+            except (OSError, ValueError):
+                metadata = {}
         result = {"run_id": run_id, "status": "running" if active else
                   "ready" if ready else "completed" if all(v == "completed" for v in status.values())
                   and not pending_gates else "blocked",
@@ -287,7 +338,11 @@ class V6HostBridge:
                   "template_id": created.get("template_id"),
                   "child_session_id": active["child_session_id"] if active else None,
                   "active_dispatches": list(active_calls.values()),
-                  "event_seq": len(events), "events_path": str(self._dir(run_id) / "events.jsonl")}
+                  "access_mode": graph.access_mode,
+                  "title": metadata.get("title") or created.get("title"),
+                  "slug": metadata.get("slug") or created.get("slug"),
+                  "run_dir": str(run_dir),
+                  "event_seq": len(events), "events_path": str(run_dir / "events.jsonl")}
         if len(nodes) == 1:
             result.update({"node_id": nodes[0]["node_id"], "card": nodes[0]["card"],
                            "write_scope": nodes[0]["write_scope"],
@@ -429,8 +484,8 @@ class V6HostBridge:
 
     def before(self, run_id: str, node_id: str, role: str, card: str, call_id: str,
                active_token: str | None = None) -> dict:
-        require_isolated_workspace(self.project)
         graph = self._graph(run_id)
+        require_isolated_workspace(self.project, graph.access_mode)
         node = graph.nodes.get(node_id)
         reason = None
         state = self.state(run_id)
@@ -453,15 +508,17 @@ class V6HostBridge:
             if state["active_dispatches"]:
                 return {"rejected": True, "reason": reason, "token": active_token}
             raise HostBridgeError(reason)
-        guard = ScopeGuard(self.project, node.write_scope)
+        guard = ScopeGuard(self.project, node.write_scope, access_mode=graph.access_mode)
         baseline = guard.snapshot()
         guard.assert_safe_before_dispatch(baseline)
         directory = self._dir(run_id)
         self._snapshot_path(run_id, call_id).write_bytes(_encode(baseline))
         self._append(run_id, "dispatch.started", node_id=node_id, role=role,
-                     capability=node.capability, write_scope=list(node.write_scope), call_id=call_id)
+                     capability=node.capability, write_scope=list(node.write_scope),
+                     access_mode=graph.access_mode, call_id=call_id)
         return {"status": "running", "token": self._token(run_id, call_id),
-                "node_id": node_id, "write_scope": list(node.write_scope)}
+                "node_id": node_id, "write_scope": list(node.write_scope),
+                "access_mode": graph.access_mode}
 
     def bind(self, run_id: str, call_id: str, token: str,
              child_session_id: str, write_scope: list[str]) -> dict:
@@ -561,36 +618,38 @@ class V6HostBridge:
             raise HostBridgeError("subagent has not returned")
         started = next(event for event in reversed(self.events(run_id))
                        if event["type"] == "dispatch.started" and event["call_id"] == call_id)
-        node = self._graph(run_id).nodes[started["node_id"]]
+        graph = self._graph(run_id)
+        node = graph.nodes[started["node_id"]]
         all_events = self.events(run_id)
         start_index = next(index for index, event in enumerate(all_events)
                            if event["type"] == "dispatch.started" and event.get("call_id") == call_id)
         concurrent_writers = any(
             peer.node_id != node.node_id and peer.write_scope
             and _peer_was_concurrent(all_events, peer.node_id, start_index)
-            for peer in self._graph(run_id).nodes.values())
+            for peer in graph.nodes.values())
         if node.write_scope and concurrent_writers and not any(
                 event["type"] == "dispatch.bound" and event.get("call_id") == call_id
                 for event in all_events):
             raise HostBridgeError("concurrent writer lacks host permission binding")
-        guard = ScopeGuard(self.project, node.write_scope)
+        guard = ScopeGuard(self.project, node.write_scope, access_mode=graph.access_mode)
         baseline = _decode(self._snapshot_path(run_id, call_id).read_bytes())
         current = guard.snapshot()
-        # These two files are written only by this bridge. Their bytes were
-        # authenticated against the token held by the host plugin.
+        # This run's ledger/snapshot files are written only by this bridge; their
+        # bytes were authenticated against the token held by the host plugin.
+        run_rel = self._dir(run_id).relative_to(self.project).as_posix()
         for rel in current.entries:
-            if rel.startswith(f".cybertron/runs/{run_id}/"):
+            if rel.startswith(run_rel + "/"):
                 baseline.entries[rel] = current.entries[rel]
         # A concurrent peer has its own node scope and a host-bound narrow
         # session permission. Exclude that peer's writes only while its active
         # window overlaps this dispatch; a peer that finished earlier cannot
         # mask an out-of-scope write here.
-        for peer in self._graph(run_id).nodes.values():
+        for peer in graph.nodes.values():
             if peer.node_id == node.node_id or not peer.write_scope:
                 continue
             if not _peer_was_concurrent(all_events, peer.node_id, start_index):
                 continue
-            peer_guard = ScopeGuard(self.project, peer.write_scope)
+            peer_guard = ScopeGuard(self.project, peer.write_scope, access_mode=graph.access_mode)
             for rel, value in current.entries.items():
                 if peer_guard._allowed(rel, is_dir=value.kind == "directory"):
                     baseline.entries[rel] = value
@@ -602,8 +661,16 @@ class V6HostBridge:
         if report.rejected_paths:
             self._append(run_id, "plan.op.rejected", node_id=node.node_id,
                          reason="write_scope violation", paths=list(report.rejected_paths))
-        artifacts = {path: value.sha256 for path, value in guard.snapshot().entries.items()
+        current_after = guard.snapshot()
+        artifacts = {path: value.sha256 for path, value in current_after.entries.items()
                      if path in report.changed_paths and path not in report.rejected_paths and value.kind == "file"}
+        if graph.access_mode == "full":
+            # Full access does not snapshot the workspace. Hash the declared
+            # artifacts directly so a completed child still has real evidence.
+            for scope in node.write_scope:
+                target = resolve_scope(scope, self.project)
+                if target.is_file() and not target.is_symlink():
+                    artifacts[str(target)] = _hash(target.read_bytes())
         rejection = next((event for event in reversed(all_events)
                           if event["type"] == "review.rejected" and event.get("call_id") == call_id), None)
         if returned["tool_status"] == "cancelled":
@@ -629,7 +696,7 @@ class V6HostBridge:
                                "exit": 0 if returned["tool_status"] == "completed" else 1,
                                "utc": _utc(), "sha256": returned["output_sha256"],
                                "session_id": child_session_id})
-        if status == "completed" and artifacts:
+        if status == "completed" and artifacts and graph.access_mode != "full":
             facts = diff_facts(baseline, guard.snapshot())
             risk, floor = risk_floor(facts)
             self._append(run_id, "gate.required", node_id=node.node_id,

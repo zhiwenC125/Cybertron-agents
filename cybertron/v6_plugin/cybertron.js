@@ -11,6 +11,9 @@ const pluginDirectory = path.dirname(fileURLToPath(import.meta.url));
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const noWriteRequested = text => /只读|不(?:要|得)?(?:创建|修改|删除|写入).*文件|read[- ]only|do not (?:write|modify|create|delete) (?:any )?files?/i.test(text);
 const writeNowRequested = text => /(?:允许|可以|同意)(?:现在|继续)?(?:写入|修改|创建).*文件|(?:you may|please) (?:write|modify|create) (?:the )?files?/i.test(text);
+const fullAccessRequested = text =>
+  /完全权限|full access|danger[- ]full[- ]access|越出(?:当前)?项目|outside (?:the )?project|(?:允许|可以|同意).*(?:项目外|桌面|下载|任意|所有|外部).*(?:文件|路径|目录)|write (?:to )?(?:the )?(?:desktop|downloads|outside)/i.test(text)
+  || /(?:写到|创建|保存到|放到|写入).*(?:桌面|Desktop|下载|Downloads)|(?:桌面|Desktop|下载|Downloads).*(?:写|创建|保存|放)/i.test(text);
 
 function runtimePath() {
   const bundled = path.resolve(pluginDirectory, '..', 'cybertron-runtime');
@@ -88,15 +91,46 @@ export default Plugin.define({
       const selected = await ctx.session.get({ sessionID: event.sessionID });
       if (selected.agent === 'prima') {
         const prompt = event.prompt?.text || '';
-        if (writeNowRequested(prompt)) await ctx.storage.set(`read-only/${event.sessionID}`, false);
-        else if (noWriteRequested(prompt)) await ctx.storage.set(`read-only/${event.sessionID}`, true);
+        if (noWriteRequested(prompt)) {
+          await ctx.storage.set(`read-only/${event.sessionID}`, true);
+          await ctx.storage.set(`access/${event.sessionID}`, 'read-only');
+        } else if (fullAccessRequested(prompt)) {
+          await ctx.storage.set(`read-only/${event.sessionID}`, false);
+          await ctx.storage.set(`access/${event.sessionID}`, 'full');
+        } else if (writeNowRequested(prompt)) {
+          await ctx.storage.set(`read-only/${event.sessionID}`, false);
+          if (await ctx.storage.get(`access/${event.sessionID}`) === 'read-only')
+            await ctx.storage.set(`access/${event.sessionID}`, 'workspace');
+        } else if (!await ctx.storage.get(`access/${event.sessionID}`)) {
+          await ctx.storage.set(`access/${event.sessionID}`, 'workspace');
+        }
         const model = primaryModel(project);
-        if (model) await ctx.session.switchModel({ sessionID: event.sessionID, model });
+        if (model) {
+          const sameModel = (left, right) => left && right
+            && left.providerID === right.providerID && left.id === right.id
+            && (left.variant || undefined) === (right.variant || undefined);
+          const selectedModel = selected.model;
+          const lastAuto = await ctx.storage.get(`model/auto/${event.sessionID}`);
+          // Respect a model the user explicitly picked in OpenCode. The
+          // configured Prima model is a default, not a hard override.
+          const userPicked = selectedModel && !sameModel(selectedModel, model)
+            && !sameModel(selectedModel, lastAuto);
+          if (!userPicked) {
+            try {
+              await ctx.session.switchModel({ sessionID: event.sessionID, model });
+              await ctx.storage.set(`model/auto/${event.sessionID}`, model);
+            } catch (error) {
+              console.warn(`Cybertron: could not switch to configured Prima model: ${error.message}`);
+            }
+          } else {
+            await ctx.storage.set(`model/override/${event.sessionID}`, selectedModel);
+          }
+        }
       }
     });
     await ctx.tool.transform(editor => {
       editor.add({
-        name: 'cy_plan', description: 'Create a validated v6 task graph. For a read-only directory or project inspection, use template {type:"read_only_scan",objective:"..."}; it creates one onyx-prime scan.static node with empty write_scope. For fixes, use bug_fix or explicit nodes. Returns ready native subagent cards.',
+        name: 'cy_plan', description: 'Create a validated v6 task graph. For a read-only inspection use template {type:"read_only_scan",objective:"..."} (write_scope=[]). For fixes use bug_fix or explicit nodes. Pass access_mode read-only/workspace/full; full is only for explicit user authorization of Desktop/Downloads/paths outside the project. Returns ready native subagent cards.',
         input: { type: 'object', properties: {
           node: nodeInput, nodes: { type: 'array', items: nodeInput, minItems: 1 },
           template: { type: 'object', properties: {
@@ -109,6 +143,7 @@ export default Plugin.define({
           test_scope: { type: 'array', items: { type: 'string' } },
           skip: { type: 'array', items: { type: 'string' } },
           request_class: { type: 'string' },
+          access_mode: { type: 'string', enum: ['read-only', 'workspace', 'full'] },
           operation: { type: 'object', properties: {
             op: { type: 'string', enum: ['add_node', 'add_edge', 'reassign_role', 'split_node',
               'retry_node', 'insert_gate', 'mark_not_applicable', 'request_human', 'complete_run'] },
@@ -119,6 +154,9 @@ export default Plugin.define({
         execute: async (input, context) => {
           if (context.agent !== 'prima') throw new Error('Only prima may create plans');
           const run_id = await ctx.storage.get(`run/${context.sessionID}`);
+          const session = await ctx.session.get({ sessionID: context.sessionID });
+          let access_mode = input.access_mode || await ctx.storage.get(`access/${context.sessionID}`) || 'workspace';
+          if (input.template?.type === 'read_only_scan') access_mode = 'read-only';
           if (run_id && (input.node || input.nodes || input.template || input.template_id || !input.operation))
             throw new Error('Existing run requires one graph operation');
           if (!run_id && ([input.node, input.nodes, input.template, input.template_id].filter(Boolean).length !== 1 || input.operation))
@@ -132,11 +170,11 @@ export default Plugin.define({
           if (input.template?.type === 'read_only_scan' &&
               (input.template.write_scope?.length || input.write_scope?.length))
             throw new Error('read_only_scan cannot have write_scope');
-          if (await ctx.storage.get(`read-only/${context.sessionID}`) &&
+          if (access_mode === 'read-only' &&
               (input.node?.write_scope?.length || input.nodes?.some(node => node.write_scope?.length) ||
                input.template?.type === 'bug_fix' || input.template_id || input.write_scope?.length ||
                (input.operation && input.operation.op !== 'request_human')))
-            throw new Error('This session has a read-only user request; cy_plan cannot create or revise a writing node');
+            throw new Error('This session is read-only; cy_plan cannot create or revise a writing node');
           const result = run_id
             ? await bridge('plan_op', project, { run_id, operation: input.operation }, context.signal)
             : await bridge('plan', project, { node: input.node, nodes: input.nodes,
@@ -144,6 +182,7 @@ export default Plugin.define({
                 objective: input.objective, write_scope: input.write_scope,
                 test_scope: input.test_scope, skip: input.skip,
                 request_class: input.request_class,
+                access_mode, session_title: session?.title || input.objective || '',
                 host_session_id: context.sessionID }, context.signal);
           if (!run_id) await ctx.storage.set(`run/${context.sessionID}`, result.run_id);
           return { content: JSON.stringify(result) };
@@ -271,6 +310,7 @@ export default Plugin.define({
       }
       await ctx.storage.set(`dispatch/${callID}`, { run_id, token: result.token,
         node_id: result.node_id, write_scope: result.write_scope,
+        access_mode: result.access_mode || 'workspace',
         started_ms: Date.now(), parent_session_id: event.sessionID });
       await ctx.storage.set(`active/${run_id}`, callID);
       await ctx.storage.set(`token/${run_id}`, result.token);
@@ -316,7 +356,8 @@ export default Plugin.define({
       if (child_session_id && tool_status === 'completed') {
         await ctx.storage.set(`child/${child_session_id}`, {
           run_id: started.run_id, call_id, node_id: started.node_id,
-          write_scope: started.write_scope, parent_session_id: started.parent_session_id,
+          write_scope: started.write_scope, access_mode: started.access_mode || 'workspace',
+          parent_session_id: started.parent_session_id,
         });
       }
     });
@@ -336,12 +377,22 @@ export default Plugin.define({
             throw new Error('Native child has no verified Cybertron node binding');
           }
           if (!await ctx.storage.get(`bound/${event.sessionID}`)) {
-            const permissions = [
-              { action: 'edit', resource: '*', effect: 'deny' },
-              ...binding.write_scope.map(resource => ({ action: 'edit', resource, effect: 'allow' })),
-              { action: 'shell', resource: '*', effect: 'deny' },
-              { action: 'external_directory', resource: '*', effect: 'deny' },
-            ];
+            const permissions = binding.access_mode === 'full'
+              ? [
+                  { action: 'edit', resource: '*', effect: 'allow' },
+                  { action: 'external_directory', resource: '*', effect: 'allow' },
+                  { action: 'edit', resource: '.git/**', effect: 'deny' },
+                  { action: 'edit', resource: '.opencode/**', effect: 'deny' },
+                  { action: 'edit', resource: '.cybertron/runs/**', effect: 'deny' },
+                  { action: 'edit', resource: 'opencode.jsonc', effect: 'deny' },
+                  { action: 'shell', resource: '*', effect: 'deny' },
+                ]
+              : [
+                  { action: 'edit', resource: '*', effect: 'deny' },
+                  ...binding.write_scope.map(resource => ({ action: 'edit', resource, effect: 'allow' })),
+                  { action: 'shell', resource: '*', effect: 'deny' },
+                  { action: 'external_directory', resource: '*', effect: 'deny' },
+                ];
             await ctx.session.update({ sessionID: event.sessionID, permissions });
             const updated = await ctx.session.get({ sessionID: event.sessionID });
             if (JSON.stringify(updated.permissions) !== JSON.stringify(permissions))
@@ -374,12 +425,21 @@ export default Plugin.define({
       const expected = primaryModel(project);
       if (expected && (event.model.providerID !== expected.providerID ||
           event.model.id !== expected.id || event.model.variant !== expected.variant)) {
-        throw new Error(`Cybertron prima model differs from active session: expected ${expected.providerID}/${expected.id}${expected.variant ? '#' + expected.variant : ''}, active ${event.model.providerID}/${event.model.id}${event.model.variant ? '#' + event.model.variant : ''}; run cybertron models doctor`);
+        // The user can switch models in OpenCode at any time. Adapt to the
+        // active session model instead of failing the whole turn; the note
+        // makes the mismatch visible without discarding the user's choice.
+        const expectedName = `${expected.providerID}/${expected.id}${expected.variant ? '#' + expected.variant : ''}`;
+        const activeName = `${event.model.providerID}/${event.model.id}${event.model.variant ? '#' + event.model.variant : ''}`;
+        await ctx.storage.set(`model/override/${event.sessionID}`, event.model);
+        event.system.push({ type: 'text', text:
+          `Cybertron: active session model ${activeName} differs from the configured Prima default ${expectedName}. Continue with the session-selected model; do not claim a model switch.` });
       }
       event.system.push({ type: 'text', text:
         'Cybertron v6 M5: plan the smallest valid task graph for the user request with cy_plan. Use node for one task, nodes for a dependency graph, template_id for a learned template, or the optional bug_fix template. cy_templates lists templates distilled from completed runs; reuse one with cy_plan template_id, objective, write_scope, and request_class when the request matches that class, then add nodes only if the seed is insufficient. cy_metrics reports ledger facts for this project. For a single requested Markdown file within alpha-trion allowed paths, use capability doc.write, role alpha-trion, write_scope containing only that path, and scope_guard verifier; keep the requested content exact. Each task needs a registered capability and role, narrow write_scope, acceptance, and scope_guard verifier. Whenever the user must answer or confirm, call the native question tool: it renders the OpenCode ask card and its answers are recorded in the run ledger. Never ask only in prose. Use options such as Approve/Reject for a yes/no gate. cy_ask is only a formal host approval event before dispatch. Never treat a recorded question as an answer. Dispatch only a ready node through the native subagent tool; use its exact returned card as description and include node_id, capability, write_scope, objective, and run_id in the child prompt. Call cy_state with wait=true after each child returns. The kernel derives risk gates from the actual workspace diff; cy_check runs fixed lint/build/test/sim targets for eligible roles, and a run_id binds its receipt to the run. Required gates cannot be removed; mark_not_applicable and complete_run remain fail-closed until trusted verifier facts exist. Background is still running; cancellation is terminal. Never claim model text as tool evidence.' });
       event.system.push({ type: 'text', text:
         'When the user requests a read-only inspection or says not to modify files, create the read_only_scan template with a short objective. It uses onyx-prime / scan.static and write_scope=[]. Do not substitute doc.write or any writing node. Plan first, then ask with the native question tool if the user asks for approval before execution; do not dispatch until the answer approves. If cy_plan rejects an explicit capability, use the registered capability in its error instead of guessing names.' });
+      event.system.push({ type: 'text', text:
+        'Access modes mirror the host: read-only (no writes), workspace (default; writes only inside the project and node write_scope), and full (only when the user explicitly authorizes Desktop/Downloads/paths outside the project). Pass access_mode to cy_plan. In full mode, role write roots are relaxed but generated config (.git, .opencode, .cybertron/runs, opencode.jsonc) stays forbidden. If an outside-project write is ambiguous, ask with the native question tool before planning. Never select full mode without the user explicitly requesting an outside path.' });
     });
   },
 });

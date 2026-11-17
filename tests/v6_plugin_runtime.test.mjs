@@ -64,6 +64,12 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     model: { providerID: 'vendor', id: 'test' } };
   await sessionHooks.get('context')(context);
   assert.equal(context.tools.cy_check, undefined);
+  const mismatched = { agent: 'prima', tools: { subagent: {} }, system: [],
+    model: { providerID: 'vendor', id: 'user-picked' } };
+  await sessionHooks.get('context')(mismatched);
+  const mismatchNote = mismatched.system.find(item => /differs from the configured Prima default/.test(item.text));
+  assert.ok(mismatchNote);
+  assert.match(mismatchNote.text, /user-picked/);
   assert.match(context.system[0].text, /single requested Markdown file/);
   assert.match(context.system[0].text, /doc\.write.*alpha-trion.*write_scope.*scope_guard/);
   assert.match(context.system[1].text, /read_only_scan.*scan\.static/);
@@ -75,11 +81,20 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     node_id: 'bad', kind: 'task', capability: 'doc.write', role: 'alpha-trion',
     objective: 'Write a report', write_scope: ['docs/report.md'],
     acceptance: ['report exists'], verifiers: ['scope_guard'],
-  } }, { agent: 'prima', sessionID: 'read-only-parent' }), /read-only user request/);
+  } }, { agent: 'prima', sessionID: 'read-only-parent' }), /read-only/);
   const readonlyPlan = JSON.parse((await tools.get('cy_plan').execute({
     template: { type: 'read_only_scan', objective: 'Inspect the temporary directory layout' },
   }, { agent: 'prima', sessionID: 'read-only-parent' })).content);
   assert.deepEqual(readonlyPlan.write_scope, []);
+  assert.equal(readonlyPlan.access_mode, 'read-only');
+  await sessionHooks.get('prompt')({ sessionID: 'full-parent',
+    prompt: { text: '把 hello.c 写到桌面，允许项目外写入，使用完全权限。' } });
+  const fullPlan = JSON.parse((await tools.get('cy_plan').execute({
+    node: { node_id: 'hello', kind: 'task', capability: 'code.write', role: 'solus-prime',
+      objective: 'Write hello.c to the Desktop', write_scope: ['Desktop/hello.c'],
+      acceptance: ['hello.c exists'], verifiers: ['scope_guard'] },
+  }, { agent: 'prima', sessionID: 'full-parent' })).content);
+  assert.equal(fullPlan.access_mode, 'full');
   assert.equal(readonlyPlan.nodes[0].role, 'onyx-prime');
   assert.equal(readonlyPlan.nodes[0].card, '[scan] scan.static | (read only)');
   const plan = JSON.parse((await tools.get('cy_plan').execute({ node: {

@@ -115,6 +115,27 @@ class RunStore:
             raise RunStoreError("A canonical UUID is required")
         return value
 
+    def _session_dir(self, session_id: str) -> Path:
+        """Locate a session directory by its immutable ID, not its folder name."""
+        self._id(session_id)
+        if self.root.is_symlink():
+            raise RunCorrupt("Unsafe sessions directory")
+        if not self.root.is_dir():
+            raise RunStoreError("Session not found or unsafe")
+        for candidate in self.root.iterdir():
+            if candidate.name.startswith("."):
+                continue
+            if candidate.is_symlink() or not candidate.is_dir():
+                raise RunCorrupt("Unsafe session directory")
+            metadata = self._safe_file(candidate / "session.json")
+            try:
+                data = json.loads(metadata.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RunCorrupt("Session metadata is unreadable") from exc
+            if data.get("session_id") == session_id:
+                return candidate
+        raise RunStoreError("Session not found or unsafe")
+
     def _config_digest(self) -> str:
         config = self.workspace / "opencode.jsonc"
         if not config.is_file():
@@ -132,7 +153,7 @@ class RunStore:
     def _runtime_digest() -> str:
         package = Path(__file__).resolve().parent
         digest = hashlib.sha256()
-        for name in ("dispatch.py", "hosts.py", "ledger.py", "model_config.py", "model_cli.py",
+        for name in ("access.py", "dispatch.py", "hosts.py", "ledger.py", "model_config.py", "model_cli.py",
                      "opencode_executor.py", "orchestrator.py", "plugin_cli.py", "registry.py", "runstore.py"):
             digest.update(name.encode() + b"\0" + (package / name).read_bytes())
         return digest.hexdigest()
@@ -149,7 +170,15 @@ class RunStore:
                 continue
             if session.is_symlink() or not session.is_dir():
                 raise RunCorrupt("Unsafe session directory")
-            self._id(session.name)
+            session_file = self._safe_file(session / "session.json")
+            try:
+                session_data = json.loads(session_file.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RunCorrupt("Session metadata is unreadable") from exc
+            if session_data.get("schema_version") != SCHEMA_VERSION or not isinstance(
+                    session_data.get("session_id"), str):
+                raise RunCorrupt("Session metadata identity or schema is invalid")
+            self._id(session_data["session_id"])
             if (session / "runs").is_symlink():
                 raise RunCorrupt("Unsafe runs directory")
             run_dir = session / "runs" / run_id
@@ -165,8 +194,9 @@ class RunStore:
         except (OSError, json.JSONDecodeError) as exc:
             raise RunCorrupt("Run metadata is unreadable") from exc
         if metadata.get("schema_version") != SCHEMA_VERSION or metadata.get("run_id") != run_id \
-                or metadata.get("session_id") != directory.parent.parent.name:
+                or not isinstance(metadata.get("session_id"), str):
             raise RunCorrupt("Run metadata identity or schema is invalid")
+        self._id(metadata["session_id"])
         for name in ("workspace", "config_sha256", "runtime_sha256"):
             if not isinstance(metadata.get(name), str):
                 raise RunCorrupt(f"Run metadata lacks {name}")
@@ -246,10 +276,7 @@ class RunStore:
             raise RunCorrupt("Unsafe sessions directory")
         existing_session = session_id is not None
         if existing_session:
-            self._id(session_id)
-            session_dir = self.root / session_id
-            if session_dir.is_symlink() or not session_dir.is_dir():
-                raise RunStoreError("Session not found or unsafe")
+            session_dir = self._session_dir(session_id)
             session_file = self._safe_file(session_dir / "session.json")
             try:
                 session_data = json.loads(session_file.read_text(encoding="utf-8"))
@@ -261,8 +288,9 @@ class RunStore:
                 raise RunStoreError("Archived session cannot receive new runs")
         else:
             session_id = str(uuid.uuid4())
+            session_dir = self.root / session_id
         run_id = str(uuid.uuid4())
-        directory = self.root / session_id / "runs" / run_id
+        directory = session_dir / "runs" / run_id
         directory.mkdir(parents=True, exist_ok=False)
         ignore = self.workspace / ".cybertron" / ".gitignore"
         if ignore.is_symlink():
