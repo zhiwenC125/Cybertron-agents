@@ -39,7 +39,8 @@ def main(argv: list[str] | None = None) -> int:
                                      test_scope=data.get("test_scope"),
                                      skip=data.get("skip"),
                                      access_mode=data.get("access_mode"),
-                                     session_title=data.get("session_title", ""))
+                                     session_title=data.get("session_title", ""),
+                                     slug=data.get("slug", ""))
             elif "template" in data:
                 template = data["template"]
                 if template.get("type") == "bug_fix":
@@ -57,14 +58,16 @@ def main(argv: list[str] | None = None) -> int:
                                      request_class=request_class,
                                      objective=template["objective"],
                                      access_mode=data.get("access_mode"),
-                                     session_title=data.get("session_title", ""))
+                                     session_title=data.get("session_title", ""),
+                                     slug=data.get("slug", ""))
             else:
                 nodes = data.get("nodes", data.get("node"))
                 result = bridge.plan(nodes, data["host_session_id"],
                                      request_class=data.get("request_class"),
                                      objective=data.get("objective", ""),
                                      access_mode=data.get("access_mode"),
-                                     session_title=data.get("session_title", ""))
+                                     session_title=data.get("session_title", ""),
+                                     slug=data.get("slug", ""))
         elif args.operation == "plan_op":
             result = bridge.plan_op(data["run_id"], data["operation"])
         elif args.operation == "state":

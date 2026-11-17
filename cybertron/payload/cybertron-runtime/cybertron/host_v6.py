@@ -42,7 +42,7 @@ def require_isolated_workspace(project: Path, access_mode: str = DEFAULT_ACCESS_
     socket or unreadable file under the home directory used to abort every
     dispatch.  The supported setup is one isolated project directory.
     """
-    if access_mode in {"read-only", "full"}:
+    if access_mode in {"read-only", "danger-full-access"}:
         # Read-only never writes and full mode is explicitly user-authorized;
         # neither needs a bounded workspace snapshot, so home is acceptable.
         return
@@ -177,7 +177,8 @@ class V6HostBridge:
              request_class: str | None = None, template_id: str | None = None,
              objective: str = "", write_scope: list[str] | None = None,
              test_scope: list[str] | None = None, skip: list[str] | None = None,
-             access_mode: str | None = None, session_title: str = "") -> dict:
+             access_mode: str | None = None, session_title: str = "",
+             slug: str = "") -> dict:
         if not isinstance(host_session_id, str) or not host_session_id:
             raise HostBridgeError("host session ID is required")
         try:
@@ -224,12 +225,11 @@ class V6HostBridge:
         run_id = str(uuid.uuid5(uuid.NAMESPACE_URL,
                                 f"{self.project}:{time.time_ns()}:{os.getpid()}:{next(_run_counter)}"))
         title = (session_title or "").strip() or objective.strip()
-        slug = slugify_title(title, fallback="run")
-        stem = f"{slug}--{run_id[:8]}"
-        directory = self.runs / stem
+        slug = slugify_title(slug or title, fallback="run")
+        directory = self.runs / slug
         suffix = 2
         while directory.exists() or directory.is_symlink():
-            directory = self.runs / f"{stem}-{suffix}"
+            directory = self.runs / f"{slug}-{suffix}"
             suffix += 1
         directory.mkdir(parents=True, exist_ok=False)
         (directory / "plan.json").write_text(json.dumps(graph_seed.to_dict(), ensure_ascii=False))
@@ -664,7 +664,7 @@ class V6HostBridge:
         current_after = guard.snapshot()
         artifacts = {path: value.sha256 for path, value in current_after.entries.items()
                      if path in report.changed_paths and path not in report.rejected_paths and value.kind == "file"}
-        if graph.access_mode == "full":
+        if graph.access_mode == "danger-full-access":
             # Full access does not snapshot the workspace. Hash the declared
             # artifacts directly so a completed child still has real evidence.
             for scope in node.write_scope:
@@ -696,7 +696,7 @@ class V6HostBridge:
                                "exit": 0 if returned["tool_status"] == "completed" else 1,
                                "utc": _utc(), "sha256": returned["output_sha256"],
                                "session_id": child_session_id})
-        if status == "completed" and artifacts and graph.access_mode != "full":
+        if status == "completed" and artifacts and graph.access_mode != "danger-full-access":
             facts = diff_facts(baseline, guard.snapshot())
             risk, floor = risk_floor(facts)
             self._append(run_id, "gate.required", node_id=node.node_id,

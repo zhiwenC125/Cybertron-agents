@@ -4,7 +4,7 @@
 
 ## 交付内容
 
-- `cybertron session create/list/show/rename/archive/unarchive` 管理 session 的可读 slug、标题与归档状态。新 session 目录使用 `<slug>--<session_id 前 8 位>`（完整 `session_id` 仍是不可变主键）；改名会移动新式目录并保留旧 slug 为 alias。阶段 B/C 旧 UUID 目录不迁移，继续按 UUID 寻址。
+- `cybertron session create/list/show/rename/archive/unarchive` 管理 session 的可读 slug、标题与归档状态。新 session 目录使用纯英文 slug（完整 `session_id` 仍是不可变主键，存储在 `session.json`）；改名会移动新式目录并保留旧 slug 为 alias。阶段 B/C 旧 UUID 目录不迁移，继续按 UUID 寻址。
 - `cybertron run create <request> --session <slug>` 在已有 session 下新建 run；`run list --session <slug>` 查询多次 run 的阶段、状态和事件序号。阶段 B 生成的旧 session 可用 UUID 查看并重命名，不移动事件目录。
 - slug 统一为 1–48 个 ASCII 小写字母、数字和连字符；空格/下划线归一为连字符。大小写冲突、保留字、路径穿越和符号链接均拒绝。创建与改名持有 session 索引锁，防止并发重名。
 - 归档后的 session 保留查询能力，禁止新增 run；取消归档后可以继续创建。默认无限期本地保留，不自动上传或删除。导出与删除尚无自动命令：导出应由用户明确指定目标，并避免包含凭证或固件；删除应要求明确 session ID 和备份确认，放在后续实现。

@@ -184,13 +184,13 @@ class PlanGraph:
             if node.write_scope:
                 raise GraphRejected("read-only plan cannot declare write_scope")
             return
-        if self.access_mode == "full":
+        if self.access_mode == "danger-full-access":
             if any(hard_denied(scope) for scope in node.write_scope):
                 raise GraphRejected("write_scope targets generated config, VCS, or run state")
             return
         if any(is_external_scope(scope) for scope in node.write_scope):
-            raise GraphRejected("workspace access mode cannot write outside the project; "
-                                "use access_mode=full only after the user explicitly authorizes it")
+            raise GraphRejected("workspace-write access mode cannot write outside the project; "
+                                "use access_mode=danger-full-access only after the user explicitly authorizes it")
         if not all(_scope_allowed(scope, roots) for scope in node.write_scope):
             raise GraphRejected("write_scope exceeds role limit or hard denial")
 

@@ -91,10 +91,10 @@ class V6HostBridgeTests(unittest.TestCase):
         self.addCleanup(lambda: external.unlink(missing_ok=True))
         node = dict(self.node)
         node["write_scope"] = [f"../{external.name}"]
-        plan = self.bridge.plan(node, "parent", access_mode="full", session_title="External write")
-        self.assertEqual(plan["access_mode"], "full")
+        plan = self.bridge.plan(node, "parent", access_mode="danger-full-access", session_title="External write")
+        self.assertEqual(plan["access_mode"], "danger-full-access")
         started = self.bridge.before(plan["run_id"], "n1", "alpha-trion", plan["card"], "call-full")
-        self.assertEqual(started["access_mode"], "full")
+        self.assertEqual(started["access_mode"], "danger-full-access")
         returned = self.bridge.after(plan["run_id"], "call-full", started["token"],
                                      "child-full", "completed", 5)
         external.write_text("hello")
@@ -107,7 +107,7 @@ class V6HostBridgeTests(unittest.TestCase):
     def test_run_folder_uses_slug_title_and_keeps_uuid_run_id(self):
         plan = self.bridge.plan(self.node, "parent", session_title="Create notes file")
         run_dir = Path(plan["run_dir"])
-        self.assertTrue(run_dir.name.startswith("create-notes-file--"))
+        self.assertEqual(run_dir.name, "create-notes-file")
         self.assertEqual(plan["title"], "Create notes file")
         self.assertEqual(plan["slug"], "create-notes-file")
         self.assertTrue((run_dir / "run.json").is_file())
@@ -116,7 +116,7 @@ class V6HostBridgeTests(unittest.TestCase):
     def test_chinese_title_falls_back_to_readable_run_prefix(self):
         plan = self.bridge.plan(self.node, "parent", session_title="创建说明文件")
         self.assertEqual(plan["slug"], "run")
-        self.assertTrue(Path(plan["run_dir"]).name.startswith("run--"))
+        self.assertEqual(Path(plan["run_dir"]).name, "run")
 
     def test_answered_question_is_recorded_even_during_dispatch(self):
         plan = self.bridge.plan(self.node, "parent")
