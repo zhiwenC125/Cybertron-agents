@@ -26,6 +26,12 @@ class FileState:
         return hashlib.sha256(self.content).hexdigest()
 
 
+def _opaque_state(info: os.stat_result) -> FileState:
+    """Fingerprint an entry the process may not read without treating it as fatal."""
+    fingerprint = f"{info.st_size}:{info.st_mtime_ns}:{info.st_ino}".encode()
+    return FileState("opaque", fingerprint, stat.S_IMODE(info.st_mode))
+
+
 @dataclass(frozen=True)
 class Snapshot:
     entries: Dict[str, FileState]
@@ -87,6 +93,9 @@ class ScopeGuard:
                 elif stat.S_ISDIR(info.st_mode):
                     entries[rel] = FileState("directory", mode=stat.S_IMODE(info.st_mode))
                 else:
+                    if stat.S_ISSOCK(info.st_mode) or stat.S_ISFIFO(info.st_mode):
+                        dirs.remove(name)
+                        continue
                     raise ScopeGuardError(f"unsupported entry: {rel}")
             for name in files:
                 path = base / name
@@ -95,7 +104,21 @@ class ScopeGuard:
                 if stat.S_ISLNK(info.st_mode):
                     entries[rel] = FileState("symlink", os.readlink(path).encode(), info.st_mode)
                 elif stat.S_ISREG(info.st_mode):
-                    entries[rel] = FileState("file", path.read_bytes(), stat.S_IMODE(info.st_mode))
+                    try:
+                        content = path.read_bytes()
+                    except OSError:
+                        # A snapshot must never make an unrelated unreadable file
+                        # fatal for every dispatch. Keep an opaque stat fingerprint
+                        # so an out-of-scope change is still detected and rejected;
+                        # such an entry cannot be restored byte-for-byte.
+                        entries[rel] = _opaque_state(info)
+                    else:
+                        entries[rel] = FileState("file", content, stat.S_IMODE(info.st_mode))
+                elif stat.S_ISSOCK(info.st_mode) or stat.S_ISFIFO(info.st_mode) \
+                        or stat.S_ISCHR(info.st_mode) or stat.S_ISBLK(info.st_mode):
+                    # Runtime endpoints and device nodes have no file contents to
+                    # snapshot. Replaced regular files still appear as deleted.
+                    continue
                 else:
                     raise ScopeGuardError(f"unsupported entry: {rel}")
         return Snapshot(entries)
@@ -160,6 +183,10 @@ class ScopeGuard:
                 path.chmod(state.mode)
             elif state.kind == "symlink":
                 path.symlink_to(state.content.decode())
+            elif state.kind == "opaque":
+                # The baseline bytes were unreadable, so they cannot be restored;
+                # the rejection is still reported to the host.
+                continue
             else:
                 path.write_bytes(state.content)
                 path.chmod(state.mode)

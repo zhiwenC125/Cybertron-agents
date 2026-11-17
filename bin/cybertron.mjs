@@ -139,6 +139,7 @@ function runDoctor(opts) {
   const agents = listMarkdown(path.join(base, 'agents'));
   const commands = listMarkdown(path.join(base, 'commands'));
   const plugin = path.join(base, 'plugins', 'cybertron.js');
+  const pluginHelper = path.join(base, 'plugins', 'hook_logic.mjs');
   const runtime = path.join(base, 'cybertron-runtime', 'cybertron', 'plugin_cli.py');
   const config = path.join(base, 'opencode.jsonc');
   const expected = listMarkdown(payload.agents).length;
@@ -146,7 +147,7 @@ function runDoctor(opts) {
   console.log(`目标: ${base}`);
   console.log(`已安装角色: ${agents.length}（期望 ${expected}）`);
   console.log(`已安装命令: ${commands.length}`);
-  console.log(`运行时: ${existsSync(plugin) && existsSync(runtime) ? '存在' : '缺失'}`);
+  console.log(`运行时: ${existsSync(plugin) && existsSync(pluginHelper) && existsSync(runtime) ? '存在' : '缺失'}`);
   console.log(`配置: ${existsSync(config) ? '存在' : '缺失'}`);
   console.log(`node: ${process.version}`);
 
@@ -154,7 +155,7 @@ function runDoctor(opts) {
     console.log('提示: 角色数量不符，运行 cybertron init --apply 重新安装。');
   }
   if (agents.length !== expected || commands.length !== 1 || !existsSync(config)
-      || !existsSync(plugin) || !existsSync(runtime)) {
+      || !existsSync(plugin) || !existsSync(pluginHelper) || !existsSync(runtime)) {
     process.exitCode = 1;
   }
 }

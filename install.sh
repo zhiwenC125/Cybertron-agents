@@ -78,9 +78,10 @@ if [ "$DOCTOR" = "1" ]; then
   echo "目标: $BASE"
   echo "已安装角色: ${AGENT_COUNT}（期望 13）"
   echo "已安装命令: ${COMMAND_COUNT}（期望 1）"
-  echo "运行时: $BASE/plugins/cybertron.js 与 $BASE/cybertron-runtime/cybertron/plugin_cli.py"
+  echo "运行时: $BASE/plugins/cybertron.js、hook_logic.mjs 与 $BASE/cybertron-runtime/cybertron/plugin_cli.py"
   [ "$AGENT_COUNT" -eq 13 ] && [ "$COMMAND_COUNT" -eq 1 ] && [ -f "$BASE/opencode.jsonc" ] \
-    && [ -f "$BASE/plugins/cybertron.js" ] && [ -f "$BASE/cybertron-runtime/cybertron/plugin_cli.py" ]
+    && [ -f "$BASE/plugins/cybertron.js" ] && [ -f "$BASE/plugins/hook_logic.mjs" ] \
+    && [ -f "$BASE/cybertron-runtime/cybertron/plugin_cli.py" ]
   exit $?
 fi
 
@@ -187,7 +188,12 @@ for kind in agents commands plugins cybertron-runtime; do
   fi
   [ -d "$src_dir" ] || continue
   if [ -L "$target_dir" ]; then echo "拒绝符号链接安装目录: $target_dir" >&2; exit 2; fi
-  for f in "$src_dir"/*."$extension"; do
+  if [ "$kind" = "plugins" ]; then
+    files=("$src_dir"/*.js "$src_dir"/*.mjs)
+  else
+    files=("$src_dir"/*."$extension")
+  fi
+  for f in "${files[@]}"; do
     [ -e "$f" ] || continue
     name="$(basename "$f")"
     target="$target_dir/$name"
@@ -234,7 +240,7 @@ else
     CHANGED_TARGETS+=("$CONFIG")
     CHANGED_KINDS+=("new")
     CHANGED_BACKUPS+=("")
-    printf '{\n  "$schema": "https://opencode.ai/config.json"\n}\n' > "$CONFIG"
+    printf '{\n  "$schema": "https://opencode.ai/config.json",\n  "plugins": ["-cybertron.runtime"]\n}\n' > "$CONFIG"
   fi
 fi
 

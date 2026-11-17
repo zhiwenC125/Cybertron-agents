@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cybertron.host_v6 import HostBridgeError, V6HostBridge
+from cybertron.host_v6 import HostBridgeError, V6HostBridge, require_isolated_workspace
 
 
 class V6HostBridgeTests(unittest.TestCase):
@@ -85,6 +85,33 @@ class V6HostBridgeTests(unittest.TestCase):
         returned = self.bridge.after(plan["run_id"], "call1", started["token"],
                                      "child-session", "completed", 1)
         self.assertEqual(returned["status"], "running")
+
+    def test_answered_question_is_recorded_even_during_dispatch(self):
+        plan = self.bridge.plan(self.node, "parent")
+        self.bridge.before(plan["run_id"], "n1", "alpha-trion", plan["card"], "call1")
+        self.bridge.ask(plan["run_id"], "Which parser?", ["native"])
+        events = self.bridge.events(plan["run_id"])
+        answered = [event for event in events if event["type"] == "human.answered"]
+        self.assertEqual(len(answered), 1)
+        self.assertEqual(answered[0]["answers"], ["native"])
+        self.assertEqual(answered[0]["source"], "opencode.question")
+
+    def test_approved_question_records_approval_event(self):
+        plan = self.bridge.plan(self.node, "parent")
+        self.bridge.ask(plan["run_id"], "Proceed with notes.md?", approved=True)
+        approved = [event for event in self.bridge.events(plan["run_id"])
+                    if event["type"] == "approval.granted"]
+        self.assertEqual(len(approved), 1)
+        self.assertEqual(approved[0]["source"], "opencode.permission")
+        self.assertEqual([event["type"] for event in self.bridge.events(plan["run_id"])
+                          if event["type"].startswith("human.")],
+                         ["human.requested"])
+
+    def test_user_home_workspace_is_rejected_before_planning(self):
+        for project in (Path.home(), Path("/")):
+            with self.subTest(project=str(project)):
+                with self.assertRaisesRegex(HostBridgeError, "isolated project directory"):
+                    require_isolated_workspace(project)
 
     def test_m1_multi_node_plan_dispatches_ready_nodes_in_order(self):
         nodes = []
@@ -298,6 +325,21 @@ class V6HostBridgeTests(unittest.TestCase):
         state = json.loads(result.stdout)
         self.assertEqual(len(state["nodes"]), 4)
         self.assertEqual(set(state["ready_nodes"]), {"scan-static", "scan-history"})
+
+    def test_read_only_scan_template_creates_unexecuted_read_only_run(self):
+        command = [sys.executable, "-m", "cybertron.host_v6_cli", "plan",
+                   "--project", str(self.root)]
+        result = subprocess.run(command, input=json.dumps({
+            "template": {"type": "read_only_scan", "objective": "List the temporary project layout"},
+            "host_session_id": "parent",
+        }), text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        state = json.loads(result.stdout)
+        self.assertEqual(state["ready_nodes"], ["scan"])
+        self.assertEqual(state["write_scope"], [])
+        self.assertEqual(self.bridge.events(state["run_id"])[0]["type"], "plan.created")
+        self.assertFalse(any(event["type"] == "dispatch.started"
+                             for event in self.bridge.events(state["run_id"])))
 
 
 if __name__ == "__main__":

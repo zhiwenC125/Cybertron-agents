@@ -3,7 +3,7 @@
 import unittest
 
 from cybertron.graph import GraphRejected, PlanGraph, PlanNode
-from cybertron.templates import bug_fix_template
+from cybertron.templates import bug_fix_template, read_only_scan_template
 from tests.test_graph import node
 
 
@@ -13,6 +13,15 @@ def op(graph, ident, kind, **payload):
 
 
 class GraphM1Tests(unittest.TestCase):
+    def test_read_only_scan_template_has_no_writing_node(self):
+        graph = read_only_scan_template("Inspect the temporary project directory")
+        self.assertEqual(len(graph.nodes), 1)
+        scan = graph.nodes["scan"]
+        self.assertEqual((scan.capability, scan.role, scan.write_scope),
+                         ("scan.static", "onyx-prime", ()))
+        with self.assertRaises(ValueError):
+            read_only_scan_template(" ")
+
     def test_reassign_rejects_running_and_role_mismatch(self):
         graph = PlanGraph([node()])
         graph.nodes["n1"].status = "running"

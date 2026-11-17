@@ -10,7 +10,7 @@ from .registry import THIRTEEN_PRIMES_REGISTRY, assert_catalog
 # ============================================================================
 
 def compile_opencode_v2_assets(target_dir: Path, *, include_feishu: bool = False,
-                               disable_legacy_cybertron: bool = False) -> List[Path]:
+                               disable_legacy_cybertron: bool = True) -> List[Path]:
     """Generates OpenCode V2 native configuration files for all 13 Primes."""
     assert_catalog()
     generated: List[Path] = []

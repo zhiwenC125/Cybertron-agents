@@ -36,6 +36,7 @@ class OpenCodeV2BundleTests(unittest.TestCase):
             self.assertEqual(validate_bundle(root), [])
             config = json.loads((root / "opencode.jsonc").read_text())
             self.assertNotIn("mcp", config)
+            self.assertIn("-cybertron.runtime", config["plugins"])
             self.assertEqual(len(config["agents"]), 13)
 
     def test_missing_agent_file_is_reported(self):

@@ -17,6 +17,12 @@ permissions:
   - action: "cy_ask"
     resource: "*"
     effect: "allow"
+  - action: "cy_ask_decision"
+    resource: "*"
+    effect: "ask"
+  - action: "question"
+    resource: "*"
+    effect: "allow"
   - action: "cy_templates"
     resource: "*"
     effect: "allow"
@@ -79,3 +85,5 @@ permissions:
    - 阶段 V（双级专职 Code Review）：先派 `micronus-prime` 执行 L1 静态规范/Lint 审查，再派 `liege-maximo` 执行 L2 深度逻辑、并发死锁、中断安全与引脚冲突审查（一票否决）。
    - 阶段 VI（专职测试与仿真检验）：派 `alchemist` 编写 `tests/**` 并运行单元测试与 QEMU/Renode 硬件仿真检验。
    - 阶段 VII（交叉编译与实体硬件烧录部署）：先派 `nexus-prime` 执行交叉编译生成固件镜像并探测硬件端口，再派 `megatronus` 触发 `ask` 人工审批后执行物理烧录与串口心跳验证。
+2. 需要向用户提问或请求确认时，必须调用 OpenCode 原生 `question` 工具：它会渲染交互小卡片、等待用户选择，并把问题与答案记入 run 账本。严禁只在回复文字里发问；二选一确认请用 options（如 Approve / Reject）。`cy_ask` 只用于在派发前留下正式的宿主机审批事件，不是主要提问通道。
+3. 工作区之外的路径（桌面、下载、用户主目录等）不属于 Cybertron 的可写范围；不得为它们创建 `write_scope` 节点。向用户说明交付物只能落在项目目录内，或由用户自行移动到桌面。

@@ -32,6 +32,23 @@ class HostBridgeError(RuntimeError):
     pass
 
 
+def require_isolated_workspace(project: Path) -> None:
+    """Reject a user-home workspace before it can create an undispatchable run.
+
+    A whole-home snapshot is both unbounded and semantically wrong: every
+    Desktop/Downloads/Library path is outside the project write model, and a
+    socket or unreadable file under the home directory used to abort every
+    dispatch.  The supported setup is one isolated project directory.
+    """
+    resolved = Path(project).resolve()
+    if resolved == Path("/").resolve() or resolved == Path.home().resolve():
+        raise HostBridgeError(
+            "project workspace is the user home directory; Cybertron requires an "
+            "isolated project directory. Open OpenCode inside a project folder "
+            "(for example ~/projects/<name>) and retry. Paths outside the project "
+            "(Desktop, Downloads, Library) are not Cybertron workspace writes.")
+
+
 _DISPATCH_END_EVENTS = {"node.completed", "node.failed", "node.blocked", "node.cancelled"}
 
 
@@ -143,6 +160,7 @@ class V6HostBridge:
              test_scope: list[str] | None = None, skip: list[str] | None = None) -> dict:
         if not isinstance(host_session_id, str) or not host_session_id:
             raise HostBridgeError("host session ID is required")
+        require_isolated_workspace(self.project)
         if template_id is not None:
             try:
                 template = load_template(self.project, template_id)
@@ -277,12 +295,25 @@ class V6HostBridge:
                            else nodes[0]["status"]})
         return result
 
-    def ask(self, run_id: str, question: str) -> dict:
+    def ask(self, run_id: str, question: str,
+            answers: list[str] | None = None, approved: bool = False) -> dict:
         if not isinstance(question, str) or not question.strip():
             raise HostBridgeError("question is required")
-        if self.state(run_id)["status"] == "running":
+        if answers is not None:
+            if not isinstance(answers, list) or any(not isinstance(item, str) for item in answers):
+                raise HostBridgeError("answers must be a string list")
+        # An unanswered question must not invalidate an active dispatch.  A
+        # question the user already answered or approved through the OpenCode
+        # host is a completed fact and may be recorded at any time.
+        if answers is None and not approved and self.state(run_id)["status"] == "running":
             raise HostBridgeError("cannot request human input during an active dispatch")
         self._append(run_id, "human.requested", question=question.strip())
+        if answers is not None:
+            self._append(run_id, "human.answered", question=question.strip(),
+                         answers=list(answers), source="opencode.question")
+        if approved:
+            self._append(run_id, "approval.granted", question=question.strip(),
+                         source="opencode.permission")
         return self.state(run_id)
 
     def template_hints(self, request_class: str | None) -> list[dict]:
@@ -398,6 +429,7 @@ class V6HostBridge:
 
     def before(self, run_id: str, node_id: str, role: str, card: str, call_id: str,
                active_token: str | None = None) -> dict:
+        require_isolated_workspace(self.project)
         graph = self._graph(run_id)
         node = graph.nodes.get(node_id)
         reason = None
@@ -422,8 +454,8 @@ class V6HostBridge:
                 return {"rejected": True, "reason": reason, "token": active_token}
             raise HostBridgeError(reason)
         guard = ScopeGuard(self.project, node.write_scope)
-        guard.assert_safe_before_dispatch(guard.snapshot())
         baseline = guard.snapshot()
+        guard.assert_safe_before_dispatch(baseline)
         directory = self._dir(run_id)
         self._snapshot_path(run_id, call_id).write_bytes(_encode(baseline))
         self._append(run_id, "dispatch.started", node_id=node_id, role=role,

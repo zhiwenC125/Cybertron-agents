@@ -29,6 +29,16 @@
           "effect": "allow"
         },
         {
+          "action": "cy_ask_decision",
+          "resource": "*",
+          "effect": "ask"
+        },
+        {
+          "action": "question",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
           "action": "cy_templates",
           "resource": "*",
           "effect": "allow"
@@ -823,5 +833,8 @@
         }
       ]
     }
-  }
+  },
+  "plugins": [
+    "-cybertron.runtime"
+  ]
 }

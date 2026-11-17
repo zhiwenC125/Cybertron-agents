@@ -67,13 +67,17 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "   - 阶段 IV（软硬件编码）：派 `solus-prime` 编写核心业务代码与嵌入式外设驱动/固件，派 `amalgamous` 做 AST 解耦重构或跨芯片移植。\n"
             "   - 阶段 V（双级专职 Code Review）：先派 `micronus-prime` 执行 L1 静态规范/Lint 审查，再派 `liege-maximo` 执行 L2 深度逻辑、并发死锁、中断安全与引脚冲突审查（一票否决）。\n"
             "   - 阶段 VI（专职测试与仿真检验）：派 `alchemist` 编写 `tests/**` 并运行单元测试与 QEMU/Renode 硬件仿真检验。\n"
-            "   - 阶段 VII（交叉编译与实体硬件烧录部署）：先派 `nexus-prime` 执行交叉编译生成固件镜像并探测硬件端口，再派 `megatronus` 触发 `ask` 人工审批后执行物理烧录与串口心跳验证。"
+            "   - 阶段 VII（交叉编译与实体硬件烧录部署）：先派 `nexus-prime` 执行交叉编译生成固件镜像并探测硬件端口，再派 `megatronus` 触发 `ask` 人工审批后执行物理烧录与串口心跳验证。\n"
+            "2. 需要向用户提问或请求确认时，必须调用 OpenCode 原生 `question` 工具：它会渲染交互小卡片、等待用户选择，并把问题与答案记入 run 账本。严禁只在回复文字里发问；二选一确认请用 options（如 Approve / Reject）。`cy_ask` 只用于在派发前留下正式的宿主机审批事件，不是主要提问通道。\n"
+            "3. 工作区之外的路径（桌面、下载、用户主目录等）不属于 Cybertron 的可写范围；不得为它们创建 `write_scope` 节点。向用户说明交付物只能落在项目目录内，或由用户自行移动到桌面。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("cy_state", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_plan", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_ask", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_ask_decision", "*", PermissionEffect.ASK),
+            PermissionRule("question", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_templates", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_metrics", "*", PermissionEffect.ALLOW),
             PermissionRule("subagent", "thirteenth", PermissionEffect.ALLOW),
@@ -596,7 +600,7 @@ PRIME_ROLES: Mapping[str, PrimeRole] = MappingProxyType({
                          if r.action == "read" and r.effect is PermissionEffect.ALLOW),
         write_roots=_ROLE_WRITE_ROOTS.get(spec.agent_id, ()),
         tool_mode="allow-list",
-        tool_classes=("task", "cy_state", "cy_plan", "cy_ask", "cy_templates", "cy_metrics")
+        tool_classes=("task", "cy_state", "cy_plan", "cy_ask", "question", "cy_templates", "cy_metrics")
                      if spec.agent_id == "prima" else
                      tuple(sorted({rule.action for rule in spec.permissions if rule.effect is PermissionEffect.ALLOW and rule.action != "*"})),
         command_mode="git-allow-list" if spec.agent_id == "vector-prime" else
@@ -616,7 +620,8 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
     if set(roles) != set(_ROLE_CAPABILITIES) or len(specs) != len(roles):
         raise ValueError("role catalogue must contain exactly thirteen unique agents")
     known_actions = {"*", "read", "glob", "grep", "edit", "shell", "subagent",
-                     "cy_state", "cy_plan", "cy_ask", "cy_templates", "cy_metrics",
+                     "cy_state", "cy_plan", "cy_ask", "cy_ask_decision", "question",
+                     "cy_templates", "cy_metrics",
                      "cy_check", "cy_review_reject", "feishu_mcp_healthcheck*",
                      "feishu_wiki_delete*", "feishu_wiki_docx_v1_document_rawContent",
                      "feishu_wiki_wiki_v2_space_getNode"}

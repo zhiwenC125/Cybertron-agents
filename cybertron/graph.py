@@ -17,6 +17,8 @@ class GraphRejected(ValueError):
 
 NODE_KINDS = frozenset({"task", "review", "verify", "human", "device_op"})
 NODE_STATES = frozenset({"pending", "running", "completed", "failed", "blocked", "cancelled", "stale"})
+GRAPH_OPERATIONS = ("add_node", "add_edge", "reassign_role", "split_node", "retry_node",
+                    "insert_gate", "mark_not_applicable", "request_human", "complete_run")
 
 # Registry is the only v6 capability and role-scope source of truth.
 from .registry import PRIME_ROLES, assert_catalog
@@ -141,7 +143,10 @@ class PlanGraph:
                 raise GraphRejected("capability and role must be strings")
             roles = CAPABILITY_CATALOG.get(node.capability)
             if roles is None or node.role not in roles:
-                raise GraphRejected("capability has no matching role")
+                role = PRIME_ROLES.get(node.role)
+                allowed = ", ".join(role.capabilities) if role else "unknown role"
+                raise GraphRejected(f"capability {node.capability!r} has no matching role "
+                                    f"{node.role!r}; registered capabilities: {allowed}")
             if any(not isinstance(value, str) or not value for values in
                    (node.depends_on, node.read_scope, node.write_scope, node.acceptance, node.verifiers)
                    for value in values):
@@ -296,7 +301,8 @@ class PlanGraph:
                 # M2 binds acceptance to verified gate receipts.
                 raise GraphRejected("acceptance evidence unavailable until M2")
             else:
-                raise GraphRejected("unknown graph operation")
+                raise GraphRejected(
+                    f"unknown graph operation {kind!r}; expected one of {', '.join(GRAPH_OPERATIONS)}")
             PlanGraph(candidate.values(), revision=self.revision + 1,
                       gates=gates, human_requests=human_requests, attempts=attempts,
                       complete=complete)
