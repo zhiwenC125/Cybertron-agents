@@ -26,15 +26,22 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
   const toolHooks = new Map();
   const sessionHooks = new Map();
   const sessionUpdates = [];
+  const approvals = [];
+  let approved = false;
   const ctx = {
     location: { project: { canonical: project } },
     storage: { get: async key => storage.get(key), set: async (key, value) => storage.set(key, value) },
+    permission: { assert: async request => {
+      approvals.push(request);
+      if (!approved) throw new Error('human denied');
+    } },
     session: {
       hook: async (name, fn) => sessionHooks.set(name, fn),
       get: async ({ sessionID }) => sessionID === 'child-1'
         ? { agent: 'alpha-trion', parentID: 'parent',
             permissions: sessionUpdates.at(-1)?.permissions } : { agent: 'prima' },
       update: async value => sessionUpdates.push(value),
+      switchModel: async () => undefined,
       wait: async () => undefined,
     },
     tool: {
@@ -51,17 +58,63 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     ['task', 'review']);
   assert.ok(toolHooks.has('execute.before'));
   assert.ok(toolHooks.has('execute.after'));
-  const context = { agent: 'prima', tools: {}, system: [],
+  await assert.rejects(sessionHooks.get('context')({ agent: 'prima', tools: {}, system: [],
+    model: { providerID: 'vendor', id: 'test' } }), /Native subagent tool is unavailable/);
+  const context = { agent: 'prima', tools: { subagent: {} }, system: [],
     model: { providerID: 'vendor', id: 'test' } };
   await sessionHooks.get('context')(context);
   assert.equal(context.tools.cy_check, undefined);
   assert.match(context.system[0].text, /single requested Markdown file/);
   assert.match(context.system[0].text, /doc\.write.*alpha-trion.*write_scope.*scope_guard/);
+  assert.match(context.system[1].text, /read_only_scan.*scan\.static/);
+  assert.deepEqual(tools.get('cy_plan').input.properties.template.properties.type.enum,
+    ['bug_fix', 'read_only_scan']);
+  await sessionHooks.get('prompt')({ sessionID: 'read-only-parent',
+    prompt: { text: '请先准备一个只读检查计划，不要修改文件，先问我是否同意。' } });
+  await assert.rejects(tools.get('cy_plan').execute({ node: {
+    node_id: 'bad', kind: 'task', capability: 'doc.write', role: 'alpha-trion',
+    objective: 'Write a report', write_scope: ['docs/report.md'],
+    acceptance: ['report exists'], verifiers: ['scope_guard'],
+  } }, { agent: 'prima', sessionID: 'read-only-parent' }), /read-only user request/);
+  const readonlyPlan = JSON.parse((await tools.get('cy_plan').execute({
+    template: { type: 'read_only_scan', objective: 'Inspect the temporary directory layout' },
+  }, { agent: 'prima', sessionID: 'read-only-parent' })).content);
+  assert.deepEqual(readonlyPlan.write_scope, []);
+  assert.equal(readonlyPlan.nodes[0].role, 'onyx-prime');
+  assert.equal(readonlyPlan.nodes[0].card, '[scan] scan.static | (read only)');
   const plan = JSON.parse((await tools.get('cy_plan').execute({ node: {
     node_id: 'n1', kind: 'task', capability: 'doc.write', role: 'alpha-trion',
     objective: 'Write notes.md', write_scope: ['notes.md'],
     acceptance: ['notes.md exists'], verifiers: ['scope_guard'],
   } }, { agent: 'prima', sessionID: 'parent' })).content);
+  await assert.rejects(tools.get('cy_ask').execute({ question: 'Confirm notes.md?' },
+    { agent: 'prima', sessionID: 'parent', messageID: 'message-1', id: 'tool-1' }), /human denied/);
+  assert.equal(readFileSync(JSON.parse((await tools.get('cy_state').execute({},
+    { agent: 'prima', sessionID: 'parent' })).content).events_path, 'utf8').includes('human.requested'), false);
+  approved = true;
+  await tools.get('cy_ask').execute({ question: 'Confirm notes.md?' },
+    { agent: 'prima', sessionID: 'parent', messageID: 'message-1', id: 'tool-1' });
+  assert.equal(approvals[0].action, 'cy_ask_decision');
+  assert.deepEqual(approvals[0].resources, ['Confirm notes.md?']);
+  const approvedLog = readFileSync(JSON.parse((await tools.get('cy_state').execute({},
+    { agent: 'prima', sessionID: 'parent' })).content).events_path, 'utf8');
+  assert.match(approvedLog, /human.requested/);
+  assert.match(approvedLog, /approval.granted/);
+  const readonlyAsked = JSON.parse((await tools.get('cy_ask').execute({
+    question: 'May I start the read-only scan?'
+  }, { agent: 'prima', sessionID: 'read-only-parent', messageID: 'message-2', id: 'tool-2' })).content);
+  assert.equal(readonlyAsked.run_id, readonlyPlan.run_id);
+  assert.equal(readonlyAsked.status, 'ready');
+  assert.match(readFileSync(readonlyAsked.events_path, 'utf8'), /human.requested/);
+  await toolHooks.get('execute.after')({ tool: 'question', sessionID: 'parent', agent: 'prima',
+    callID: 'question-1', status: 'completed',
+    input: { questions: [{ header: 'Parser', question: 'Which parser?' }] },
+    result: { metadata: { answers: [['native']] } } });
+  const questionState = JSON.parse((await tools.get('cy_state').execute({},
+    { agent: 'prima', sessionID: 'parent' })).content);
+  const questionLog = readFileSync(questionState.events_path, 'utf8');
+  assert.match(questionLog, /human.answered/);
+  assert.match(questionLog, /native/);
   await assert.rejects(toolHooks.get('execute.before')({ tool: 'subagent', sessionID: 'parent',
     callID: 'bad-call', input: { description: 'bad card', agentID: 'alpha-trion' } }),
     /node card/);

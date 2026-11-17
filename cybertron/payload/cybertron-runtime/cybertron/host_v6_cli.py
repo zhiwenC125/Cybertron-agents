@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from .host_v6 import HostBridgeError, V6HostBridge
-from .templates import bug_fix_template
+from .templates import bug_fix_template, read_only_scan_template
 from .profiles import CheckRejected, run_check
 
 
@@ -40,12 +40,19 @@ def main(argv: list[str] | None = None) -> int:
                                      skip=data.get("skip"))
             elif "template" in data:
                 template = data["template"]
-                if template.get("type") != "bug_fix":
+                if template.get("type") == "bug_fix":
+                    graph = bug_fix_template(template["objective"], tuple(template["write_scope"]))
+                    request_class = "bug-fix"
+                elif template.get("type") == "read_only_scan":
+                    if template.get("write_scope"):
+                        raise ValueError("read_only_scan cannot have write_scope")
+                    graph = read_only_scan_template(template["objective"])
+                    request_class = "read-only-scan"
+                else:
                     raise ValueError("unknown plan template")
-                graph = bug_fix_template(template["objective"], tuple(template["write_scope"]))
                 nodes = [node.to_dict() for node in graph.nodes.values()]
                 result = bridge.plan(nodes, data["host_session_id"],
-                                     request_class="bug-fix",
+                                     request_class=request_class,
                                      objective=template["objective"])
             else:
                 nodes = data.get("nodes", data.get("node"))
@@ -57,7 +64,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.operation == "state":
             result = bridge.state(data["run_id"])
         elif args.operation == "ask":
-            result = bridge.ask(data["run_id"], data["question"])
+            result = bridge.ask(data["run_id"], data["question"], data.get("answers"),
+                                approved=bool(data.get("approved")))
         elif args.operation == "before":
             result = bridge.before(data["run_id"], data["node_id"], data["role"],
                                    data["card"], data["call_id"], data.get("active_token"))

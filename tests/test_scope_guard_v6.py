@@ -1,5 +1,8 @@
 import tempfile
 import unittest
+import os
+import socket
+import errno
 from pathlib import Path
 
 from cybertron.scope_guard import ScopeGuard, ScopeGuardError
@@ -86,6 +89,56 @@ class ScopeGuardTests(unittest.TestCase):
         guard = ScopeGuard(self.root, ("src/**",))
         with self.assertRaises(ScopeGuardError):
             guard.assert_safe_before_dispatch(guard.snapshot())
+
+    def test_existing_socket_and_fifo_do_not_block_dispatch_or_diff(self):
+        sock_path = self.root / "runtime.sock"
+        fifo_path = self.root / "runtime.fifo"
+        sock = socket.socket(socket.AF_UNIX)
+        self.addCleanup(sock.close)
+        previous_cwd = Path.cwd()
+        try:
+            os.chdir(self.root)
+            try:
+                sock.bind(sock_path.name)
+            except OSError as exc:
+                if exc.errno != errno.EPERM:
+                    raise
+        finally:
+            os.chdir(previous_cwd)
+        os.mkfifo(fifo_path)
+        guard = ScopeGuard(self.root, ("src/**",))
+        before = guard.snapshot()
+        guard.assert_safe_before_dispatch(before)
+        if sock_path.exists():
+            self.assertNotIn("runtime.sock", before.entries)
+        self.assertNotIn("runtime.fifo", before.entries)
+        (self.root / "src" / "keep.txt").write_text("allowed")
+        self.assertEqual(guard.diff(before).changed_paths, ("src/keep.txt",))
+
+    def test_special_file_cannot_hide_out_of_scope_regular_file_replacement(self):
+        guard = ScopeGuard(self.root, ("src/**",))
+        before = guard.snapshot()
+        target = self.root / "tests" / "test_existing.py"
+        target.unlink()
+        os.mkfifo(target)
+        report = guard.verify_and_rollback(before)
+        self.assertEqual(report.rejected_paths, ("tests/test_existing.py",))
+        self.assertEqual(target.read_text(), "original")
+
+
+    def test_unreadable_file_is_opaque_instead_of_fatal(self):
+        secret = self.root / "tests" / "secret.txt"
+        secret.write_text("classified")
+        os.chmod(secret, 0)
+        self.addCleanup(os.chmod, secret, 0o600)
+        if os.access(secret, os.R_OK):
+            self.skipTest("file mode 000 is readable for this user")
+        guard = ScopeGuard(self.root, ("src/**",))
+        before = guard.snapshot()
+        self.assertEqual(before.entries["tests/secret.txt"].kind, "opaque")
+        guard.assert_safe_before_dispatch(before)
+        (self.root / "src" / "keep.txt").write_text("allowed")
+        self.assertEqual(guard.diff(before).changed_paths, ("src/keep.txt",))
 
 
 if __name__ == "__main__":

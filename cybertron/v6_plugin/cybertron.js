@@ -9,6 +9,8 @@ import { nativeDispatch, childSession, nativeToolStatus } from './hook_logic.mjs
 
 const pluginDirectory = path.dirname(fileURLToPath(import.meta.url));
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const noWriteRequested = text => /只读|不(?:要|得)?(?:创建|修改|删除|写入).*文件|read[- ]only|do not (?:write|modify|create|delete) (?:any )?files?/i.test(text);
+const writeNowRequested = text => /(?:允许|可以|同意)(?:现在|继续)?(?:写入|修改|创建).*文件|(?:you may|please) (?:write|modify|create) (?:the )?files?/i.test(text);
 
 function runtimePath() {
   const bundled = path.resolve(pluginDirectory, '..', 'cybertron-runtime');
@@ -85,26 +87,34 @@ export default Plugin.define({
     await ctx.session.hook('prompt', async event => {
       const selected = await ctx.session.get({ sessionID: event.sessionID });
       if (selected.agent === 'prima') {
+        const prompt = event.prompt?.text || '';
+        if (writeNowRequested(prompt)) await ctx.storage.set(`read-only/${event.sessionID}`, false);
+        else if (noWriteRequested(prompt)) await ctx.storage.set(`read-only/${event.sessionID}`, true);
         const model = primaryModel(project);
         if (model) await ctx.session.switchModel({ sessionID: event.sessionID, model });
       }
     });
     await ctx.tool.transform(editor => {
       editor.add({
-        name: 'cy_plan', description: 'Create a validated v6 task graph, seed one from a learned template, use the optional bug_fix plan seed, or apply one revisioned graph operation. Returns ready native subagent cards.',
+        name: 'cy_plan', description: 'Create a validated v6 task graph. For a read-only directory or project inspection, use template {type:"read_only_scan",objective:"..."}; it creates one onyx-prime scan.static node with empty write_scope. For fixes, use bug_fix or explicit nodes. Returns ready native subagent cards.',
         input: { type: 'object', properties: {
           node: nodeInput, nodes: { type: 'array', items: nodeInput, minItems: 1 },
           template: { type: 'object', properties: {
-            type: { type: 'string', enum: ['bug_fix'] }, objective: { type: 'string' },
+            type: { type: 'string', enum: ['bug_fix', 'read_only_scan'] }, objective: { type: 'string' },
             write_scope: { type: 'array', items: { type: 'string' }, minItems: 1 },
-          }, required: ['type', 'objective', 'write_scope'], additionalProperties: false },
+          }, required: ['type', 'objective'], additionalProperties: false },
           template_id: { type: 'string' },
           objective: { type: 'string' },
           write_scope: { type: 'array', items: { type: 'string' } },
           test_scope: { type: 'array', items: { type: 'string' } },
           skip: { type: 'array', items: { type: 'string' } },
           request_class: { type: 'string' },
-          operation: { type: 'object', additionalProperties: true },
+          operation: { type: 'object', properties: {
+            op: { type: 'string', enum: ['add_node', 'add_edge', 'reassign_role', 'split_node',
+              'retry_node', 'insert_gate', 'mark_not_applicable', 'request_human', 'complete_run'] },
+            op_id: { type: 'string' },
+            plan_revision: { type: 'integer' },
+          }, required: ['op', 'op_id', 'plan_revision'], additionalProperties: true },
         }, additionalProperties: false },
         execute: async (input, context) => {
           if (context.agent !== 'prima') throw new Error('Only prima may create plans');
@@ -117,6 +127,16 @@ export default Plugin.define({
             throw new Error('A template seed requires the new objective');
           if (input.skip && !input.template_id)
             throw new Error('skip is only valid with a template seed');
+          if (input.template?.type === 'bug_fix' && !input.template.write_scope?.length)
+            throw new Error('bug_fix requires write_scope');
+          if (input.template?.type === 'read_only_scan' &&
+              (input.template.write_scope?.length || input.write_scope?.length))
+            throw new Error('read_only_scan cannot have write_scope');
+          if (await ctx.storage.get(`read-only/${context.sessionID}`) &&
+              (input.node?.write_scope?.length || input.nodes?.some(node => node.write_scope?.length) ||
+               input.template?.type === 'bug_fix' || input.template_id || input.write_scope?.length ||
+               (input.operation && input.operation.op !== 'request_human')))
+            throw new Error('This session has a read-only user request; cy_plan cannot create or revise a writing node');
           const result = run_id
             ? await bridge('plan_op', project, { run_id, operation: input.operation }, context.signal)
             : await bridge('plan', project, { node: input.node, nodes: input.nodes,
@@ -152,14 +172,26 @@ export default Plugin.define({
         },
       });
       editor.add({
-        name: 'cy_ask', description: 'Record a question that requires a human answer.',
+        name: 'cy_ask', description: 'Formal host approval gate for one yes/no decision. Prefer the native question tool for user questions; this opens the OpenCode permission card and records approval.granted in the run ledger.',
         input: { type: 'object', properties: { question: { type: 'string' } },
           required: ['question'], additionalProperties: false },
         execute: async (input, context) => {
           if (context.agent !== 'prima') throw new Error('Only prima may request human input');
           const run_id = await ctx.storage.get(`run/${context.sessionID}`);
           if (!run_id) throw new Error('No v6 run in this session');
-          const result = await bridge('ask', project, { run_id, question: input.question }, context.signal);
+          if (typeof input.question !== 'string' || !input.question.trim())
+            throw new Error('question is required');
+          const state = await bridge('state', project, { run_id }, context.signal);
+          if (state.status === 'running')
+            throw new Error('cannot request human input during an active dispatch');
+          await ctx.permission.assert({
+            sessionID: context.sessionID, agent: context.agent,
+            source: { type: 'tool', messageID: context.messageID, id: context.id },
+            action: 'cy_ask_decision', resources: [input.question.trim()],
+            metadata: { question: input.question.trim(), run_id },
+          });
+          const result = await bridge('ask', project,
+            { run_id, question: input.question, approved: true }, context.signal);
           return { content: JSON.stringify(result) };
         },
       });
@@ -244,6 +276,31 @@ export default Plugin.define({
       await ctx.storage.set(`token/${run_id}`, result.token);
     });
     await ctx.tool.hook('execute.after', async event => {
+      if (event.tool === 'question') {
+        // The native OpenCode question card is the only user-facing ask UI.
+        // Persist its question and the structured answer in the run ledger so
+        // the plan is auditable without a second text prompt.
+        const call_id = event.callID || event.id || event.toolCallID;
+        if (event.status !== 'completed') return;
+        const selected = await ctx.session.get({ sessionID: event.sessionID });
+        if (selected.agent !== 'prima') return;
+        const run_id = await ctx.storage.get(`run/${event.sessionID}`);
+        if (!run_id) return;
+        const asked = Array.isArray(event.input?.questions)
+          ? event.input.questions.map(item => String(item?.question || '').trim()).filter(Boolean) : [];
+        const answers = event.result?.metadata?.answers || event.result?.answers;
+        if (!asked.length || !Array.isArray(answers)) return;
+        for (let index = 0; index < asked.length; index += 1) {
+          const answer = Array.isArray(answers[index]) ? answers[index].map(String) : [];
+          try {
+            await bridge('ask', project, { run_id, question: asked[index], answers: answer }, ctx.signal);
+          } catch (error) {
+            // Never turn a completed user answer into a failed tool call.
+            console.warn(`Cybertron: could not record question answer (${call_id || 'no call id'}): ${error.message}`);
+          }
+        }
+        return;
+      }
       if (event.tool !== 'subagent') return;
       const call_id = event.callID || event.id || event.toolCallID;
       const started = call_id ? await ctx.storage.get(`dispatch/${call_id}`) : null;
@@ -301,6 +358,7 @@ export default Plugin.define({
         delete event.tools.cy_state;
         delete event.tools.cy_plan;
         delete event.tools.cy_ask;
+        delete event.tools.question;
         delete event.tools.cy_templates;
         delete event.tools.cy_metrics;
         delete event.tools.subagent;
@@ -311,13 +369,17 @@ export default Plugin.define({
       }
       delete event.tools.cy_check;
       delete event.tools.cy_review_reject;
+      if (!event.tools.subagent && !event.tools.execute)
+        throw new Error('Native subagent tool is unavailable for prima; disable the legacy cybertron.runtime plugin in this project with plugins: ["-cybertron.runtime"] and restart OpenCode');
       const expected = primaryModel(project);
       if (expected && (event.model.providerID !== expected.providerID ||
           event.model.id !== expected.id || event.model.variant !== expected.variant)) {
-        throw new Error('Cybertron prima model differs from active session; run cybertron models doctor');
+        throw new Error(`Cybertron prima model differs from active session: expected ${expected.providerID}/${expected.id}${expected.variant ? '#' + expected.variant : ''}, active ${event.model.providerID}/${event.model.id}${event.model.variant ? '#' + event.model.variant : ''}; run cybertron models doctor`);
       }
       event.system.push({ type: 'text', text:
-        'Cybertron v6 M5: plan the smallest valid task graph for the user request with cy_plan. Use node for one task, nodes for a dependency graph, template_id for a learned template, or the optional bug_fix template. cy_templates lists templates distilled from completed runs; reuse one with cy_plan template_id, objective, write_scope, and request_class when the request matches that class, then add nodes only if the seed is insufficient. cy_metrics reports ledger facts for this project. For a single requested Markdown file within alpha-trion allowed paths, use capability doc.write, role alpha-trion, write_scope containing only that path, and scope_guard verifier; keep the requested content exact. Each task needs a registered capability and role, narrow write_scope, acceptance, and scope_guard verifier. Dispatch only a ready node through the native subagent tool; use its exact returned card as description and include node_id, capability, write_scope, objective, and run_id in the child prompt. Call cy_state with wait=true after each child returns. The kernel derives risk gates from the actual workspace diff; cy_check runs fixed lint/build/test/sim targets for eligible roles, and a run_id binds its receipt to the run. Required gates cannot be removed; mark_not_applicable and complete_run remain fail-closed until trusted verifier facts exist. Background is still running; cancellation is terminal. Never claim model text as tool evidence.' });
+        'Cybertron v6 M5: plan the smallest valid task graph for the user request with cy_plan. Use node for one task, nodes for a dependency graph, template_id for a learned template, or the optional bug_fix template. cy_templates lists templates distilled from completed runs; reuse one with cy_plan template_id, objective, write_scope, and request_class when the request matches that class, then add nodes only if the seed is insufficient. cy_metrics reports ledger facts for this project. For a single requested Markdown file within alpha-trion allowed paths, use capability doc.write, role alpha-trion, write_scope containing only that path, and scope_guard verifier; keep the requested content exact. Each task needs a registered capability and role, narrow write_scope, acceptance, and scope_guard verifier. Whenever the user must answer or confirm, call the native question tool: it renders the OpenCode ask card and its answers are recorded in the run ledger. Never ask only in prose. Use options such as Approve/Reject for a yes/no gate. cy_ask is only a formal host approval event before dispatch. Never treat a recorded question as an answer. Dispatch only a ready node through the native subagent tool; use its exact returned card as description and include node_id, capability, write_scope, objective, and run_id in the child prompt. Call cy_state with wait=true after each child returns. The kernel derives risk gates from the actual workspace diff; cy_check runs fixed lint/build/test/sim targets for eligible roles, and a run_id binds its receipt to the run. Required gates cannot be removed; mark_not_applicable and complete_run remain fail-closed until trusted verifier facts exist. Background is still running; cancellation is terminal. Never claim model text as tool evidence.' });
+      event.system.push({ type: 'text', text:
+        'When the user requests a read-only inspection or says not to modify files, create the read_only_scan template with a short objective. It uses onyx-prime / scan.static and write_scope=[]. Do not substitute doc.write or any writing node. Plan first, then ask with the native question tool if the user asks for approval before execution; do not dispatch until the answer approves. If cy_plan rejects an explicit capability, use the registered capability in its error instead of guessing names.' });
     });
   },
 });

@@ -79,10 +79,13 @@ class InstallerCliTest(unittest.TestCase):
         self.assertEqual(len(agents), 13)
         commands = list((self.tmp / ".opencode" / "commands").glob("*.md"))
         self.assertEqual(len(commands), 1)
+        self.assertEqual((self.tmp / ".opencode/plugins/hook_logic.mjs").read_bytes(),
+                         (ROOT / "cybertron/payload/plugins/hook_logic.mjs").read_bytes())
         config = json.loads(
             (self.tmp / ".opencode" / "opencode.jsonc").read_text()
         )
         self.assertNotIn("default_agent", config)
+        self.assertIn("-cybertron.runtime", config["plugins"])
 
     def test_apply_is_idempotent(self):
         self.run_cli("init", "--apply", "--project", str(self.tmp))
@@ -116,10 +119,12 @@ class InstallerCliTest(unittest.TestCase):
                     for (kind, name), content in expected.items():
                         self.assertEqual((project / ".opencode" / kind / name).read_bytes(), content)
                     self.assertNotIn("default_agent", json.loads((project / ".opencode/opencode.jsonc").read_text()))
+                    self.assertIn("-cybertron.runtime", json.loads((project / ".opencode/opencode.jsonc").read_text())["plugins"])
                     repeated = self.run_entry(entry, "--apply")
                     self.assertEqual(repeated.returncode, 0, repeated.stderr)
                     self.assertRegex(repeated.stdout, r"未变 [1-9][0-9]+")
                     self.assertTrue((project / ".opencode/plugins/cybertron.js").is_file())
+                    self.assertTrue((project / ".opencode/plugins/hook_logic.mjs").is_file())
                     self.assertTrue((project / ".opencode/cybertron-runtime/cybertron/plugin_cli.py").is_file())
                     agent = project / ".opencode/agents/prima.md"
                     agent.write_text("local edit one", encoding="utf-8")

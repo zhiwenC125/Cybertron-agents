@@ -38,6 +38,15 @@ class GraphTests(unittest.TestCase):
                 with self.assertRaises(GraphRejected):
                     PlanGraph([candidate])
 
+    def test_unknown_capability_reports_registered_role_options(self):
+        with self.assertRaisesRegex(GraphRejected, "scan.static"):
+            PlanGraph([node(role="onyx-prime", capability="repo.inspect", write_scope=())])
+
+    def test_unknown_graph_operation_lists_supported_operations(self):
+        graph = PlanGraph([node()])
+        with self.assertRaisesRegex(GraphRejected, "add_node"):
+            graph.apply_op({"op_id": "op-1", "plan_revision": 0, "op": "apply"})
+
     def test_write_scope_outside_role_and_hard_denials_rejected(self):
         for scope in ("tests/**", ".git/config", ".cybertron/runs/r1/**", "../src/**"):
             with self.subTest(scope=scope):

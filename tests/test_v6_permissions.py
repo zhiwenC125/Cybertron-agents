@@ -41,6 +41,14 @@ class V6PermissionTests(unittest.TestCase):
         self.assertEqual(MegatronusCircuitBreaker(prima.permissions).verify_tool_call(
             "cybertron_run", "*", "legacy")[0], PermissionEffect.DENY)
 
+    def test_prima_human_confirmation_requires_host_decision(self):
+        prima = THIRTEEN_PRIMES_REGISTRY[0]
+        breaker = MegatronusCircuitBreaker(prima.permissions)
+        self.assertEqual(breaker.verify_tool_call(
+            "cy_ask_decision", "Confirm?", "ask")[0], PermissionEffect.ASK)
+        self.assertEqual(breaker.verify_tool_call(
+            "question", "*", "question")[0], PermissionEffect.ALLOW)
+
     def test_learning_tools_are_prima_only(self):
         for agent in THIRTEEN_PRIMES_REGISTRY:
             for tool in ("cy_templates", "cy_metrics"):

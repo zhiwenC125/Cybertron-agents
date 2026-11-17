@@ -5,6 +5,18 @@ from __future__ import annotations
 from .graph import PlanGraph, PlanNode
 
 
+def read_only_scan_template(objective: str) -> PlanGraph:
+    """Seed one onyx-prime inspection node without a project write scope."""
+    if not isinstance(objective, str) or not objective.strip():
+        raise ValueError("read-only objective is required")
+    return PlanGraph([PlanNode(
+        "scan", "task", "scan.static", "onyx-prime", objective.strip(),
+        write_scope=(),
+        acceptance=("Report the requested inspection findings without changing project files",),
+        verifiers=("scope_guard",),
+    )])
+
+
 def bug_fix_template(objective: str, write_scope: tuple[str, ...]) -> PlanGraph:
     """Seed a four-node bug investigation, fix, and independent review.
 
