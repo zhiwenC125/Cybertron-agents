@@ -7,7 +7,7 @@ REPO="zhiwenC125/Cybertron-agents"
 MODE="project"
 PROJECT_DIR="."
 APPLY=0
-VERSION="v0.3.0"
+VERSION="v0.4.0"
 EXPECTED_SHA256=""
 DOCTOR=0
 
@@ -23,7 +23,7 @@ Cybertron 安装脚本
   --project DIR         安装到 DIR/.opencode（默认当前目录）
   --apply               真正写入文件（默认只预览）
   --dry-run             只预览（默认）
-  --version REF         指定 tag（默认 v0.3.0）；分支仅用于显式开发测试
+  --version REF         指定 tag（默认 v0.4.0）；分支仅用于显式开发测试
   --sha256 HEX          校验下载归档的 SHA-256
   --doctor              只检查本地安装，不下载或写入
   -h, --help            显示本帮助
