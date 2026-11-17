@@ -116,7 +116,7 @@ function runInit(opts) {
   });
   console.log(`\n新增 ${result.created}，更新 ${result.updated}，未变 ${result.same}`);
   console.log('安装完成。运行: opencode2 debug agents');
-  console.log('模型编队配置入口: cybertron models setup');
+  console.log(`模型编队配置入口: npx -y cybertron-agents@${JSON.parse(readFileSync(path.join(pkgRoot, 'package.json'), 'utf8')).version} models setup（全局安装或 Shell 启动器可用对应 cybertron 入口）`);
 }
 
 function runDshPath() {
@@ -152,7 +152,7 @@ function runDoctor(opts) {
   console.log(`node: ${process.version}`);
 
   if (agents.length !== expected) {
-    console.log('提示: 角色数量不符，运行 cybertron init --apply 重新安装。');
+    console.log('提示: 角色数量不符，重新运行当前安装入口的 init --apply。');
   }
   if (agents.length !== expected || commands.length !== 1 || !existsSync(config)
       || !existsSync(plugin) || !existsSync(pluginHelper) || !existsSync(runtime)) {

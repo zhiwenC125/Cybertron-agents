@@ -280,4 +280,6 @@ chmod 755 "$launcher"
 PYTHONPATH="$BASE/cybertron-runtime${PYTHONPATH:+:$PYTHONPATH}" python3 -m cybertron.model_cli apply "${model_args[@]}"
 DONE=1
 echo "安装完成。运行: opencode2 debug agents"
-echo "模型编队配置入口: $launcher models setup ${model_args[*]}"
+echo "未修改 PATH；后续命令请使用下面的绝对路径："
+echo "  模型编队: $launcher models setup ${model_args[*]}"
+echo "  本地检查: $launcher doctor ${model_args[*]}"

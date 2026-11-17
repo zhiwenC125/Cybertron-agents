@@ -111,7 +111,7 @@ def _setup(args) -> int:
     project, base, path = _scope(args)
     if not (base / "agents" / "prima.md").is_file():
         scope = "--global" if args.global_ else f"--project {project}"
-        raise ModelConfigError(f"此作用域尚未安装 Cybertron；先运行 cybertron init --apply {scope}")
+        raise ModelConfigError(f"此作用域尚未安装 Cybertron；先运行当前安装入口的 init --apply {scope}")
     current = load_profile(path)
     inherited = effective_profile(project) if not args.global_ else None
     _show(current or inherited, str(path) if current else "继承全局" if inherited else "发行包默认")
@@ -219,7 +219,7 @@ def _doctor(args) -> int:
         base = default_base(True, str(project))
     _show(profile, str(path) if args.global_ else "当前生效")
     if not profile:
-        print("尚未配置本机模型编队。运行 cybertron models setup。")
+        print("尚未配置本机模型编队。运行当前安装入口的 models setup。")
         return 1
     missing = missing_models(profile, _catalog(project, args.global_))
     if missing:
@@ -308,7 +308,7 @@ def _provider_add(args) -> int:
         return 0
     backup = add_provider(config, args.provider_id, entry)
     print(f"已写入 {config}" + (f"；上一版: {backup}" if backup else ""))
-    print("请确保 OpenCode 已连接该供应商，或在 OpenCode 服务环境中设置认证变量；随后运行 cybertron models setup。")
+    print("请确保 OpenCode 已连接该供应商，或在 OpenCode 服务环境中设置认证变量；随后运行当前安装入口的 models setup。")
     return 0
 
 
