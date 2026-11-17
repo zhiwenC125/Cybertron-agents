@@ -126,6 +126,28 @@ class ScopeGuardTests(unittest.TestCase):
         self.assertEqual(target.read_text(), "original")
 
 
+    def test_access_modes_control_writes_and_skip_full_snapshot(self):
+        read_only = ScopeGuard(self.root, (), access_mode="read-only")
+        self.assertFalse(read_only._allowed("src/keep.txt", is_dir=False))
+        full = ScopeGuard(self.root, ("/tmp/outside.txt",), access_mode="full")
+        self.assertTrue(full._allowed("src/keep.txt", is_dir=False))
+        self.assertTrue(full._allowed("/tmp/outside.txt", is_dir=False))
+        self.assertFalse(full._allowed(".git/config", is_dir=False))
+        self.assertEqual(full.snapshot().entries, {})
+        with self.assertRaises(ScopeGuardError):
+            ScopeGuard(self.root, ("/tmp/outside.txt",), access_mode="workspace")
+
+    def test_pruned_dependency_tree_keeps_directory_entry(self):
+        modules = self.root / "node_modules" / "pkg"
+        modules.mkdir(parents=True)
+        (modules / "index.js").write_text("vendored")
+        guard = ScopeGuard(self.root, ("src/**",))
+        before = guard.snapshot()
+        self.assertIn("node_modules", before.entries)
+        self.assertNotIn("node_modules/pkg/index.js", before.entries)
+        (modules / "index.js").write_text("changed")
+        self.assertEqual(guard.diff(before).changed_paths, ())
+
     def test_unreadable_file_is_opaque_instead_of_fatal(self):
         secret = self.root / "tests" / "secret.txt"
         secret.write_text("classified")

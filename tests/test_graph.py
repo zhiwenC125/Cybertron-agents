@@ -47,6 +47,17 @@ class GraphTests(unittest.TestCase):
         with self.assertRaisesRegex(GraphRejected, "add_node"):
             graph.apply_op({"op_id": "op-1", "plan_revision": 0, "op": "apply"})
 
+    def test_access_modes_gate_write_scope(self):
+        with self.assertRaisesRegex(GraphRejected, "read-only"):
+            PlanGraph([node(write_scope=("src/app/**",))], access_mode="read-only")
+        with self.assertRaisesRegex(GraphRejected, "outside the project"):
+            PlanGraph([node(write_scope=("../hello.c",))], access_mode="workspace")
+        graph = PlanGraph([node(write_scope=("Desktop/hello.c",))], access_mode="full")
+        self.assertEqual(graph.access_mode, "full")
+        self.assertEqual(PlanGraph.from_dict(graph.to_dict()).access_mode, "full")
+        with self.assertRaisesRegex(GraphRejected, "generated config"):
+            PlanGraph([node(write_scope=(".git/config",))], access_mode="full")
+
     def test_write_scope_outside_role_and_hard_denials_rejected(self):
         for scope in ("tests/**", ".git/config", ".cybertron/runs/r1/**", "../src/**"):
             with self.subTest(scope=scope):

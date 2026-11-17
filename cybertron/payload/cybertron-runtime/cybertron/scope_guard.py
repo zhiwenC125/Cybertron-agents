@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, Tuple
 
+from .access import DEFAULT_ACCESS_MODE, hard_denied, normalize_access_mode
+
 
 class ScopeGuardError(RuntimeError):
     pass
@@ -44,28 +46,41 @@ class ScopeReport:
     rolled_back: bool
 
 
+PRUNED_DIRS = frozenset({"node_modules", ".venv", "venv", "__pycache__",
+                         ".mypy_cache", ".pytest_cache", ".ruff_cache", ".cache",
+                         ".gradle", ".idea"})
+
+
 class ScopeGuard:
     """Check a node's actual workspace diff; never follow workspace symlinks."""
 
-    def __init__(self, workspace: Path, write_scope: Iterable[str]) -> None:
+    def __init__(self, workspace: Path, write_scope: Iterable[str],
+                 access_mode: str = DEFAULT_ACCESS_MODE) -> None:
         self.workspace = Path(workspace).absolute()
         if not self.workspace.is_dir() or self.workspace.is_symlink():
             raise ScopeGuardError("workspace must be a real directory")
+        self.access_mode = normalize_access_mode(access_mode)
         self.write_scope = tuple(write_scope)
         for scope in self.write_scope:
-            if not isinstance(scope, str) or not scope or scope.startswith("/") or ".." in scope.split("/"):
+            if not isinstance(scope, str) or not scope:
                 raise ScopeGuardError("invalid write_scope")
+            if self.access_mode == "workspace" and (
+                    scope.startswith("/") or scope.startswith("~") or ".." in scope.split("/")):
+                raise ScopeGuardError("workspace access mode requires project-relative write_scope")
+            if hard_denied(scope):
+                raise ScopeGuardError("write_scope targets generated config, VCS, or run state")
 
     @staticmethod
     def _hard_denied(path: str) -> bool:
-        return (path == ".git" or path.startswith(".git/")
-                or path == ".cybertron/runs" or path.startswith(".cybertron/runs/")
-                or path == ".opencode" or path.startswith(".opencode/")
-                or path == "opencode.jsonc")
+        return hard_denied(path)
 
     def _allowed(self, path: str, *, is_dir: bool) -> bool:
         if self._hard_denied(path):
             return False
+        if self.access_mode == "read-only":
+            return False
+        if self.access_mode == "full":
+            return True
         for scope in self.write_scope:
             if scope == "**":
                 return True
@@ -80,6 +95,11 @@ class ScopeGuard:
         return False
 
     def snapshot(self) -> Snapshot:
+        # Read-only has no writes to verify, and full access is explicitly
+        # user-authorized; do not walk an unbounded home directory or pretend
+        # to constrain it. Declared artifacts are hashed by the host instead.
+        if self.access_mode in {"read-only", "full"}:
+            return Snapshot({})
         entries: Dict[str, FileState] = {}
         for current, dirs, files in os.walk(self.workspace, topdown=True, followlinks=False):
             base = Path(current)
@@ -92,6 +112,11 @@ class ScopeGuard:
                     dirs.remove(name)
                 elif stat.S_ISDIR(info.st_mode):
                     entries[rel] = FileState("directory", mode=stat.S_IMODE(info.st_mode))
+                    if name in PRUNED_DIRS:
+                        # Dependency and cache trees dominate large repositories.
+                        # Keep the directory entry (deletion is still detected)
+                        # without reading every vendored file.
+                        dirs.remove(name)
                 else:
                     if stat.S_ISSOCK(info.st_mode) or stat.S_ISFIFO(info.st_mode):
                         dirs.remove(name)

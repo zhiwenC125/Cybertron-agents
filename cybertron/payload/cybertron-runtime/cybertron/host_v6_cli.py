@@ -37,7 +37,9 @@ def main(argv: list[str] | None = None) -> int:
                                      objective=data.get("objective", ""),
                                      write_scope=data.get("write_scope"),
                                      test_scope=data.get("test_scope"),
-                                     skip=data.get("skip"))
+                                     skip=data.get("skip"),
+                                     access_mode=data.get("access_mode"),
+                                     session_title=data.get("session_title", ""))
             elif "template" in data:
                 template = data["template"]
                 if template.get("type") == "bug_fix":
@@ -53,12 +55,16 @@ def main(argv: list[str] | None = None) -> int:
                 nodes = [node.to_dict() for node in graph.nodes.values()]
                 result = bridge.plan(nodes, data["host_session_id"],
                                      request_class=request_class,
-                                     objective=template["objective"])
+                                     objective=template["objective"],
+                                     access_mode=data.get("access_mode"),
+                                     session_title=data.get("session_title", ""))
             else:
                 nodes = data.get("nodes", data.get("node"))
                 result = bridge.plan(nodes, data["host_session_id"],
                                      request_class=data.get("request_class"),
-                                     objective=data.get("objective", ""))
+                                     objective=data.get("objective", ""),
+                                     access_mode=data.get("access_mode"),
+                                     session_title=data.get("session_title", ""))
         elif args.operation == "plan_op":
             result = bridge.plan_op(data["run_id"], data["operation"])
         elif args.operation == "state":

@@ -21,6 +21,8 @@ GRAPH_OPERATIONS = ("add_node", "add_edge", "reassign_role", "split_node", "retr
                     "insert_gate", "mark_not_applicable", "request_human", "complete_run")
 
 # Registry is the only v6 capability and role-scope source of truth.
+from .access import (DEFAULT_ACCESS_MODE, hard_denied, is_external_scope,
+                     normalize_access_mode)
 from .registry import PRIME_ROLES, assert_catalog
 
 CAPABILITY_CATALOG: Mapping[str, Mapping[str, Tuple[str, ...]]] = MappingProxyType({
@@ -108,8 +110,10 @@ class PlanGraph:
     def __init__(self, nodes: Iterable[PlanNode] = (), *, revision: int = 0,
                  events: Iterable[Mapping[str, Any]] = (), applied_ops: Mapping[str, Mapping[str, Any]] = None,
                  gates: Iterable[str] = (), human_requests: Iterable[str] = (),
-                 attempts: Mapping[str, int] = None, complete: bool = False):
+                 attempts: Mapping[str, int] = None, complete: bool = False,
+                 access_mode: str = DEFAULT_ACCESS_MODE):
         assert_catalog()
+        self.access_mode = normalize_access_mode(access_mode)
         items = list(nodes)
         if len({item.node_id for item in items}) != len(items):
             raise GraphRejected("duplicate node_id")
@@ -153,8 +157,7 @@ class PlanGraph:
                 raise GraphRejected("node lists must contain nonempty strings")
             if len(set(node.depends_on)) != len(node.depends_on) or any(dep not in self.nodes for dep in node.depends_on):
                 raise GraphRejected("duplicate or missing dependency")
-            if not all(_scope_allowed(scope, roles[node.role]) for scope in node.write_scope):
-                raise GraphRejected("write_scope exceeds role limit or hard denial")
+            self._validate_write_scope(node, roles[node.role])
             attempts = node.budget.get("max_attempts")
             if type(attempts) is not int or attempts < 1:
                 raise GraphRejected("invalid max_attempts")
@@ -176,6 +179,21 @@ class PlanGraph:
         for node_id in self.nodes:
             visit(node_id)
 
+    def _validate_write_scope(self, node: "PlanNode", roots: Tuple[str, ...]) -> None:
+        if self.access_mode == "read-only":
+            if node.write_scope:
+                raise GraphRejected("read-only plan cannot declare write_scope")
+            return
+        if self.access_mode == "full":
+            if any(hard_denied(scope) for scope in node.write_scope):
+                raise GraphRejected("write_scope targets generated config, VCS, or run state")
+            return
+        if any(is_external_scope(scope) for scope in node.write_scope):
+            raise GraphRejected("workspace access mode cannot write outside the project; "
+                                "use access_mode=full only after the user explicitly authorizes it")
+        if not all(_scope_allowed(scope, roots) for scope in node.write_scope):
+            raise GraphRejected("write_scope exceeds role limit or hard denial")
+
     def ready_nodes(self) -> List[PlanNode]:
         self.validate()
         return [node for node in self.nodes.values()
@@ -187,7 +205,8 @@ class PlanGraph:
                 "nodes": [node.to_dict() for node in self.nodes.values()],
                 "events": copy.deepcopy(self.events), "applied_ops": copy.deepcopy(self.applied_ops),
                 "gates": list(self.gates), "human_requests": list(self.human_requests),
-                "attempts": dict(self.attempts), "complete": self.complete}
+                "attempts": dict(self.attempts), "complete": self.complete,
+                "access_mode": self.access_mode}
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "PlanGraph":
@@ -198,7 +217,8 @@ class PlanGraph:
                        revision=data["plan_revision"], events=data.get("events", ()),
                        applied_ops=data.get("applied_ops", {}), gates=data.get("gates", ()),
                        human_requests=data.get("human_requests", ()),
-                       attempts=data.get("attempts", {}), complete=data.get("complete", False))
+                       attempts=data.get("attempts", {}), complete=data.get("complete", False),
+                       access_mode=data.get("access_mode", DEFAULT_ACCESS_MODE))
         except (KeyError, TypeError, ValueError) as exc:
             raise GraphRejected("invalid graph payload") from exc
 
@@ -305,7 +325,7 @@ class PlanGraph:
                     f"unknown graph operation {kind!r}; expected one of {', '.join(GRAPH_OPERATIONS)}")
             PlanGraph(candidate.values(), revision=self.revision + 1,
                       gates=gates, human_requests=human_requests, attempts=attempts,
-                      complete=complete)
+                      complete=complete, access_mode=self.access_mode)
         except (GraphRejected, KeyError, TypeError, ValueError, AttributeError) as exc:
             reason = str(exc) if isinstance(exc, GraphRejected) else "invalid operation payload"
             self.events.append({"type": "plan.op.rejected", "op_id": op_id, "reason": reason})

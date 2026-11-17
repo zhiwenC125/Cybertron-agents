@@ -35,6 +35,8 @@ class SessionStoreTests(unittest.TestCase):
     def test_multiple_runs_survive_rename_and_old_alias(self):
         created = self.sessions.create("Motor_Control", "电机控制")
         self.assertEqual(created["slug"], "motor-control")
+        self.assertTrue(created["directory"].startswith("motor-control--"))
+        self.assertTrue((self.sessions.root / created["directory"]).is_dir())
         first = self.sessions.create_run("motor-control", "任务一")
         renamed = self.sessions.rename("MOTOR-CONTROL", "drive-controller", "驱动控制")
         second = self.sessions.create_run("motor-control", "任务二")
@@ -43,6 +45,9 @@ class SessionStoreTests(unittest.TestCase):
         self.assertEqual(renamed["aliases"], ["motor-control"])
         self.assertEqual(self.sessions.show("drive-controller")["run_count"], 2)
         self.assertEqual(self.sessions.show("motor-control")["title"], "驱动控制")
+        renamed_dir = self.sessions.show("drive-controller")["directory"]
+        self.assertTrue(renamed_dir.startswith("drive-controller--"))
+        self.assertFalse((self.sessions.root / created["directory"]).exists())
         self.assertEqual({item["run_id"] for item in self.sessions.list_runs("drive-controller")},
                          {first["run_id"], second["run_id"]})
 

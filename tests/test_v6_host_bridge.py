@@ -86,6 +86,38 @@ class V6HostBridgeTests(unittest.TestCase):
                                      "child-session", "completed", 1)
         self.assertEqual(returned["status"], "running")
 
+    def test_full_access_writes_and_hashes_an_external_artifact(self):
+        external = (self.root.parent / f"cybertron-external-{self.root.name}.txt").resolve()
+        self.addCleanup(lambda: external.unlink(missing_ok=True))
+        node = dict(self.node)
+        node["write_scope"] = [f"../{external.name}"]
+        plan = self.bridge.plan(node, "parent", access_mode="full", session_title="External write")
+        self.assertEqual(plan["access_mode"], "full")
+        started = self.bridge.before(plan["run_id"], "n1", "alpha-trion", plan["card"], "call-full")
+        self.assertEqual(started["access_mode"], "full")
+        returned = self.bridge.after(plan["run_id"], "call-full", started["token"],
+                                     "child-full", "completed", 5)
+        external.write_text("hello")
+        result = self.bridge.finish(plan["run_id"], returned["token"], "child-full")
+        self.assertEqual(result["status"], "completed")
+        evidence = [event for event in self.bridge.events(plan["run_id"])
+                    if event["type"] == "node.completed"][-1]
+        self.assertIn(str(external), evidence["artifacts"])
+
+    def test_run_folder_uses_slug_title_and_keeps_uuid_run_id(self):
+        plan = self.bridge.plan(self.node, "parent", session_title="Create notes file")
+        run_dir = Path(plan["run_dir"])
+        self.assertTrue(run_dir.name.startswith("create-notes-file--"))
+        self.assertEqual(plan["title"], "Create notes file")
+        self.assertEqual(plan["slug"], "create-notes-file")
+        self.assertTrue((run_dir / "run.json").is_file())
+        self.assertEqual(self.bridge.state(plan["run_id"])["run_dir"], str(run_dir))
+
+    def test_chinese_title_falls_back_to_readable_run_prefix(self):
+        plan = self.bridge.plan(self.node, "parent", session_title="创建说明文件")
+        self.assertEqual(plan["slug"], "run")
+        self.assertTrue(Path(plan["run_dir"]).name.startswith("run--"))
+
     def test_answered_question_is_recorded_even_during_dispatch(self):
         plan = self.bridge.plan(self.node, "parent")
         self.bridge.before(plan["run_id"], "n1", "alpha-trion", plan["card"], "call1")
