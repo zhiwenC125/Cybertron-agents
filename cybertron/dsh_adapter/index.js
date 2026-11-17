@@ -1,13 +1,19 @@
 /**
- * Cybertron v6 tools for DeepSeek Harness.
+ * Cybertron tools for DeepSeek Harness.
  *
  * The plugin is a transport: it spawns the deterministic Python kernel and
  * returns its JSON. It never decides node state, gate evidence, or plan
  * validity itself. The preset that mounts it is the only place the cy_* tools
  * exist, so a normal DSH session does not inherit the orchestrator surface.
+ *
+ * The bundle must not import `@deepseek-ai/dsh-tools`: a profile/link-installed
+ * bundle resolves from its own directory, while DSH packages live in the
+ * installation. The registry accepts the plain tool definition below, so the
+ * bundle stays loadable without a profile dependency on DSH internals.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
 import { callBridge, hostIdOf, jsonResult } from './bridge.js'
+
+const defineTool = definition => definition
 
 export const name = 'cybertron-dsh'
 export const inject = ['tools', 'workingDirectory']
@@ -25,7 +31,7 @@ export function apply(ctx, config = {}) {
 
   ctx.tools.register(defineTool({
     name: 'cy_plan',
-    description: 'Create or revise a validated Cybertron v6 plan graph. Provide a JSON payload: '
+    description: 'Create or revise a validated Cybertron plan graph. Provide a JSON payload: '
       + 'one of {"node": {...}}, {"nodes": [...]}, {"template_id": ..., "objective": ...}, '
       + 'or {"operation": {...}} with "run_id". Optional fields: write_scope, test_scope, '
       + 'skip (read-only capabilities), request_class, access_mode '
