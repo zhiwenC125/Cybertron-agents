@@ -103,3 +103,8 @@ export function grantCovers({ resources, grants }) {
   return (resources || []).every(value =>
     value.startsWith('/') || value.startsWith('~') ? related(value) : true)
 }
+
+/** A run that can no longer accept nodes; a new request may start a fresh run. */
+export function runIsTerminal(state) {
+  return Boolean(state) && state.status === 'completed'
+}
