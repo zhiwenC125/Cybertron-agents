@@ -28,3 +28,78 @@ export function nativeToolStatus(event) {
   if (event.error?.name === 'AbortError') return 'cancelled';
   return 'error';
 }
+
+/**
+ * Build the child-session permission rules for one dispatch. Under
+ * workspace-write the project scopes are allowed directly; every declared
+ * external path is `ask`, so the host gates it per call and the kernel can
+ * record that the gate ran. `danger-full-access` keeps the existing open set.
+ */
+export function childPermissionRules({ accessMode, writeScope, externalScope }) {
+  if (accessMode === 'danger-full-access') {
+    return [
+      { action: 'edit', resource: '*', effect: 'allow' },
+      { action: 'external_directory', resource: '*', effect: 'allow' },
+      { action: 'edit', resource: '.git/**', effect: 'deny' },
+      { action: 'edit', resource: '.opencode/**', effect: 'deny' },
+      { action: 'edit', resource: '.cybertron/runs/**', effect: 'deny' },
+      { action: 'edit', resource: 'opencode.jsonc', effect: 'deny' },
+      { action: 'shell', resource: '*', effect: 'deny' },
+    ]
+  }
+  const external = (externalScope || []).flatMap(path => ([
+    { action: 'external_directory', resource: path, effect: 'ask' },
+    { action: 'external_directory', resource: path + '/*', effect: 'ask' },
+    { action: 'edit', resource: path, effect: 'ask' },
+    { action: 'edit', resource: path + '/*', effect: 'ask' },
+  ]))
+  return [
+    { action: 'edit', resource: '*', effect: 'deny' },
+    ...(writeScope || []).map(resource => ({ action: 'edit', resource, effect: 'allow' })),
+    { action: 'shell', resource: '*', effect: 'deny' },
+    { action: 'external_directory', resource: '*', effect: 'deny' },
+    ...external,
+  ]
+}
+
+const normalizePath = value => String(value).replace(/\/\*$/, '').replace(/\/+$/, '')
+
+/** True when `target` is `root` or lies below it. */
+export function pathCovered(roots, target) {
+  const value = normalizePath(target)
+  return (roots || []).some(root => {
+    const base = normalizePath(root)
+    return value === base || value.startsWith(base + '/')
+  })
+}
+
+/**
+ * Decide what the permission hook should do with one evaluation.
+ * Returns 'skip' for project-internal or relative paths, 'ask' when every
+ * outside path is covered by the node's declared external scope, and 'deny'
+ * otherwise. `external_directory` reports the directory boundary of a write,
+ * so containment may hold in either direction.
+ */
+export function externalGate({ action, resources, external, projectRoot, effect }) {
+  const outside = (resources || []).filter(value => value.startsWith('/') || value.startsWith('~'))
+  if (!outside.length) return 'skip'
+  if (outside.every(value => pathCovered([projectRoot], value))) return 'skip'
+  const related = value => (external || []).some(root =>
+    pathCovered([value], root) || pathCovered([root], value))
+  const declared = action === 'external_directory'
+    ? outside.every(related)
+    : outside.every(value => pathCovered(external, value))
+  if (!declared) return 'deny'
+  // A saved "always" approval resolves the write to allow before this hook
+  // runs; keep it and record a standing grant instead of asking again.
+  return effect === 'allow' ? 'allow' : 'ask'
+}
+
+/** True when every outside resource is covered by a recorded "always" grant. */
+export function grantCovers({ resources, grants }) {
+  if (!grants || !grants.length) return false
+  const related = value => grants.some(root =>
+    pathCovered([value], root) || pathCovered([root], value))
+  return (resources || []).every(value =>
+    value.startsWith('/') || value.startsWith('~') ? related(value) : true)
+}

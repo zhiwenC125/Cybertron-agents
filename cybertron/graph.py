@@ -70,6 +70,7 @@ class PlanNode:
     depends_on: Tuple[str, ...] = ()
     read_scope: Tuple[str, ...] = ()
     write_scope: Tuple[str, ...] = ()
+    external_scope: Tuple[str, ...] = ()
     acceptance: Tuple[str, ...] = ()
     verifiers: Tuple[str, ...] = ()
     budget: Dict[str, int] = field(default_factory=lambda: {"max_attempts": 2})
@@ -81,6 +82,7 @@ class PlanNode:
             "capability": self.capability, "role": self.role,
             "objective": self.objective, "depends_on": list(self.depends_on),
             "read_scope": list(self.read_scope), "write_scope": list(self.write_scope),
+            "external_scope": list(self.external_scope),
             "acceptance": list(self.acceptance), "verifiers": list(self.verifiers),
             "budget": dict(self.budget), "status": self.status,
         }
@@ -95,6 +97,7 @@ class PlanNode:
                 depends_on=tuple(data.get("depends_on", ())),
                 read_scope=tuple(data.get("read_scope", ())),
                 write_scope=tuple(data.get("write_scope", ())),
+                external_scope=tuple(data.get("external_scope", ())),
                 acceptance=tuple(data.get("acceptance", ())),
                 verifiers=tuple(data.get("verifiers", ())),
                 budget=dict(data.get("budget", {"max_attempts": 2})),
@@ -152,7 +155,8 @@ class PlanGraph:
                 raise GraphRejected(f"capability {node.capability!r} has no matching role "
                                     f"{node.role!r}; registered capabilities: {allowed}")
             if any(not isinstance(value, str) or not value for values in
-                   (node.depends_on, node.read_scope, node.write_scope, node.acceptance, node.verifiers)
+                   (node.depends_on, node.read_scope, node.write_scope, node.external_scope,
+                    node.acceptance, node.verifiers)
                    for value in values):
                 raise GraphRejected("node lists must contain nonempty strings")
             if len(set(node.depends_on)) != len(node.depends_on) or any(dep not in self.nodes for dep in node.depends_on):
@@ -181,18 +185,33 @@ class PlanGraph:
 
     def _validate_write_scope(self, node: "PlanNode", roots: Tuple[str, ...]) -> None:
         if self.access_mode == "read-only":
-            if node.write_scope:
-                raise GraphRejected("read-only plan cannot declare write_scope")
+            if node.write_scope or node.external_scope:
+                raise GraphRejected("read-only plan cannot declare write_scope or external_scope")
             return
         if self.access_mode == "danger-full-access":
+            if node.external_scope:
+                raise GraphRejected("danger-full-access declares outside paths in write_scope; "
+                                    "external_scope is only for workspace-write")
             if any(hard_denied(scope) for scope in node.write_scope):
                 raise GraphRejected("write_scope targets generated config, VCS, or run state")
             return
         if any(is_external_scope(scope) for scope in node.write_scope):
             raise GraphRejected("workspace-write access mode cannot write outside the project; "
-                                "use access_mode=danger-full-access only after the user explicitly authorizes it")
+                                "declare outside paths in external_scope or use "
+                                "access_mode=danger-full-access only after the user authorizes it")
         if not all(_scope_allowed(scope, roots) for scope in node.write_scope):
             raise GraphRejected("write_scope exceeds role limit or hard denial")
+        for scope in node.external_scope:
+            if not is_external_scope(scope):
+                raise GraphRejected("external_scope entries must be absolute, home-relative, "
+                                    "or parent-relative paths")
+            if "*" in scope or "?" in scope:
+                raise GraphRejected("external_scope entries must be literal paths without globs")
+            parts = [part for part in scope.replace("\\", "/").split("/") if part]
+            if any(part in {".", ".."} for part in parts):
+                raise GraphRejected("external_scope entries cannot contain '.' or '..' segments")
+            if hard_denied(scope):
+                raise GraphRejected("external_scope targets generated config, VCS, or run state")
 
     def ready_nodes(self) -> List[PlanNode]:
         self.validate()

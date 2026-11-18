@@ -15,7 +15,8 @@ from .profiles import CheckRejected, run_check
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cybertron-v6-host")
     parser.add_argument("operation", choices=("plan", "plan_op", "state", "review_plan", "ask",
-                                             "before", "after", "bind", "review_reject", "finish",
+                                             "before", "after", "bind", "permission",
+                                             "review_reject", "finish",
                                              "check", "templates", "metrics"))
     parser.add_argument("--project", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -59,7 +60,8 @@ def main(argv: list[str] | None = None) -> int:
                                      objective=template["objective"],
                                      access_mode=data.get("access_mode"),
                                      session_title=data.get("session_title", ""),
-                                     slug=data.get("slug", ""))
+                                     slug=data.get("slug", ""),
+                                     host=data.get("host", "opencode"))
             else:
                 nodes = data.get("nodes", data.get("node"))
                 result = bridge.plan(nodes, data["host_session_id"],
@@ -67,7 +69,8 @@ def main(argv: list[str] | None = None) -> int:
                                      objective=data.get("objective", ""),
                                      access_mode=data.get("access_mode"),
                                      session_title=data.get("session_title", ""),
-                                     slug=data.get("slug", ""))
+                                     slug=data.get("slug", ""),
+                                     host=data.get("host", "opencode"))
         elif args.operation == "plan_op":
             result = bridge.plan_op(data["run_id"], data["operation"])
         elif args.operation == "state":
@@ -86,7 +89,12 @@ def main(argv: list[str] | None = None) -> int:
                                   data["duration_ms"], data.get("output_sha256"))
         elif args.operation == "bind":
             result = bridge.bind(data["run_id"], data["call_id"], data["token"],
-                                 data["child_session_id"], data["write_scope"])
+                                 data["child_session_id"], data["write_scope"],
+                                 data.get("external_scope"))
+        elif args.operation == "permission":
+            result = bridge.permission(data["run_id"], data["call_id"], data["request_id"],
+                                       data["action"], data["resources"], data.get("reply"),
+                                       granted=bool(data.get("granted")))
         elif args.operation == "review_reject":
             result = bridge.review_reject(data["run_id"], data["call_id"], data["token"],
                                           data["child_session_id"], data["affected_node_id"],

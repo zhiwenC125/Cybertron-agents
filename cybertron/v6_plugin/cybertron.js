@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nativeDispatch, childSession, nativeToolStatus } from './hook_logic.mjs';
+import { nativeDispatch, childSession, nativeToolStatus, childPermissionRules, externalGate, grantCovers } from './hook_logic.mjs';
 import shellPolicy from './shell_policy.mjs';
 
 const pluginDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -201,7 +201,8 @@ export default Plugin.define({
                 test_scope: input.test_scope, skip: input.skip,
                 request_class: input.request_class,
                 access_mode, session_title: session?.title || input.objective || '',
-                slug: input.slug || '', host_session_id: context.sessionID }, context.signal);
+                slug: input.slug || '', host_session_id: context.sessionID,
+                host: 'opencode' }, context.signal);
           if (!run_id) {
             await ctx.storage.set(`run/${context.sessionID}`, result.run_id);
             // A planning child gives the parent its run id, so prima can adopt
@@ -407,6 +408,7 @@ export default Plugin.define({
       }
       await ctx.storage.set(`dispatch/${callID}`, { run_id, token: result.token,
         node_id: result.node_id, write_scope: result.write_scope,
+        external_scope: result.external_scope || [],
         access_mode: result.access_mode || 'workspace-write',
         started_ms: Date.now(), parent_session_id: event.sessionID });
       await ctx.storage.set(`active/${run_id}`, callID);
@@ -453,11 +455,99 @@ export default Plugin.define({
       if (child_session_id && tool_status === 'completed') {
         await ctx.storage.set(`child/${child_session_id}`, {
           run_id: started.run_id, call_id, node_id: started.node_id,
-          write_scope: started.write_scope, access_mode: started.access_mode || 'workspace-write',
+          write_scope: started.write_scope, external_scope: started.external_scope || [],
+          access_mode: started.access_mode || 'workspace-write',
           parent_session_id: started.parent_session_id,
         });
       }
     });
+    if (ctx.permission && typeof ctx.permission.hook === 'function') {
+      // External writes are declared in the plan and gated by OpenCode's own
+      // ask/once/always/reject rules. This hook only narrows undeclared paths
+      // and records what the host decided; it never turns allow back into ask.
+      const replyHandler = async event => {
+        const data = event && event.data ? event.data : event;
+        if (!data || !data.sessionID || data.reply === undefined) return;
+        const binding = await ctx.storage.get(`child/${data.sessionID}`);
+        if (!binding) return;
+        const last = await ctx.storage.get(`perm/${data.sessionID}`);
+        if (!last) return;
+        if (data.reply === 'always') {
+          const grants = (await ctx.storage.get(`grant/${binding.run_id}`)) || [];
+          await ctx.storage.set(`grant/${binding.run_id}`,
+            [...new Set([...grants, ...last.resources])]);
+        }
+        await bridge('permission', project, {
+          run_id: binding.run_id, call_id: binding.call_id,
+          request_id: data.requestID || last.request_id,
+          action: last.action, resources: last.resources, reply: data.reply,
+        });
+      };
+      if (ctx.event && typeof ctx.event.subscribe === 'function') {
+        try {
+          const stream = ctx.event.subscribe({ types: ['permission.replied'] });
+          if (stream && typeof stream[Symbol.asyncIterator] === 'function') {
+            void (async () => {
+              try {
+                for await (const item of stream) await replyHandler(item);
+              } catch (error) {
+                console.warn(`Cybertron: permission reply stream stopped: ${error.message}`);
+              }
+            })();
+          }
+        } catch (error) {
+          console.warn(`Cybertron: cannot subscribe to permission replies: ${error.message}`);
+        }
+      }
+      await ctx.permission.hook('evaluate', async evaluation => {
+        if (evaluation.action !== 'edit' && evaluation.action !== 'external_directory') return;
+        if (!evaluation.resources || !evaluation.resources.length) return;
+        const binding = await ctx.storage.get(`child/${evaluation.sessionID}`);
+        if (!binding) return;
+        const external = binding.external_scope || [];
+        if (!external.length) return;
+        const verdict = externalGate({ action: evaluation.action, resources: evaluation.resources,
+          external, projectRoot: project, effect: evaluation.effect });
+        if (verdict === 'skip') return;
+        if (verdict === 'deny') {
+          evaluation.effect = 'deny';
+          evaluation.message = 'Cybertron: path is outside the node external_scope';
+          return;
+        }
+        const requestId = `${evaluation.sessionID}:${evaluation.action}:${evaluation.resources.join('|')}`;
+        try {
+          const grants = await ctx.storage.get(`grant/${binding.run_id}`);
+          if (grantCovers({ resources: evaluation.resources, grants })) {
+            // An "always" reply is already on record for this run: skip the
+            // prompt but keep the standing grant visible in the ledger.
+            evaluation.effect = 'allow';
+            await bridge('permission', project, {
+              run_id: binding.run_id, call_id: binding.call_id, request_id: requestId,
+              action: evaluation.action, resources: evaluation.resources, granted: true,
+            });
+            return;
+          }
+          if (verdict === 'allow') {
+            // OpenCode saved an "always" rule: record it and leave allow.
+            await bridge('permission', project, {
+              run_id: binding.run_id, call_id: binding.call_id, request_id: requestId,
+              action: evaluation.action, resources: evaluation.resources, granted: true,
+            });
+            return;
+          }
+          await ctx.storage.set(`perm/${evaluation.sessionID}`,
+            { action: evaluation.action, resources: evaluation.resources, request_id: requestId });
+          evaluation.effect = 'ask';
+          evaluation.message = 'Cybertron: approve this external write';
+          await bridge('permission', project, {
+            run_id: binding.run_id, call_id: binding.call_id, request_id: requestId,
+            action: evaluation.action, resources: evaluation.resources,
+          });
+        } catch (error) {
+          console.warn(`Cybertron: could not record permission event: ${error.message}`);
+        }
+      });
+    }
     await ctx.session.hook('context', async event => {
       if (event.agent === 'thirteenth') {
         const session = await ctx.session.get({ sessionID: event.sessionID });
@@ -507,22 +597,11 @@ export default Plugin.define({
             throw new Error('Native child has no verified Cybertron node binding');
           }
           if (!await ctx.storage.get(`bound/${event.sessionID}`)) {
-            const permissions = binding.access_mode === 'danger-full-access'
-              ? [
-                  { action: 'edit', resource: '*', effect: 'allow' },
-                  { action: 'external_directory', resource: '*', effect: 'allow' },
-                  { action: 'edit', resource: '.git/**', effect: 'deny' },
-                  { action: 'edit', resource: '.opencode/**', effect: 'deny' },
-                  { action: 'edit', resource: '.cybertron/runs/**', effect: 'deny' },
-                  { action: 'edit', resource: 'opencode.jsonc', effect: 'deny' },
-                  { action: 'shell', resource: '*', effect: 'deny' },
-                ]
-              : [
-                  { action: 'edit', resource: '*', effect: 'deny' },
-                  ...binding.write_scope.map(resource => ({ action: 'edit', resource, effect: 'allow' })),
-                  { action: 'shell', resource: '*', effect: 'deny' },
-                  { action: 'external_directory', resource: '*', effect: 'deny' },
-                ];
+            const permissions = childPermissionRules({
+              accessMode: binding.access_mode,
+              writeScope: binding.write_scope,
+              externalScope: binding.external_scope,
+            });
             await ctx.session.update({ sessionID: event.sessionID, permissions });
             const updated = await ctx.session.get({ sessionID: event.sessionID });
             if (JSON.stringify(updated.permissions) !== JSON.stringify(permissions))
@@ -532,7 +611,8 @@ export default Plugin.define({
               throw new Error('Missing bound native dispatch receipt');
             await bridge('bind', project, { run_id: binding.run_id, call_id: binding.call_id,
               token: dispatch.token, child_session_id: event.sessionID,
-              write_scope: binding.write_scope });
+              write_scope: binding.write_scope,
+              external_scope: binding.external_scope || [] });
             await ctx.storage.set(`bound/${event.sessionID}`, true);
           }
         }
