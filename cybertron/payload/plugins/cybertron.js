@@ -92,6 +92,7 @@ const nodeInput = {
     depends_on: { type: 'array', items: { type: 'string' } },
     read_scope: { type: 'array', items: { type: 'string' } },
     write_scope: { type: 'array', items: { type: 'string' } },
+    external_scope: { type: 'array', items: { type: 'string' } },
     acceptance: { type: 'array', items: { type: 'string' } },
     verifiers: { type: 'array', items: { type: 'string' } },
   },
@@ -146,7 +147,7 @@ export default Plugin.define({
     });
     await ctx.tool.transform(editor => {
       editor.add({
-        name: 'cy_plan', description: 'Create a validated v6 task graph. For a read-only inspection use template {type:"read_only_scan",objective:"..."} (write_scope=[]). For fixes use bug_fix or explicit nodes. Pass access_mode read-only/workspace-write/danger-full-access; danger-full-access is only for explicit user authorization of Desktop/Downloads/paths outside the project. Pass an English slug for the on-disk run folder. Returns ready native subagent cards.',
+        name: 'cy_plan', description: 'Create a validated v6 task graph. For a read-only inspection use template {type:"read_only_scan",objective:"..."} (write_scope=[]). For fixes use bug_fix or explicit nodes. Pass access_mode read-only/workspace-write/danger-full-access. Under workspace-write, list intended outside paths in the node external_scope; each write then needs a host approval (once/always/reject). Use danger-full-access only for explicit blanket authorization of Desktop/Downloads/outside paths. Pass an English slug for the on-disk run folder. Returns ready native subagent cards.',
         input: { type: 'object', properties: {
           node: nodeInput, nodes: { type: 'array', items: nodeInput, minItems: 1 },
           template: { type: 'object', properties: {
@@ -562,7 +563,7 @@ export default Plugin.define({
           event.system.push({ type: 'text', text:
             'Cybertron planner: you are thirteenth, the only role that authors the plan. Clarify the human intent with `question`, check `cy_templates` before planning, then create or revise the kernel-validated graph with `cy_plan`. The kernel writes and validates plan.json; do not read or edit it directly. Do not dispatch `subagent`, run shell, or edit files: dispatch, approval, and settlement belong to prima. After `cy_plan` returns, give the human and prima the run_id, ready node cards, access_mode, gates, and any risk that needs human confirmation.' });
           event.system.push({ type: 'text', text:
-            'When the user requests a read-only inspection or says not to modify files, create the read_only_scan template with a short objective: onyx-prime / scan.static and write_scope=[]. Do not substitute doc.write or a writing node. If the user asks for approval before execution, ask with the native question tool and do not hand off until the answer approves. Use a short English slug (for example hello-doc) for cy_plan.slug; the on-disk run folder uses only that slug and stores the UUID inside run.json. Access modes are host-native: read-only (no writes), workspace-write (default; project and node write_scope only), and danger-full-access (only when the user explicitly authorizes Desktop/Downloads/paths outside the project). Pass access_mode to cy_plan. In danger-full-access mode role write roots relax, but .git, .opencode, .cybertron/runs, and opencode.jsonc stay forbidden. If an outside-project write is ambiguous, ask with the native question tool before planning; never select danger-full-access without explicit authorization.' });
+            'When the user requests a read-only inspection or says not to modify files, create the read_only_scan template with a short objective: onyx-prime / scan.static and write_scope=[]. Do not substitute doc.write or a writing node. If the user asks for approval before execution, ask with the native question tool and do not hand off until the answer approves. Use a short English slug (for example hello-doc) for cy_plan.slug; the on-disk run folder uses only that slug and stores the UUID inside run.json. Access modes are host-native: read-only (no writes), workspace-write (default; project write_scope plus any declared external_scope paths, each gated by a host approval card), and danger-full-access (only when the user explicitly authorizes a blanket Desktop/Downloads/outside scope). Prefer external_scope for a few known outside files: the user approves each write (or chooses always) and the kernel records it. Use danger-full-access only when the user asks for unrestricted outside access. Pass access_mode to cy_plan. In danger-full-access mode role write roots relax, but .git, .opencode, .cybertron/runs, and opencode.jsonc stay forbidden. If an outside-project write is ambiguous, ask with the native question tool before planning; never select danger-full-access without explicit authorization.' });
           return;
         }
       }

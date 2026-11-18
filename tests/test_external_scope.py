@@ -142,3 +142,12 @@ class ExternalScopeHostTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PlanSchemaTests(unittest.TestCase):
+    def test_plugin_schema_exposes_external_scope(self):
+        root = Path(__file__).resolve().parent.parent
+        needle = "external_scope: { type: 'array', items: { type: 'string' } }"
+        for relative in ("cybertron/v6_plugin/cybertron.js", ".opencode/plugins/cybertron.js"):
+            with self.subTest(path=relative):
+                self.assertIn(needle, (root / relative).read_text())
