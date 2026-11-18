@@ -14,9 +14,9 @@ from .profiles import CheckRejected, run_check
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cybertron-v6-host")
-    parser.add_argument("operation", choices=("plan", "plan_op", "state", "ask", "before", "after",
-                                             "bind", "review_reject", "finish", "check",
-                                             "templates", "metrics"))
+    parser.add_argument("operation", choices=("plan", "plan_op", "state", "review_plan", "ask",
+                                             "before", "after", "bind", "review_reject", "finish",
+                                             "check", "templates", "metrics"))
     parser.add_argument("--project", type=Path, required=True)
     args = parser.parse_args(argv)
     data = json.load(sys.stdin)
@@ -72,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
             result = bridge.plan_op(data["run_id"], data["operation"])
         elif args.operation == "state":
             result = bridge.state(data["run_id"])
+        elif args.operation == "review_plan":
+            result = bridge.review_plan(data["run_id"])
         elif args.operation == "ask":
             result = bridge.ask(data["run_id"], data["question"], data.get("answers"),
                                 approved=bool(data.get("approved")))

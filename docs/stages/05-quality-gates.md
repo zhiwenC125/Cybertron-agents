@@ -2,6 +2,8 @@
 
 状态：已完成约定的离线质量门禁，开发者终端复验通过。真实 OpenCode 全角色接力仍待后续阶段实现。
 
+> 2026-11-18 更新：执行角色已按 [`design/role-capability-matrix.md`](../../design/role-capability-matrix.md) 第八节开放**角色级命令白名单 shell**；本文件下文“静态检查/测试/构建全部 deny”是阶段 5 的历史状态。计划所有权同时从 `prima` 拆到 `thirteenth`。
+
 ## 对应代码与当前起点
 
 `cybertron/ledger.py` 的 `reject_review` 将编码和审查步骤退回待执行，`cybertron/dispatch.py` 识别 `REJECTED` 结果：

@@ -33,7 +33,7 @@ class EngineTests(unittest.TestCase):
             root = Path(directory)
             opencode_files = compile_opencode_v2_assets(root)
             dsh_files = compile_deepseek_harness_assets(root)
-            self.assertEqual(len(opencode_files), 14)
+            self.assertEqual(len(opencode_files), 15)
             self.assertEqual(len(dsh_files), 1)
             config = json.loads((root / "opencode.jsonc").read_text())
             preset = json.loads((root / ".dsh/cybertron-primes-preset.json").read_text())
@@ -60,18 +60,26 @@ class EngineTests(unittest.TestCase):
         nexus = MegatronusCircuitBreaker(agents["nexus-prime"].permissions)
         megatronus = MegatronusCircuitBreaker(agents["megatronus"].permissions)
         self.assertEqual(nexus.verify_tool_call("shell", "openocd -f board.cfg", "n")[0], PermissionEffect.DENY)
-        self.assertEqual(nexus.verify_tool_call("shell", "make all", "build")[0], PermissionEffect.DENY)
+        self.assertEqual(nexus.verify_tool_call("shell", "make all", "build")[0], PermissionEffect.ALLOW)
+        self.assertEqual(nexus.verify_tool_call("shell", "pio run -t upload", "upload")[0], PermissionEffect.DENY)
         self.assertEqual(megatronus.verify_tool_call("shell", "openocd -f board.cfg", "m")[0], PermissionEffect.ASK)
         self.assertEqual(
             nexus.verify_tool_call("shell", "cmake .; rm -rf build", "chained")[0],
             PermissionEffect.DENY,
         )
 
-    def test_test_and_lint_commands_are_held_until_sandboxed(self):
+    def test_test_and_lint_commands_are_allow_listed(self):
         agents = {agent.agent_id: agent for agent in THIRTEEN_PRIMES_REGISTRY}
         for agent_id, command in (("alchemist", "pytest -q"),
                                   ("alchemist", "python3 -m pytest"),
-                                  ("micronus-prime", "ruff check .")):
+                                  ("micronus-prime", "ruff check ."),
+                                  ("nexus-prime", "cmake -S . -B build")):
+            with self.subTest(agent=agent_id, command=command):
+                breaker = MegatronusCircuitBreaker(agents[agent_id].permissions)
+                self.assertEqual(breaker.verify_tool_call("shell", command, command)[0],
+                                 PermissionEffect.ALLOW)
+        for agent_id, command in (("micronus-prime", "ruff check --fix ."),
+                                  ("alchemist", "rm -rf /")):
             with self.subTest(agent=agent_id, command=command):
                 breaker = MegatronusCircuitBreaker(agents[agent_id].permissions)
                 self.assertEqual(breaker.verify_tool_call("shell", command, command)[0],

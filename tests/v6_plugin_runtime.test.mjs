@@ -50,8 +50,21 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     },
   };
   await plugin.setup(ctx);
-  assert.deepEqual([...tools.keys()], ['cy_plan', 'cy_state', 'cy_ask', 'cy_templates',
-    'cy_metrics', 'cy_check', 'cy_review_reject']);
+  const shell = async event => toolHooks.get('execute.before')(event);
+  await shell({ tool: 'shell', agent: 'vector-prime', sessionID: 'parent',
+    input: { command: 'git show HEAD' } });
+  await assert.rejects(shell({ tool: 'shell', agent: 'vector-prime', sessionID: 'parent',
+    input: { command: 'git push' } }), /not allow-listed/);
+  await assert.rejects(shell({ tool: 'shell', agent: 'vector-prime', sessionID: 'parent',
+    input: { command: "sh -c 'rm -rf /'" } }), /not allow-listed/);
+  await assert.rejects(shell({ tool: 'shell', agent: 'micronus-prime', sessionID: 'parent',
+    input: { command: 'make all' } }), /not allow-listed/);
+  await shell({ tool: 'shell', agent: 'megatronus', sessionID: 'parent',
+    input: { command: 'openocd -f board.cfg' } });
+  await assert.rejects(shell({ tool: 'shell', agent: 'prima', sessionID: 'parent',
+    input: { command: 'git status' } }), /no shell allow-list/);
+  assert.deepEqual([...tools.keys()], ['cy_plan', 'cy_plan_review', 'cy_state', 'cy_ask',
+    'cy_templates', 'cy_metrics', 'cy_check', 'cy_review_reject']);
   assert.deepEqual(tools.get('cy_plan').input.properties.nodes.items.properties.kind.enum,
     ['task', 'review']);
   assert.deepEqual(tools.get('cy_plan').input.properties.node.properties.kind.enum,
@@ -70,9 +83,28 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
   const mismatchNote = mismatched.system.find(item => /differs from the configured Prima default/.test(item.text));
   assert.ok(mismatchNote);
   assert.match(mismatchNote.text, /user-picked/);
-  assert.match(context.system[0].text, /single requested Markdown file/);
-  assert.match(context.system[0].text, /doc\.write.*alpha-trion.*write_scope.*scope_guard/);
-  assert.match(context.system[1].text, /read_only_scan.*scan\.static/);
+  assert.equal(context.tools.cy_plan, undefined);
+  assert.match(context.system[0].text, /authored and revised by thirteenth/);
+  assert.match(context.system[0].text, /run_id/);
+  assert.match(context.system[1].text, /ask thirteenth for the run_id/);
+  const planner = { agent: 'thirteenth', sessionID: 'planner',
+    tools: { cy_plan: {}, cy_state: {}, cy_templates: {}, question: {}, subagent: {},
+      cy_ask: {}, cy_metrics: {}, cy_check: {}, cy_review_reject: {} },
+    system: [], model: { providerID: 'vendor', id: 'test' } };
+  await sessionHooks.get('context')(planner);
+  assert.ok(planner.tools.cy_plan);
+  assert.ok(planner.tools.question);
+  assert.equal(planner.tools.subagent, undefined);
+  assert.match(planner.system[0].text, /only role that authors the plan/);
+  const plannerPlan = JSON.parse((await tools.get('cy_plan').execute({
+    template: { type: 'read_only_scan', objective: 'Planner handoff test' },
+  }, { agent: 'thirteenth', sessionID: 'planner' })).content);
+  assert.equal(plannerPlan.access_mode, 'read-only');
+  await assert.rejects(tools.get('cy_state').execute({ wait: true },
+    { agent: 'thirteenth', sessionID: 'planner' }), /prima owns wait/);
+  const adopted = JSON.parse((await tools.get('cy_state').execute(
+    { run_id: plannerPlan.run_id }, { agent: 'prima', sessionID: 'adopter' })).content);
+  assert.equal(adopted.run_id, plannerPlan.run_id);
   assert.deepEqual(tools.get('cy_plan').input.properties.template.properties.type.enum,
     ['bug_fix', 'read_only_scan']);
   await sessionHooks.get('prompt')({ sessionID: 'read-only-parent',
@@ -102,6 +134,16 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     objective: 'Write notes.md', write_scope: ['notes.md'],
     acceptance: ['notes.md exists'], verifiers: ['scope_guard'],
   } }, { agent: 'prima', sessionID: 'parent' })).content);
+  await assert.rejects(toolHooks.get('execute.before')({ tool: 'subagent', sessionID: 'parent',
+    callID: 'pre-review', input: { description: plan.card, agentID: 'alpha-trion' } }),
+  /Plan review required/);
+  const planReview = JSON.parse((await tools.get('cy_plan_review').execute(
+    { run_id: plan.run_id }, { agent: 'prima', sessionID: 'parent' })).content);
+  assert.equal(planReview.approved, true);
+  assert.equal(planReview.state.review_current, true);
+  await assert.rejects(tools.get('cy_plan_review').execute(
+    { run_id: plan.run_id }, { agent: 'thirteenth', sessionID: 'planner' }),
+  /Only prima may review a plan/);
   await assert.rejects(tools.get('cy_ask').execute({ question: 'Confirm notes.md?' },
     { agent: 'prima', sessionID: 'parent', messageID: 'message-1', id: 'tool-1' }), /human denied/);
   assert.equal(readFileSync(JSON.parse((await tools.get('cy_state').execute({},
@@ -163,6 +205,8 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
   writeFileSync(path.join(project, 'CMakeLists.txt'),
     'cmake_minimum_required(VERSION 3.20)\nproject(hello C)\nadd_executable(hello main.c)\n');
   writeFileSync(path.join(project, 'main.c'), 'int main(void){return 0;}\n');
+  await assert.rejects(tools.get('cy_check').execute({ target: 'test' },
+    { agent: 'nexus-prime', sessionID: 'child-1' }), /cannot run cy_check target test/);
   const check = JSON.parse((await tools.get('cy_check').execute({ target: 'build' },
     { agent: 'nexus-prime', sessionID: 'child-1' })).content);
   assert.equal(check.status, 'pass');

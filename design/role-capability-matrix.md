@@ -98,3 +98,54 @@
 2. **如果必须减到 10**：按第四节的归并，但接受 L2 独立性和侦察/架构边界的下降。
 3. **必须保留一个专职 Git agent**：`vector-prime` 改为版本控制与交付官，负责 commit / push / PR；不要让每个编码角色都碰 git。
 4. **真正的能力缺口**不是「少 3 个角色」，而是「构建/测试/lint/运行/联网」没有归属——这些应由共享 runner 提供，而不是再加 agent。
+
+## 八、2026-11-18 权限复核与修正
+
+本轮按「职责契约是否可执行」复核了 13 个角色，结论不是「普通角色缺 shell」，而是**权限定价不一致**：一部分角色缺少完成本职工作的窄只读/发现/产物写入权限，另一部分角色持有越出职责的工具或指向不存在的工具。
+
+已修正（权限、计划所有权与 shell 白名单）：
+
+| 角色 | 修正 |
+| --- | --- |
+| `liege-maximo` | 补齐 `include/**`、`app/**`、`lib/**`、`bsp/**`、`sim/**`、`scripts/**`、构建配置、`.github/**` 的只读范围，使其能审查 HAL、引脚与构建配置。 |
+| `alchemist` | 增加 `sim/**`、`sim.resc`、`sim.expect` 写权，修复 `cy_check target=sim` 无法落盘仿真的矛盾。 |
+| `micronus-prime` / `alpha-trion` | 增加 `glob` / `grep`，使 L1 审查和文档官能发现文件。 |
+| `quintus-prime` | 增加源码树只读与 `glob` / `grep`，脚手架前能检查现有结构；保留 `.cybertron/plans/**` 设计产物写权，但不允许写 `.cybertron/runs/**`。 |
+| `thirteenth` | 增加 `question` 与 `tests/**`、`CHANGELOG.md` 只读，澄清与验收不再只能读三份文档。 |
+| `vector-prime` | 移除越出职责的 `cy_check`。 |
+| `cy_check` | 目标按角色收窄：`micronus/solus/amalgamous` 仅 `lint`，`alchemist` 仅 `test`/`sim`，`nexus` 仅 `build`。 |
+| `thirteenth` / `prima` | 计划所有权拆分：`thirteenth` 拥有 `cy_plan`、只读 `cy_state`、`cy_templates` 与 `question`；`prima` 保留 `cy_state(wait)`、`cy_ask`、`cy_metrics`、`subagent`，不再拥有 `cy_plan`。跨 session 用 `cy_state(run_id=...)` 接管。 |
+| 执行角色 | 增加按角色白名单 shell：`vector` 只读 Git、`micronus` lint、`alchemist` test/sim、`nexus` build/工具链探测、`megatronus` 烧录/串口/回滚（高危 `ask`）、`solus/amalgamous` 格式化与本地编译检查。 |
+
+本轮之后仍待补的能力：
+
+| 角色 | 缺口 |
+| --- | --- |
+| `vector-prime` | 已补 `git log/show/blame/diff/rev-list/merge-base` 白名单；仍建议 typed `cy_git` 统一拒绝 `--output`、`--ext-diff` 与 textconv 副作用。 |
+| `megatronus` | 已补串口读取、`cp/mv` 备份恢复、`git checkout` 回滚、`ssh/scp`（均 `ask`）；仍建议 `device_broker` 统一设备回执与黄金固件校验。 |
+| `onyx-prime` | 无 `stat`/`lstat`，无法测大小或区分符号链接；需要只读 `fs_stat`/`fs_list` 与 `read_image`。 |
+| `liege-maximo` | 仍无 `grep` 与 `read_image`；OpenCode 的 `grep` 不能按路径限定，需要项目根限定的 `cy_grep`。 |
+| `thirteenth` | 已可只读 `cy_state`；仍建议补 `cy_accept`，把验收证据固化为结构化报告而不是只读投影。 |
+| `nexus-prime` | 已补 `cmake/make/pio/arm-none-eabi/cargo/docker` 与 `lsusb/ls /dev/tty*`；`feishu_mcp_healthcheck` 仍不是现存工具。 |
+| `solus-prime` / `amalgamous` | 仍不能写 `include/**` 私有头文件；若放开，必须同时在 `PlanGraph` 增加 HAL 契约硬拒绝，避免借私有头篡改 `hal_*.h`。 |
+| 全局 | `read "*"` 在 `$HOME` 工作区可读到 `.ssh`、恢复码、`.pypirc` 等；需要凭据 deny-list 或工作区边界。`network=True` 的 `thirteenth`/`alpha-trion` 没有 `webfetch` 权限，需删除虚假能力或补受限预览工具。 |
+
+## 九、计划评审、交接与 shell 护栏（2026-11-18 第二轮硬化）
+
+### 计划评审门禁
+
+- `thirteenth` 仍只负责提案；`prima` 在第一次派发前必须调用 `cy_plan_review`。
+- 内核 `review_plan` 做确定性检查：角色/capability、acceptance、`scope_guard`、写范围重叠、外部路径、`danger-full-access`、设备节点；结果写入 `plan.reviewed` 事件。
+- 事件携带 `plan_revision` 与 `plan.json` 的 SHA-256；计划一旦修订或 `plan.json` 被直接改动，旧评审立即失效，`subagent` 派发被拒绝，直到重新评审。
+- `prima` 的 `tool.execute.before` 在派发前检查 `state.review_current`；没有当前 revision 的批准评审就不能派发。
+
+### 交接体验
+
+- `cy_plan` / `cy_state` 的返回值新增 `handoff` 对象：`run_id`、`plan_revision`、`next_agent`、`ready_nodes`、`ready_cards`、`access_mode`、`required_gates`、`review_current`。
+- 同一 session 切 agent 时共享 `run_id`；跨 session 时 `prima` 用 `cy_state(run_id=...)` 接管。
+
+### shell 护栏
+
+- 角色 shell 白名单由 `cybertron/exporters.py` 编译为 `shell_policy.mjs`，与 `registry.py` 同源，避免两套规则漂移。
+- OpenCode 插件的 `tool.execute.before` 在命令进入宿主前做第二次校验：拒绝换行、`;`、`|`、`&`、`<>`、反引号、`$()`，拒绝未列入 allow/ask 的命令，拒绝 deny 模式。
+- 宿主权限仍是最终边界；插件护栏只是防止“宿主命令解析比注册表更宽”的旁路。`cy_check` 仍是隔离 lint/build/test/sim 的首选。
