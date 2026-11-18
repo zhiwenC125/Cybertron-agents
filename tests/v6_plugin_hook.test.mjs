@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { nativeDispatch, childSession, nativeToolStatus, childPermissionRules, pathCovered, externalGate, grantCovers } from '../cybertron/v6_plugin/hook_logic.mjs';
+import { nativeDispatch, childSession, nativeToolStatus, childPermissionRules, pathCovered, externalGate, grantCovers, runIsTerminal } from '../cybertron/v6_plugin/hook_logic.mjs';
 
 test('native card binds node, capability, scope, role, and call', () => {
   assert.deepEqual(nativeDispatch({ input: { description: '[n1] doc.write | notes.md', agentID: 'alpha-trion' },
@@ -76,4 +76,12 @@ test('standing grants cover later writes in the same declared scope', () => {
   assert.equal(grantCovers({ resources: ['/Users/x/Desktop/other.md'], grants }), false);
   assert.equal(grantCovers({ resources: ['docs/a.md'], grants }), true);
   assert.equal(grantCovers({ resources: ['/Users/x/Desktop/report.md'], grants: [] }), false);
+});
+
+test('only a completed run frees the session for a new plan', () => {
+  assert.equal(runIsTerminal({ status: 'completed' }), true);
+  assert.equal(runIsTerminal({ status: 'ready' }), false);
+  assert.equal(runIsTerminal({ status: 'running' }), false);
+  assert.equal(runIsTerminal({ status: 'blocked' }), false);
+  assert.equal(runIsTerminal(null), false);
 });

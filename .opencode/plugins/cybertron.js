@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nativeDispatch, childSession, nativeToolStatus, childPermissionRules, externalGate, grantCovers } from './hook_logic.mjs';
+import { nativeDispatch, childSession, nativeToolStatus, childPermissionRules, externalGate, grantCovers, runIsTerminal } from './hook_logic.mjs';
 import shellPolicy from './shell_policy.mjs';
 
 const pluginDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -172,8 +172,18 @@ export default Plugin.define({
         execute: async (input, context) => {
           if (!['prima', 'thirteenth'].includes(context.agent))
             throw new Error('Only thirteenth may author plans; prima only dispatches');
-          const run_id = await ctx.storage.get(`run/${context.sessionID}`);
+          let run_id = await ctx.storage.get(`run/${context.sessionID}`);
           const session = await ctx.session.get({ sessionID: context.sessionID });
+          if (run_id) {
+            const current = await bridge('state', project, { run_id }, context.signal);
+            if (runIsTerminal(current)) {
+              // A finished run cannot accept new nodes; start a fresh one for
+              // the new request instead of failing on 'Existing run requires
+              // one graph operation'.
+              await ctx.storage.remove(`run/${context.sessionID}`);
+              run_id = null;
+            }
+          }
           let access_mode = input.access_mode || await ctx.storage.get(`access/${context.sessionID}`) || 'workspace-write';
           if (input.template?.type === 'read_only_scan') access_mode = 'read-only';
           if (run_id && (input.node || input.nodes || input.template || input.template_id || !input.operation))
@@ -383,7 +393,16 @@ export default Plugin.define({
       if (event.tool !== 'subagent') return;
       const parent = await ctx.session.get({ sessionID: event.sessionID });
       if (parent.agent !== 'prima') throw new Error('Only prima may dispatch a native subagent');
-      const run_id = await ctx.storage.get(`run/${event.sessionID}`);
+      let run_id = await ctx.storage.get(`run/${event.sessionID}`);
+      if (run_id) {
+        const current = await bridge('state', project, { run_id }, event.signal);
+        if (runIsTerminal(current)) {
+          // Without this, a planner dispatch after a finished run is treated
+          // as a node dispatch and fails with 'requires node card'.
+          await ctx.storage.remove(`run/${event.sessionID}`);
+          run_id = null;
+        }
+      }
       const target = event.input?.agentID || event.input?.agent || event.input?.agentId;
       if (!run_id) {
         // Pre-plan phase: prima may dispatch thirteenth to clarify intent and
