@@ -4,7 +4,7 @@
 
 ![Cybertron Agents — Multi-Agent Framework for Intelligent Tasks](assets/cybertron-banner.jpg)
 
-[![Release](https://img.shields.io/badge/release-v0.5.1-8b8cff?style=for-the-badge)](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.5.1)
+[![Release](https://img.shields.io/badge/release-v0.6.0-8b8cff?style=for-the-badge)](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.6.0)
 [![CI](https://img.shields.io/github/actions/workflow/status/zhiwenC125/Cybertron-agents/verify.yml?branch=main&style=for-the-badge&label=verify)](https://github.com/zhiwenC125/Cybertron-agents/actions/workflows/verify.yml)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-73f8ff?style=for-the-badge)](pyproject.toml)
 [![License](https://img.shields.io/badge/license-MIT-f67adf?style=for-the-badge)](LICENSE)
@@ -21,78 +21,55 @@
 
 ## ⚡ 60 秒安装
 
-先安装 [OpenCode V2](https://opencode.ai/) 并配置可用模型。请选择一种渠道，在**目标项目目录**运行；安装器默认只预览，加入 `--apply` 才会写入。npm 命令请勿在本仓库目录运行，以免命中本地同名包。
+先安装 [OpenCode V2](https://opencode.ai/) 并配置可用模型。0.6.0 默认**全局安装**：13 个角色、`/cybertron` 命令、插件和 Python 运行时写入 `~/.config/opencode`，所有项目共用；每个项目的 run 账本、模型覆盖和源码写入仍落在项目目录。安装器默认只预览，加入 `--apply` 才写入。
 
 ### npm · 不需要全局 `cybertron` 命令
 
 ```bash
-npx -y cybertron-agents@0.5.1 init --dry-run --project .
-npx -y cybertron-agents@0.5.1 init --apply --project .
+npx -y cybertron-agents@0.6.0 init --dry-run
+npx -y cybertron-agents@0.6.0 init --apply
+npx -y cybertron-agents@0.6.0 models setup
+npx -y cybertron-agents@0.6.0 doctor --global
 ```
 
-`npx` 只运行这一次命令，**不会**在 `~/.local/bin`、`/usr/local/bin` 或 nvm 的全局 bin 目录里留下 `cybertron`。因此后续命令也必须继续带 `npx`：
+npx 只运行一次，不会留下全局 `cybertron` 命令；后续命令继续带 npx 即可。若希望直接使用 `cybertron`：
 
 ```bash
-npx -y cybertron-agents@0.5.1 models setup
-npx -y cybertron-agents@0.5.1 doctor --project .
-```
-
-如果你希望直接使用 `cybertron`，再显式全局安装：
-
-```bash
-npm install -g cybertron-agents@0.5.1
+npm install -g cybertron-agents@0.6.0
 cybertron --version
 ```
 
-若仍报 `zsh: command not found: cybertron`，检查 `npm config get prefix`，并把它的 `bin` 目录加入 `PATH`（nvm/asdf 用户通常是 nvm 的 `versions/node/*/bin`，不是 `/usr/local/bin`）。
+若报 `zsh: command not found: cybertron`，把 `npm config get prefix` 下的 `bin` 加入 `PATH`。
 
 ### pipx · Python 隔离安装
 
 ```bash
-pipx install cybertron-agents==0.5.1
-pipx ensurepath          # 把 pipx 的 bin 目录写入 shell PATH
-exec zsh                 # 重新加载 PATH；或关闭并重开终端
-cybertron init --dry-run --project .
-cybertron init --apply --project .
+pipx install cybertron-agents==0.6.0
+pipx ensurepath
+exec zsh
+cybertron init --apply
+cybertron models setup
+cybertron doctor --global
 ```
 
-`pipx` 默认把可执行文件放在 `~/.local/bin`。如果该目录不在 zsh 的 `PATH` 中，即使安装成功也会出现 `zsh: command not found: cybertron`。可以先用绝对路径验证：
-
-```bash
-~/.local/bin/cybertron --version
-```
-
-或者临时用 `pipx run`：
-
-```bash
-pipx run --spec cybertron-agents==0.5.1 cybertron init --apply --project .
-```
-
-如果你用的是普通 `pip install cybertron-agents`（不推荐），CLI 可能落在 `~/Library/Python/3.x/bin` 或 `~/.local/bin`。无需处理 PATH 的兜底写法是：
-
-```bash
-python3 -m cybertron.installer init --apply --project .
-python3 -m cybertron.installer models setup
-```
+`pipx` 默认把可执行文件放在 `~/.local/bin`；不在 `PATH` 时先用 `~/.local/bin/cybertron` 验证。
 
 ### GitHub Release · 可先审阅安装脚本
 
 ```bash
-curl -fsSL https://github.com/zhiwenC125/Cybertron-agents/releases/download/v0.5.1/install.sh -o install.sh
-bash install.sh --dry-run --project .
-bash install.sh --apply --project .
+curl -fsSL https://github.com/zhiwenC125/Cybertron-agents/releases/download/v0.6.0/install.sh -o install.sh
+bash install.sh --dry-run
+bash install.sh --apply
 ```
 
-Shell 安装器**不会修改 PATH**。安装结束后会打印启动器路径；后续 `models` / `doctor` 请使用该绝对路径：
+Shell 安装器不会修改 PATH。安装结束后使用打印出的启动器路径：
 
 ```bash
-./.opencode/bin/cybertron models setup --project .
-./.opencode/bin/cybertron doctor --project .
-# --global 安装时（默认路径；XDG_CONFIG_HOME 不同请替换）：
-"${XDG_CONFIG_HOME:-$HOME/.config}/opencode/bin/cybertron" models setup --global
+"${XDG_CONFIG_HOME:-$HOME/.config}/opencode/bin/cybertron" models setup
+"${XDG_CONFIG_HOME:-$HOME/.config}/opencode/bin/cybertron" doctor --global
 ```
 
-> 想让所有项目都能选择 `thirteenth` / `prima`？将安装命令中的 `--project .` 换成 `--global`。三条渠道的包内容已经在 [0.3.0 发布验收](docs/stages/I-release-030.md)中核对。
+> **默认全局，项目只放运行产物。** 只有需要项目级角色权限或完全隔离的插件版本时，才显式使用 `--project .`；全局和项目同时安装会被 `init` 拒绝，除非加 `--allow-duplicate`。项目级模型覆盖仍可用 `cybertron models setup --project .`。
 
 ### 启动第一项任务
 
@@ -105,7 +82,7 @@ opencode2 debug agents
 
 > 修复登录接口的超时问题，补充回归测试，并说明改动影响。
 
-首次使用时按安装渠道运行模型配置命令：npm 用 `npx -y cybertron-agents@0.5.1 models setup`，pipx 用 `cybertron models setup`，Shell 安装用 `./.opencode/bin/cybertron models setup`。随后通过 OpenCode 的认证流程提供模型密钥。Cybertron 的模型配置只保存模型 ID，不保存 API Key。[模型配置说明 →](docs/stages/H-model-configuration.md)
+首次使用时按安装渠道运行模型配置命令：npm 用 `npx -y cybertron-agents@0.6.0 models setup`，pipx 用 `cybertron models setup`，Shell 安装用 `"${XDG_CONFIG_HOME:-$HOME/.config}/opencode/bin/cybertron" models setup`。随后通过 OpenCode 的认证流程提供模型密钥。Cybertron 的模型配置只保存模型 ID，不保存 API Key。[模型配置说明 →](docs/stages/H-model-configuration.md)
 
 ---
 
@@ -136,7 +113,7 @@ v6 的 M0–M5 已完成验收；真实 OpenCode 宿主中的模板复用案例�
 ## 🪐 两个宿主
 
 - **OpenCode V2**：主集成路径。十三角色由 [`cybertron/registry.py`](cybertron/registry.py) 定义，配置由导出器生成；原生子代理卡片、权限、运行账本和工具回执共同构成执行证据。
-- **DeepSeek Harness**：随包分发的实验性 `Cybertron` preset。可用安装入口的 `dsh path` 找到 bundle（npm：`npx -y cybertron-agents@0.5.1 dsh path`；pipx：`cybertron dsh path`；Shell：`./.opencode/bin/cybertron dsh path`）；preset 名称为 `Cybertron`；目前是单一 `prima` persona 与 `cy_*` 工具，尚未提供与 OpenCode 相同的十三角色子会话写范围绑定。[查看限制 →](cybertron/dsh_adapter/docs/DETAIL.md)
+- **DeepSeek Harness**：随包分发的实验性 `Cybertron` preset。可用安装入口的 `dsh path` 找到 bundle（npm：`npx -y cybertron-agents@0.6.0 dsh path`；pipx：`cybertron dsh path`；Shell：`"${XDG_CONFIG_HOME:-$HOME/.config}/opencode/bin/cybertron" dsh path`）；preset 名称为 `Cybertron`；目前是单一 `prima` persona 与 `cy_*` 工具，尚未提供与 OpenCode 相同的十三角色子会话写范围绑定。[查看限制 →](cybertron/dsh_adapter/docs/DETAIL.md)
 
 ## 🛡️ 安全边界
 
@@ -154,14 +131,15 @@ python3 -m cybertron.stage5_verify
 python3 cybertron_primes_engine.py
 ```
 
-阶段 5 隔离验证依赖 macOS `sandbox-exec`。当前 0.5.1 的发布说明见 [v0.5.1 发布说明](docs/releases/v0.5.1.md)；0.4.0 的 DSH/访问模式变更见 [v0.4.0 发布说明](docs/releases/v0.4.0.md)。
+阶段 5 隔离验证依赖 macOS `sandbox-exec`。当前 0.6.0 的发布说明见 [v0.6.0 发布说明](docs/releases/v0.6.0.md)；0.4.0 的 DSH/访问模式变更见 [v0.4.0 发布说明](docs/releases/v0.4.0.md)。
 
 ## 📚 继续探索
 
 | 想了解 | 文档 |
 | --- | --- |
-| 安装路径、升级与卸载 | [安装与发布方案](docs/packaging-and-installation.md) |
+| 安装路径与升级 | [安装与发布方案](docs/packaging-and-installation.md) |
 | v6 设计与门禁 | [动态任务图开发计划](design/DEVELOPMENT_PLAN.md) · [里程碑证据](docs/stages/v6-progress.md) |
+| 0.6.0 具体变更 | [发布说明](docs/releases/v0.6.0.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.6.0) |
 | 0.5.1 具体变更 | [发布说明](docs/releases/v0.5.1.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.5.1) |
 | 0.5.0 具体变更 | [发布说明](docs/releases/v0.5.0.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.5.0) |
 | 0.4.0 具体变更 | [发布说明](docs/releases/v0.4.0.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.4.0) |
@@ -173,6 +151,6 @@ python3 cybertron_primes_engine.py
 
 **Plan with intent. Execute with boundaries. Verify with evidence.**
 
-MIT License · [Cybertron v0.5.1](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.5.1)
+MIT License · [Cybertron v0.6.0](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.6.0)
 
 </div>

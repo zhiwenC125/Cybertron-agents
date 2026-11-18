@@ -54,6 +54,29 @@ class InstallerCliTest(unittest.TestCase):
         return subprocess.run([*commands[entry], *args, "--project", str(self.tmp)],
                               cwd=ROOT, env=self.env(), capture_output=True, text=True)
 
+    def run_cli_in(self, cwd, *args):
+        return subprocess.run(
+            [sys.executable, "-m", "cybertron.installer", *args],
+            cwd=cwd, env={**self.env(), "PYTHONPATH": str(ROOT)},
+            capture_output=True, text=True,
+        )
+
+    def test_default_init_is_global(self):
+        result = self.run_cli_in(self.tmp, "init", "--apply")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        global_dir = self.config_home / "opencode"
+        self.assertEqual(len(list((global_dir / "agents").glob("*.md"))), 13)
+        self.assertTrue((global_dir / "plugins" / "shell_policy.mjs").is_file())
+        self.assertFalse((self.tmp / ".opencode").exists())
+
+    def test_init_refuses_a_duplicate_install(self):
+        project = self.run_cli("init", "--apply", "--project", str(self.tmp))
+        self.assertEqual(project.returncode, 0, project.stderr)
+        duplicate = self.run_cli_in(self.tmp, "init", "--apply")
+        self.assertEqual(duplicate.returncode, 2)
+        self.assertIn("另一处 Cybertron 安装", duplicate.stderr)
+        self.assertFalse((self.config_home / "opencode" / "agents").exists())
+
     def test_dsh_path_points_at_the_bundled_adapter(self):
         result = self.run_cli("dsh", "path")
         self.assertEqual(result.returncode, 0, result.stderr)
