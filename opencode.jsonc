@@ -1316,7 +1316,7 @@
     },
     "thirteenth": {
       "description": "[第十三天尊] 人类意图与计划图所有者：通过 question 澄清需求，用 cy_plan 创建/修订内核校验的计划；把 run_id 与 ready 节点交给 prima 派发。",
-      "mode": "primary",
+      "mode": "all",
       "model": "deepseek/deepseek-flash",
       "steps": 12,
       "color": "#10b981",

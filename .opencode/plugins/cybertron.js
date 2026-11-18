@@ -202,7 +202,13 @@ export default Plugin.define({
                 request_class: input.request_class,
                 access_mode, session_title: session?.title || input.objective || '',
                 slug: input.slug || '', host_session_id: context.sessionID }, context.signal);
-          if (!run_id) await ctx.storage.set(`run/${context.sessionID}`, result.run_id);
+          if (!run_id) {
+            await ctx.storage.set(`run/${context.sessionID}`, result.run_id);
+            // A planning child gives the parent its run id, so prima can adopt
+            // the plan without the human copying the id between agents.
+            if (session?.parentID)
+              await ctx.storage.set(`run/${session.parentID}`, result.run_id);
+          }
           return { content: JSON.stringify(result) };
         },
       });
@@ -376,7 +382,13 @@ export default Plugin.define({
       const parent = await ctx.session.get({ sessionID: event.sessionID });
       if (parent.agent !== 'prima') throw new Error('Only prima may dispatch a native subagent');
       const run_id = await ctx.storage.get(`run/${event.sessionID}`);
-      if (!run_id) throw new Error('No ready Cybertron node; call cy_plan first');
+      const target = event.input?.agentID || event.input?.agent || event.input?.agentId;
+      if (!run_id) {
+        // Pre-plan phase: prima may dispatch thirteenth to clarify intent and
+        // author the plan before any Cybertron node exists.
+        if (target === 'thirteenth') return;
+        throw new Error('No ready Cybertron node; call cy_plan first');
+      }
       const reviewState = await bridge('state', project, { run_id }, event.signal);
       if (!reviewState.review_current)
         throw new Error('Plan review required: call cy_plan_review on the current plan revision before dispatch');
@@ -467,6 +479,22 @@ export default Plugin.define({
       if (event.agent !== 'prima') {
         const session = await ctx.session.get({ sessionID: event.sessionID });
         const parentRun = session.parentID && await ctx.storage.get(`run/${session.parentID}`);
+        if (event.agent === 'thirteenth' && !parentRun) {
+          // Planning child: prima dispatched thirteenth before any run exists.
+          // Keep only the planning surface; the run id is handed to prima by
+          // cy_plan, so the human never switches agents or copies ids.
+          delete event.tools.cy_state;
+          delete event.tools.cy_plan_review;
+          delete event.tools.cy_ask;
+          delete event.tools.cy_ask_decision;
+          delete event.tools.cy_metrics;
+          delete event.tools.cy_check;
+          delete event.tools.cy_review_reject;
+          delete event.tools.subagent;
+          event.system.push({ type: 'text', text:
+            'Cybertron planning child: you are thirteenth, dispatched by prima to clarify the human intent and author the plan. Ask the human with the native `question` tool, check `cy_templates`, then create the kernel-validated graph with `cy_plan`. The kernel writes plan.json; do not edit it. Do not dispatch subagent, run shell, edit files, review plans, or settle nodes. When the plan is ready, return the plan summary, ready cards, access_mode, and gates; prima will review and dispatch.' });
+          return;
+        }
         if (parentRun) {
           let binding;
           for (let attempt = 0; attempt < 100; attempt++) {
@@ -539,9 +567,9 @@ export default Plugin.define({
           `Cybertron: active session model ${activeName} differs from the configured Prima default ${expectedName}. Continue with the session-selected model; do not claim a model switch.` });
       }
       event.system.push({ type: 'text', text:
-        'Cybertron dispatcher: the plan is authored and revised by thirteenth, not by you. Read or adopt the run with cy_state (pass run_id when thirteenth created it in another session; never invent an id). Before the first dispatch, call cy_plan_review on the current plan revision; a revision change invalidates the review and blocks dispatch until you review again. Dispatch only ready nodes through the native subagent tool, using the exact kernel card as the description and including node_id, capability, write_scope, objective, and run_id in the child prompt. Call cy_state with wait=true after each child returns. Use cy_ask for formal host approval before a risky dispatch; use the native question tool only when the human must choose. Do not call cy_plan, do not edit files, and never claim model text as tool evidence.' });
+        'Cybertron dispatcher: you are the single human-facing entry. If no run exists, first dispatch thirteenth as a planning subagent with the human request; thirteenth will ask the human to clarify intent and author the plan, and its run id is handed to you automatically. When it returns, read the run with cy_state, call cy_plan_review on the current revision, then dispatch ready nodes through the native subagent tool. A plan revision invalidates the review and blocks dispatch until you review again. Use the exact kernel card as the description and include node_id, capability, write_scope, objective, and run_id in the child prompt. Call cy_state with wait=true after each child returns. Use cy_ask for formal host approval before a risky dispatch; use the native question tool only when the human must choose. Do not call cy_plan, do not edit files, and never claim model text as tool evidence.' });
       event.system.push({ type: 'text', text:
-        'If no run exists, the plan has not been authored yet: ask thirteenth for the run_id, or ask the human to plan with thirteenth first. Do not create nodes, revise scopes, or change access_mode yourself; read access_mode, write_scope, and gates from cy_state.' });
+        'If no run exists yet, dispatch thirteenth first as the planning subagent; do not ask the human to switch agents or copy a run id. Do not create nodes, revise scopes, or change access_mode yourself; read access_mode, write_scope, and gates from cy_state after thirteenth returns.' });
     });
   },
 });

@@ -39,7 +39,10 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
       hook: async (name, fn) => sessionHooks.set(name, fn),
       get: async ({ sessionID }) => sessionID === 'child-1'
         ? { agent: 'alpha-trion', parentID: 'parent',
-            permissions: sessionUpdates.at(-1)?.permissions } : { agent: 'prima' },
+            permissions: sessionUpdates.at(-1)?.permissions }
+        : sessionID === 'preplan-child'
+          ? { agent: 'thirteenth', parentID: 'preplan-parent' }
+          : { agent: 'prima' },
       update: async value => sessionUpdates.push(value),
       switchModel: async () => undefined,
       wait: async () => undefined,
@@ -50,6 +53,26 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     },
   };
   await plugin.setup(ctx);
+  // Pre-plan: prima may dispatch thirteenth before any run exists.
+  await toolHooks.get('execute.before')({ tool: 'subagent', sessionID: 'preplan-parent',
+    callID: 'plan-call', input: { description: 'Clarify intent and plan', agentID: 'thirteenth' } });
+  const preplanTools = { cy_plan: {}, cy_templates: {}, question: {}, cy_state: {},
+    cy_ask: {}, cy_metrics: {}, cy_check: {}, cy_review_reject: {}, subagent: {} };
+  const preplanContext = { agent: 'thirteenth', sessionID: 'preplan-child',
+    tools: preplanTools, system: [], model: { providerID: 'vendor', id: 'test' } };
+  await sessionHooks.get('context')(preplanContext);
+  assert.ok(preplanTools.cy_plan);
+  assert.ok(preplanTools.question);
+  assert.ok(preplanTools.cy_templates);
+  assert.equal(preplanTools.subagent, undefined);
+  const preplan = JSON.parse((await tools.get('cy_plan').execute({
+    template: { type: 'read_only_scan', objective: 'Pre-plan handoff test' },
+  }, { agent: 'thirteenth', sessionID: 'preplan-child' })).content);
+  assert.equal(preplan.access_mode, 'read-only');
+  const preplanAdopted = JSON.parse((await tools.get('cy_state').execute({},
+    { agent: 'prima', sessionID: 'preplan-parent' })).content);
+  assert.equal(preplanAdopted.run_id, preplan.run_id);
+  assert.equal(preplanAdopted.handoff.next_agent, 'prima');
   const shell = async event => toolHooks.get('execute.before')(event);
   await shell({ tool: 'shell', agent: 'vector-prime', sessionID: 'parent',
     input: { command: 'git show HEAD' } });
@@ -84,9 +107,10 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
   assert.ok(mismatchNote);
   assert.match(mismatchNote.text, /user-picked/);
   assert.equal(context.tools.cy_plan, undefined);
-  assert.match(context.system[0].text, /authored and revised by thirteenth/);
-  assert.match(context.system[0].text, /run_id/);
-  assert.match(context.system[1].text, /ask thirteenth for the run_id/);
+  assert.match(context.system[0].text, /single human-facing entry/);
+  assert.match(context.system[0].text, /dispatch thirteenth as a planning subagent/);
+  assert.match(context.system[0].text, /run id is handed to you automatically/);
+  assert.match(context.system[1].text, /dispatch thirteenth first as the planning subagent/);
   const planner = { agent: 'thirteenth', sessionID: 'planner',
     tools: { cy_plan: {}, cy_state: {}, cy_templates: {}, question: {}, subagent: {},
       cy_ask: {}, cy_metrics: {}, cy_check: {}, cy_review_reject: {} },
