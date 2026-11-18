@@ -66,7 +66,7 @@ bash install.sh --apply --version v0.7.0 --sha256 <归档文件的 SHA-256>
 `pipx` 与 npm 无关：它从 PyPI 安装 Python CLI 到隔离 venv。要求 Python 3.9+。
 
 ```bash
-pipx install cybertron-agents==0.7.0
+pipx install cybertron-agents==0.7.1
 pipx ensurepath
 exec zsh
 cybertron init --dry-run
@@ -74,7 +74,7 @@ cybertron init --apply
 cybertron doctor --global
 ```
 
-`pipx` 会把命令装到 `~/.local/bin`；该目录不在 zsh 的 `PATH` 时，安装成功后仍会报 `zsh: command not found: cybertron`。可先用 `~/.local/bin/cybertron --version` 验证，或临时使用 `pipx run --spec cybertron-agents==0.7.0 cybertron ...`。
+`pipx` 会把命令装到 `~/.local/bin`；该目录不在 zsh 的 `PATH` 时，安装成功后仍会报 `zsh: command not found: cybertron`。可先用 `~/.local/bin/cybertron --version` 验证，或临时使用 `pipx run --spec cybertron-agents==0.7.1 cybertron ...`。
 
 - 源码分支中的新版 wheel 内置与 npm 一致的角色、命令、插件和运行时，默认无需下载 GitHub `main`。`--payload DIR` 可显式使用本地目录；`--ref` 可显式选择远程版本。
 - 固定版本：`pipx install cybertron-agents==<version>`。
