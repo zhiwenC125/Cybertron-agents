@@ -81,6 +81,8 @@ class InstallerCliTest(unittest.TestCase):
         self.assertEqual(len(commands), 1)
         self.assertEqual((self.tmp / ".opencode/plugins/hook_logic.mjs").read_bytes(),
                          (ROOT / "cybertron/payload/plugins/hook_logic.mjs").read_bytes())
+        self.assertEqual((self.tmp / ".opencode/plugins/shell_policy.mjs").read_bytes(),
+                         (ROOT / "cybertron/payload/plugins/shell_policy.mjs").read_bytes())
         config = json.loads(
             (self.tmp / ".opencode" / "opencode.jsonc").read_text()
         )
@@ -125,6 +127,7 @@ class InstallerCliTest(unittest.TestCase):
                     self.assertRegex(repeated.stdout, r"未变 [1-9][0-9]+")
                     self.assertTrue((project / ".opencode/plugins/cybertron.js").is_file())
                     self.assertTrue((project / ".opencode/plugins/hook_logic.mjs").is_file())
+                    self.assertTrue((project / ".opencode/plugins/shell_policy.mjs").is_file())
                     self.assertTrue((project / ".opencode/cybertron-runtime/cybertron/plugin_cli.py").is_file())
                     agent = project / ".opencode/agents/prima.md"
                     agent.write_text("local edit one", encoding="utf-8")

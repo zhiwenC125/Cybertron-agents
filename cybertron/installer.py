@@ -145,7 +145,7 @@ def plan(payload: Path, base: Path) -> list:
     if not runtime.is_dir():
         runtime = payload.parent / "cybertron"
     extras = [("plugins", payload / "plugins" / name, base / "plugins" / name)
-              for name in ("cybertron.js", "hook_logic.mjs")]
+              for name in ("cybertron.js", "hook_logic.mjs", "shell_policy.mjs")]
     extras.extend(("runtime", src, base / "cybertron-runtime" / "cybertron" / src.name)
                   for src in sorted(runtime.glob("*.py")))
     if not (runtime / "plugin_cli.py").is_file():
@@ -371,6 +371,7 @@ def run_doctor(args) -> int:
     commands = list_markdown(base / "commands")
     plugin = base / "plugins" / "cybertron.js"
     plugin_helper = base / "plugins" / "hook_logic.mjs"
+    plugin_policy = base / "plugins" / "shell_policy.mjs"
     runtime = base / "cybertron-runtime" / "cybertron" / "plugin_cli.py"
     if payload is None:
         expected = KNOWN_AGENT_COUNT
@@ -384,11 +385,12 @@ def run_doctor(args) -> int:
     print(f"角色来源: {source}")
     print(f"已安装角色: {len(agents)}（期望 {expected}）")
     print(f"已安装命令: {len(commands)}")
-    print(f"运行时: {'存在' if plugin.is_file() and plugin_helper.is_file() and runtime.is_file() else '缺失'}")
+    print(f"运行时: {'存在' if plugin.is_file() and plugin_helper.is_file() and plugin_policy.is_file() and runtime.is_file() else '缺失'}")
     print(f"配置: {'存在' if config.exists() else '缺失'}")
     print(f"python: {sys.version.split()[0]}")
     healthy = len(agents) == expected and len(commands) == 1 and config.is_file() \
-        and plugin.is_file() and plugin_helper.is_file() and runtime.is_file()
+        and plugin.is_file() and plugin_helper.is_file() and plugin_policy.is_file() \
+        and runtime.is_file()
     if not healthy:
         print("提示: 角色数量不符，重新运行当前安装入口的 init --apply。")
     return 0 if healthy else 1
