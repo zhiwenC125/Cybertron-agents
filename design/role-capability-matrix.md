@@ -149,3 +149,23 @@
 - 角色 shell 白名单由 `cybertron/exporters.py` 编译为 `shell_policy.mjs`，与 `registry.py` 同源，避免两套规则漂移。
 - OpenCode 插件的 `tool.execute.before` 在命令进入宿主前做第二次校验：拒绝换行、`;`、`|`、`&`、`<>`、反引号、`$()`，拒绝未列入 allow/ask 的命令，拒绝 deny 模式。
 - 宿主权限仍是最终边界；插件护栏只是防止“宿主命令解析比注册表更宽”的旁路。`cy_check` 仍是隔离 lint/build/test/sim 的首选。
+
+## 十、单一入口：prima 接需求，thirteenth 做规划（0.7.0）
+
+人类只和 `prima` 对话，不再手动切换 agent：
+
+```text
+人类 → prima（唯一入口）
+     → 无 run：派 subagent(thirteenth) 澄清意图
+     → thirteenth：question → cy_templates → cy_plan
+     → run_id 自动写回父会话
+     → prima：cy_state → cy_plan_review → subagent 派发 → cy_state(wait=true)
+```
+
+实现要点：
+
+- `thirteenth` 为 `mode: all`，可被 prima 作为 planning subagent 派遣；其规划子会话保留 `question`、`cy_templates`、`cy_plan`，删除 `subagent`、`cy_ask`、`cy_plan_review`、`cy_state` 等非规划工具。
+- `prima` 的 `subagent` 钩子在无 run 时允许目标为 `thirteenth` 的预规划派发，不要求 ready 节点；普通节点仍要求已有 run。
+- `cy_plan` 在 thirteenth 的规划子会话成功后，把 run id 写入 `run/<parent_session>`，prima 不需要人工复制 run id。
+- 计划仍由内核写 `plan.json`；`cy_plan_review` 门禁不变，计划 revision 变化后必须重新评审。
+- `/cybertron` 命令改为 `agent: prima`。
