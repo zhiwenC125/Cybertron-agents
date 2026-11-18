@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { nativeDispatch, childSession, nativeToolStatus } from '../cybertron/v6_plugin/hook_logic.mjs';
+import { nativeDispatch, childSession, nativeToolStatus, childPermissionRules, pathCovered, externalGate, grantCovers } from '../cybertron/v6_plugin/hook_logic.mjs';
 
 test('native card binds node, capability, scope, role, and call', () => {
   assert.deepEqual(nativeDispatch({ input: { description: '[n1] doc.write | notes.md', agentID: 'alpha-trion' },
@@ -25,4 +25,55 @@ test('child session and cancellation semantics', () => {
   assert.equal(nativeToolStatus({ status: 'completed' }), 'completed');
   assert.equal(nativeToolStatus({ status: 'error', error: { name: 'AbortError' } }), 'cancelled');
   assert.equal(nativeToolStatus({ status: 'error', error: { name: 'Other' } }), 'error');
+});
+
+test('workspace-write child rules allow project scope and ask for external paths', () => {
+  const rules = childPermissionRules({
+    accessMode: 'workspace-write',
+    writeScope: ['docs/**'],
+    externalScope: ['/tmp/report.md'],
+  });
+  const last = (action, resource) => [...rules].reverse()
+    .find(rule => rule.action === action && rule.resource === resource);
+  assert.deepEqual(last('edit', 'docs/**'), { action: 'edit', resource: 'docs/**', effect: 'allow' });
+  assert.equal(last('external_directory', '/tmp/report.md').effect, 'ask');
+  assert.equal(last('edit', '/tmp/report.md').effect, 'ask');
+  assert.equal(last('edit', '*').effect, 'deny');
+  assert.equal(last('shell', '*').effect, 'deny');
+});
+
+test('danger-full-access keeps the open rule set and ignores external scope', () => {
+  const rules = childPermissionRules({ accessMode: 'danger-full-access', writeScope: [], externalScope: [] });
+  assert.equal(rules[0].effect, 'allow');
+  assert.equal(rules.find(rule => rule.action === 'external_directory').effect, 'allow');
+  assert.equal(rules.find(rule => rule.resource === '.git/**').effect, 'deny');
+});
+
+test('pathCovered respects directory boundaries and comment wildcards', () => {
+  assert.equal(pathCovered(['/tmp/x'], '/tmp/x/report.md'), true);
+  assert.equal(pathCovered(['/tmp/x'], '/tmp/x'), true);
+  assert.equal(pathCovered(['/tmp/x'], '/tmp/xy/report.md'), false);
+  assert.equal(pathCovered(['/tmp/x'], '/tmp/x/*'), true);
+});
+
+test('external gate skips project paths and gates only declared outside paths', () => {
+  const projectRoot = '/work/project';
+  const external = ['/Users/x/Desktop/report.md'];
+  assert.equal(externalGate({ action: 'edit', resources: ['docs/a.md'], external, projectRoot }), 'skip');
+  assert.equal(externalGate({ action: 'edit', resources: ['/work/project/docs/a.md'], external, projectRoot }), 'skip');
+  assert.equal(externalGate({ action: 'edit', resources: ['/Users/x/Desktop/report.md'], external, projectRoot }), 'ask');
+  assert.equal(externalGate({ action: 'edit', resources: ['/Users/x/Desktop/other.md'], external, projectRoot }), 'deny');
+  assert.equal(externalGate({ action: 'external_directory', resources: ['/Users/x/Desktop/*'], external, projectRoot }), 'ask');
+  assert.equal(externalGate({ action: 'edit', resources: ['/Users/x/Desktop/report.md'],
+    external, projectRoot, effect: 'allow' }), 'allow');
+  assert.equal(externalGate({ action: 'edit', resources: ['/Users/x/Desktop/other.md'],
+    external, projectRoot, effect: 'allow' }), 'deny');
+});
+
+test('standing grants cover later writes in the same declared scope', () => {
+  const grants = ['/Users/x/Desktop/report.md'];
+  assert.equal(grantCovers({ resources: ['/Users/x/Desktop/report.md'], grants }), true);
+  assert.equal(grantCovers({ resources: ['/Users/x/Desktop/other.md'], grants }), false);
+  assert.equal(grantCovers({ resources: ['docs/a.md'], grants }), true);
+  assert.equal(grantCovers({ resources: ['/Users/x/Desktop/report.md'], grants: [] }), false);
 });

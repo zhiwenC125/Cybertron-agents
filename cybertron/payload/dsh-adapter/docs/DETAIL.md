@@ -27,6 +27,10 @@ stale revisions are rejected by the kernel, not by prompt text.
   interpreter when needed, and `PYTHONPATH` is composed automatically.
 - A native subagent provider is composed in the profile. The preset declares a
   `subagent` tool but does not supply the provider.
+- Escalation follows the host: this bundle does not issue its own approvals.
+  Outside-project writes use DSH's session `SandboxMode` and the tool-level
+  `sandbox_permissions` one-shot retry, gated by DSH's approval seam. Cybertron
+  records artifact hashes only; it never asks the user itself under DSH.
 - Dispatch binding for DSH child sessions (per-node write scope and verified
   child receipts) is not implemented by this bundle yet. Until it is, treat
   the DSH adapter as planning and ledger access, not as a fully governed

@@ -62,6 +62,7 @@ export function apply(ctx, config = {}) {
           access_mode: payload.access_mode, slug: payload.slug,
           session_title: payload.session_title,
           host_session_id: hostIdOf(exec),
+          host: 'dsh',
         }, exec.signal, config)
       }
       return jsonResult(result)

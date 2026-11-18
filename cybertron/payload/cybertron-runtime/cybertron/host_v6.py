@@ -135,7 +135,22 @@ class V6HostBridge:
 
     @staticmethod
     def _card(node: PlanNode) -> str:
-        return f"[{node.node_id}] {node.capability} | {', '.join(node.write_scope) or '(read only)'}"
+        scope = ", ".join(node.write_scope) or "(read only)"
+        if node.external_scope:
+            scope = f"{scope}; external: {', '.join(node.external_scope)}"
+        return f"[{node.node_id}] {node.capability} | {scope}"
+
+    def _external_paths(self, node: PlanNode) -> list[str]:
+        return [str(resolve_scope(scope, self.project)) for scope in node.external_scope]
+
+    def _host(self, run_id: str) -> str:
+        run_file = self._dir(run_id) / "run.json"
+        if not run_file.is_file() or run_file.is_symlink():
+            return "opencode"
+        try:
+            return json.loads(run_file.read_text()).get("host", "opencode")
+        except (OSError, ValueError):
+            return "opencode"
 
     def _graph(self, run_id: str) -> PlanGraph:
         return PlanGraph.from_dict(json.loads((self._dir(run_id) / "plan.json").read_text()))
@@ -178,9 +193,11 @@ class V6HostBridge:
              objective: str = "", write_scope: list[str] | None = None,
              test_scope: list[str] | None = None, skip: list[str] | None = None,
              access_mode: str | None = None, session_title: str = "",
-             slug: str = "") -> dict:
+             slug: str = "", host: str = "opencode") -> dict:
         if not isinstance(host_session_id, str) or not host_session_id:
             raise HostBridgeError("host session ID is required")
+        if host not in {"opencode", "dsh"}:
+            raise HostBridgeError("host must be opencode or dsh")
         try:
             mode = normalize_access_mode(access_mode)
         except ValueError as exc:
@@ -235,7 +252,8 @@ class V6HostBridge:
         (directory / "plan.json").write_text(json.dumps(graph_seed.to_dict(), ensure_ascii=False))
         (directory / "run.json").write_text(json.dumps({
             "run_id": run_id, "title": title[:200], "slug": slug,
-            "host_session_id": host_session_id, "access_mode": mode,
+            "host_session_id": host_session_id, "access_mode": mode, "host": host,
+            "evidence_level": ("kernel-receipt" if host == "opencode" else "host-approved"),
             "created_utc": _utc(),
         }, ensure_ascii=False))
         (directory / "events.jsonl").touch()
@@ -379,7 +397,9 @@ class V6HostBridge:
                            if status.get(node_id) != "completed"}
         nodes = [{"node_id": node.node_id, "status": status[node.node_id],
                   "card": self._card(node), "role": node.role,
-                  "write_scope": list(node.write_scope)} for node in graph.nodes.values()]
+                  "write_scope": list(node.write_scope),
+                  "external_scope": self._external_paths(node)}
+                 for node in graph.nodes.values()]
         active = next(iter(active_calls.values()), None)
         created = next((event for event in events if event["type"] == "plan.created"), {})
         run_dir = self._dir(run_id)
@@ -401,6 +421,8 @@ class V6HostBridge:
                   "child_session_id": active["child_session_id"] if active else None,
                   "active_dispatches": list(active_calls.values()),
                   "access_mode": graph.access_mode,
+                  "host": self._host(run_id),
+                  "evidence_level": metadata.get("evidence_level", "kernel-receipt"),
                   "title": metadata.get("title") or created.get("title"),
                   "slug": metadata.get("slug") or created.get("slug"),
                   "run_dir": str(run_dir),
@@ -606,13 +628,16 @@ class V6HostBridge:
         self._snapshot_path(run_id, call_id).write_bytes(_encode(baseline))
         self._append(run_id, "dispatch.started", node_id=node_id, role=role,
                      capability=node.capability, write_scope=list(node.write_scope),
+                     external_scope=self._external_paths(node),
                      access_mode=graph.access_mode, call_id=call_id)
         return {"status": "running", "token": self._token(run_id, call_id),
                 "node_id": node_id, "write_scope": list(node.write_scope),
+                "external_scope": self._external_paths(node),
                 "access_mode": graph.access_mode}
 
     def bind(self, run_id: str, call_id: str, token: str,
-             child_session_id: str, write_scope: list[str]) -> dict:
+             child_session_id: str, write_scope: list[str],
+             external_scope: list[str] | None = None) -> dict:
         """Record a host-verified child session permission binding."""
         self._verify_token(run_id, call_id, token)
         events = self.events(run_id)
@@ -625,6 +650,8 @@ class V6HostBridge:
         node = self._graph(run_id).nodes[start["node_id"]]
         if write_scope != list(node.write_scope):
             raise HostBridgeError("child permission scope differs from plan")
+        if external_scope is not None and list(external_scope) != self._external_paths(node):
+            raise HostBridgeError("child external scope differs from plan")
         prior = next((event for event in events if event["type"] == "dispatch.bound"
                       and event.get("call_id") == call_id), None)
         if prior:
@@ -633,7 +660,66 @@ class V6HostBridge:
             return self.state(run_id)
         self._append(run_id, "dispatch.bound", call_id=call_id,
                      node_id=node.node_id, child_session_id=child_session_id,
-                     write_scope=write_scope)
+                     write_scope=write_scope,
+                     external_scope=self._external_paths(node))
+        return self.state(run_id)
+
+    def permission(self, run_id: str, call_id: str, request_id: str,
+                   action: str, resources: list[str],
+                   reply: str | None = None, granted: bool = False) -> dict:
+        """Record one host permission request or reply for a dispatch.
+
+        The OpenCode plugin calls this from its permission hook. A write to a
+        declared external path is accepted by ``finish`` only when the host
+        gate actually ran for it, so a silent bypass fails the node.
+        """
+        if not isinstance(request_id, str) or not request_id:
+            raise HostBridgeError("request_id is required")
+        if not isinstance(action, str) or not action:
+            raise HostBridgeError("action is required")
+        if not isinstance(resources, list) or not resources or any(
+                not isinstance(item, str) or not item for item in resources):
+            raise HostBridgeError("resources must be a nonempty string list")
+        if reply is not None and reply not in {"once", "always", "reject"}:
+            raise HostBridgeError("reply must be once, always, or reject")
+        events = self.events(run_id)
+        start = next((event for event in events if event["type"] == "dispatch.started"
+                      and event.get("call_id") == call_id), None)
+        if start is None:
+            raise HostBridgeError("no dispatch for call_id")
+        if granted:
+            if any(event["type"] == "permission.granted"
+                   and event.get("call_id") == call_id
+                   and event.get("action") == action
+                   and event.get("resources") == list(resources)
+                   for event in events):
+                return self.state(run_id)
+            self._append(run_id, "permission.granted", call_id=call_id,
+                         node_id=start["node_id"], request_id=request_id,
+                         action=action, resources=list(resources),
+                         source="opencode.permission")
+        elif reply is None:
+            if any(event["type"] == "permission.requested"
+                   and event.get("call_id") == call_id
+                   and event.get("action") == action
+                   and event.get("resources") == list(resources)
+                   for event in events):
+                return self.state(run_id)
+            self._append(run_id, "permission.requested", call_id=call_id,
+                         node_id=start["node_id"], request_id=request_id,
+                         action=action, resources=list(resources),
+                         source="opencode.permission")
+        else:
+            if any(event["type"] == "permission.resolved"
+                   and event.get("call_id") == call_id
+                   and event.get("request_id") == request_id
+                   and event.get("reply") == reply
+                   for event in events):
+                return self.state(run_id)
+            self._append(run_id, "permission.resolved", call_id=call_id,
+                         node_id=start["node_id"], request_id=request_id,
+                         action=action, resources=list(resources), reply=reply,
+                         source="opencode.permission")
         return self.state(run_id)
 
     def review_reject(self, run_id: str, call_id: str, token: str,
@@ -762,19 +848,44 @@ class V6HostBridge:
                 target = resolve_scope(scope, self.project)
                 if target.is_file() and not target.is_symlink():
                     artifacts[str(target)] = _hash(target.read_bytes())
+        external_artifacts: dict[str, str] = {}
+        unapproved_external: list[str] = []
+        host = self._host(run_id)
+        if node.external_scope:
+            # Outside the project there is no baseline to diff or roll back.
+            # Evidence is the artifact hash plus proof that the host gate ran.
+            for target in self._external_paths(node):
+                path = Path(target)
+                if path.is_file() and not path.is_symlink():
+                    external_artifacts[str(path)] = _hash(path.read_bytes())
+            requested = {resource for event in all_events
+                         if event["type"] in {"permission.requested", "permission.granted"}
+                         and event.get("call_id") == call_id
+                         for resource in (event.get("resources") or ())}
+            if host == "opencode":
+                # OpenCode gates each external write through its own
+                # ask/always/reject rules; the kernel verifies that the gate
+                # ran. DSH approves through its sandbox mode and one-shot
+                # escalation, which the kernel cannot observe, so it records
+                # the artifact hash without demanding a kernel-side receipt.
+                unapproved_external = sorted(path for path in external_artifacts
+                                             if path not in requested)
+            artifacts.update(external_artifacts)
         rejection = next((event for event in reversed(all_events)
                           if event["type"] == "review.rejected" and event.get("call_id") == call_id), None)
         if returned["tool_status"] == "cancelled":
             status = "cancelled"
-        elif rejection or report.rejected_paths or returned["tool_status"] == "error":
+        elif (unapproved_external or rejection or report.rejected_paths
+              or returned["tool_status"] == "error"):
             status = "failed"
-        elif not artifacts and node.write_scope:
+        elif not artifacts and (node.write_scope or node.external_scope):
             status = "blocked"
         elif not node.write_scope and report.changed_paths:
             status = "failed"
         else:
             status = "completed"
         diagnostic = (rejection["diagnostic"] if rejection else
+                      "external write without host approval: " + ", ".join(unapproved_external) if unapproved_external else
                       "write_scope violation: " + ", ".join(report.rejected_paths) if report.rejected_paths else
                       "native subagent error" if returned["tool_status"] == "error" else
                       "no accepted artifact" if status == "blocked" else None)
