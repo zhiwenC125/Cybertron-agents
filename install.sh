@@ -4,12 +4,13 @@
 set -euo pipefail
 
 REPO="zhiwenC125/Cybertron-agents"
-MODE="project"
+MODE="global"
 PROJECT_DIR="."
 APPLY=0
-VERSION="v0.5.1"
+VERSION="v0.6.0"
 EXPECTED_SHA256=""
 DOCTOR=0
+ALLOW_DUPLICATE=0
 
 usage() {
   cat <<'EOF'
@@ -20,18 +21,19 @@ Cybertron 安装脚本
 
 选项:
   --global              安装到全局 OpenCode 配置目录
-  --project DIR         安装到 DIR/.opencode（默认当前目录）
+  --project DIR         安装到 DIR/.opencode（需显式指定；默认全局）
   --apply               真正写入文件（默认只预览）
   --dry-run             只预览（默认）
-  --version REF         指定 tag（默认 v0.5.1）；分支仅用于显式开发测试
+  --version REF         指定 tag（默认 v0.6.0）；分支仅用于显式开发测试
   --sha256 HEX          校验下载归档的 SHA-256
+  --allow-duplicate     允许全局与项目同时安装（不推荐）
   --doctor              只检查本地安装，不下载或写入
   -h, --help            显示本帮助
 
 示例:
-  sh install.sh --dry-run
-  sh install.sh --apply --project .
-  sh install.sh --apply --global
+  sh install.sh --dry-run              # 预览全局安装
+  sh install.sh --apply                # 全局安装
+  sh install.sh --apply --project .    # 项目安装
   sh install.sh --apply --version v0.1.0 --sha256 <hex>
 EOF
 }
@@ -47,6 +49,7 @@ while [ $# -gt 0 ]; do
     --project=*) MODE="project"; PROJECT_DIR="${1#*=}" ;;
     --apply) APPLY=1 ;;
     --dry-run) APPLY=0 ;;
+    --allow-duplicate) ALLOW_DUPLICATE=1 ;;
     --doctor) DOCTOR=1 ;;
     --version)
       VERSION="${2:?--version 需要一个分支或 tag 参数}"
@@ -66,8 +69,19 @@ done
 
 if [ "$MODE" = "global" ]; then
   BASE="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
+  OTHER="$PROJECT_DIR/.opencode"
 else
   BASE="$PROJECT_DIR/.opencode"
+  OTHER="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
+fi
+
+if [ "$DOCTOR" != "1" ] && [ -f "$OTHER/plugins/cybertron.js" ]; then
+  if [ "$ALLOW_DUPLICATE" != "1" ]; then
+    echo "检测到另一处 Cybertron 安装: $OTHER" >&2
+    echo "请先移除其中一处，或显式使用 --allow-duplicate（不推荐）。" >&2
+    exit 2
+  fi
+  echo "警告: 同时存在另一处安装 $OTHER；两个插件会被重复加载。"
 fi
 
 if [ "$DOCTOR" = "1" ]; then
@@ -76,11 +90,13 @@ if [ "$DOCTOR" = "1" ]; then
   for f in "$BASE"/agents/*.md; do [ -e "$f" ] && AGENT_COUNT=$((AGENT_COUNT + 1)); done
   for f in "$BASE"/commands/*.md; do [ -e "$f" ] && COMMAND_COUNT=$((COMMAND_COUNT + 1)); done
   echo "目标: $BASE"
+  if [ -f "$OTHER/plugins/cybertron.js" ]; then echo "另一处安装: 检测到 $OTHER"; else echo "另一处安装: 无"; fi
   echo "已安装角色: ${AGENT_COUNT}（期望 13）"
   echo "已安装命令: ${COMMAND_COUNT}（期望 1）"
-  echo "运行时: $BASE/plugins/cybertron.js、hook_logic.mjs 与 $BASE/cybertron-runtime/cybertron/plugin_cli.py"
+  echo "运行时: $BASE/plugins/cybertron.js、hook_logic.mjs、shell_policy.mjs 与 $BASE/cybertron-runtime/cybertron/plugin_cli.py"
   [ "$AGENT_COUNT" -eq 13 ] && [ "$COMMAND_COUNT" -eq 1 ] && [ -f "$BASE/opencode.jsonc" ] \
     && [ -f "$BASE/plugins/cybertron.js" ] && [ -f "$BASE/plugins/hook_logic.mjs" ] \
+    && [ -f "$BASE/plugins/shell_policy.mjs" ] \
     && [ -f "$BASE/cybertron-runtime/cybertron/plugin_cli.py" ]
   exit $?
 fi

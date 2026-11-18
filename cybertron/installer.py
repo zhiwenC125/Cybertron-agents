@@ -18,7 +18,7 @@ import urllib.request
 from pathlib import Path
 
 REPO = "zhiwenC125/Cybertron-agents"
-DEFAULT_REF = "v0.5.1"
+DEFAULT_REF = "v0.6.0"
 KNOWN_AGENT_COUNT = 13
 MINIMAL_CONFIG = (
     '{\n'
@@ -43,7 +43,7 @@ def _version() -> str:
 
         return version("cybertron-agents")
     except Exception:
-        return "0.5.1"
+        return "0.6.0"
 
 
 def default_base(global_install: bool, project: str) -> Path:
@@ -54,6 +54,16 @@ def default_base(global_install: bool, project: str) -> Path:
     caller = Path(os.environ.get("CYBERTRON_PROJECT_CWD", ".")).resolve()
     requested = Path(project or ".")
     return (requested if requested.is_absolute() else caller / requested).resolve() / ".opencode"
+
+
+def other_install_base(base: Path, global_install: bool) -> Path:
+    """Return the other install location for duplicate detection."""
+    if global_install:
+        caller = Path(os.environ.get("CYBERTRON_PROJECT_CWD", ".")).resolve()
+        return (caller / ".opencode").resolve()
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    root = Path(config_home) if config_home else Path.home() / ".config"
+    return (root / "opencode").resolve()
 
 
 def find_payload_dir(base: Path) -> Path:
@@ -303,11 +313,20 @@ def apply_install(items: list, config_path: Path | None = None, post_apply=None)
 def run_init(args) -> int:
     payload = resolve_payload(args.payload, args.ref, args.sha256)
     base = default_base(args.global_, args.project)
+    other = other_install_base(base, args.global_)
+    duplicate = other != base and (other / "plugins" / "cybertron.js").is_file()
+    if duplicate and not getattr(args, "allow_duplicate", False):
+        print(f"检测到另一处 Cybertron 安装: {other}", file=sys.stderr)
+        print("请先移除其中一处，或显式使用 --allow-duplicate（不推荐）。", file=sys.stderr)
+        return 2
+    if duplicate:
+        print(f"警告: 同时存在另一处安装 {other}；两个插件会被重复加载。")
     dry_run = not args.apply
     items = plan(payload, base)
     if not items:
         raise SystemExit("payload 为空，未找到可安装的 Markdown")
 
+    print(f"安装模式: {'全局' if args.global_ else '项目'}")
     print(f"安装目标: {base}")
     print(f"payload: {payload}")
     print(f"模式: {'预览（dry-run，加 --apply 写入）' if dry_run else '写入（--apply）'}")
@@ -364,6 +383,8 @@ def run_dsh(args) -> int:
 
 def run_doctor(args) -> int:
     base = default_base(args.global_, args.project)
+    other = other_install_base(base, args.global_)
+    duplicate = other != base and (other / "plugins" / "cybertron.js").is_file()
     payload = resolve_payload(
         args.payload, args.ref, args.sha256, allow_download=False
     )
@@ -382,6 +403,8 @@ def run_doctor(args) -> int:
     config = base / "opencode.jsonc"
 
     print(f"目标: {base}")
+    print(f"安装模式: {'全局' if args.global_ else '项目'}")
+    print(f"另一处安装: {'检测到 ' + str(other) if duplicate else '无'}")
     print(f"角色来源: {source}")
     print(f"已安装角色: {len(agents)}（期望 {expected}）")
     print(f"已安装命令: {len(commands)}")
@@ -391,6 +414,8 @@ def run_doctor(args) -> int:
     healthy = len(agents) == expected and len(commands) == 1 and config.is_file() \
         and plugin.is_file() and plugin_helper.is_file() and plugin_policy.is_file() \
         and runtime.is_file()
+    if duplicate:
+        print("提示: 检测到全局与项目重复安装；只保留一处，另一个插件会被重复加载。")
     if not healthy:
         print("提示: 角色数量不符，重新运行当前安装入口的 init --apply。")
     return 0 if healthy else 1
@@ -406,18 +431,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command")
 
-    init_parser = sub.add_parser("init", help="安装角色与 /cybertron 命令")
-    init_parser.add_argument("--global", dest="global_", action="store_true")
-    init_parser.add_argument("--project", default=os.environ.get("CYBERTRON_PROJECT_CWD", "."))
+    init_parser = sub.add_parser("init", help="安装角色与 /cybertron 命令（默认全局）")
+    init_parser.add_argument("--global", dest="global_", action="store_true", default=None)
+    init_parser.add_argument("--project", default=None)
+    init_parser.add_argument("--allow-duplicate", action="store_true",
+                             help="允许同时存在全局与项目安装（不推荐）")
     init_parser.add_argument("--payload", default="")
     init_parser.add_argument("--ref", default="")
     init_parser.add_argument("--sha256", default="")
     init_parser.add_argument("--apply", action="store_true")
     init_parser.add_argument("--dry-run", dest="apply", action="store_false")
 
-    doctor_parser = sub.add_parser("doctor", help="检查安装状态")
-    doctor_parser.add_argument("--global", dest="global_", action="store_true")
-    doctor_parser.add_argument("--project", default=os.environ.get("CYBERTRON_PROJECT_CWD", "."))
+    doctor_parser = sub.add_parser("doctor", help="检查安装状态（默认全局）")
+    doctor_parser.add_argument("--global", dest="global_", action="store_true", default=None)
+    doctor_parser.add_argument("--project", default=None)
     doctor_parser.add_argument("--payload", default="")
     doctor_parser.add_argument("--ref", default="")
     doctor_parser.add_argument("--sha256", default="")
@@ -447,6 +474,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command in {"init", "doctor"}:
+        if getattr(args, "global_", None) is None:
+            args.global_ = getattr(args, "project", None) is None
+        if args.global_:
+            args.project = "."
     if args.command == "init":
         return run_init(args)
     if args.command == "doctor":

@@ -31,27 +31,31 @@ function usage() {
   console.log(`cybertron-agents
 
 用法:
-  cybertron init [--global | --project DIR] [--apply] [--dry-run]
-  cybertron doctor [--global | --project DIR]
+  cybertron init [--project DIR | --global] [--apply] [--dry-run]   # 默认全局
+  cybertron doctor [--project DIR | --global]
   cybertron models setup|show|doctor|rollback [--global | --project DIR]
   cybertron dsh path
   cybertron --version
   cybertron --help
 
-默认 init 只预览（dry-run），加 --apply 才写入。`);
+默认 init 安装到全局 OpenCode 配置；只预览（dry-run），加 --apply 才写入。`);
 }
 
 function parseArgs(argv) {
-  const opts = { global: false, projectDir: process.cwd(), apply: false };
+  const opts = { global: undefined, projectDir: undefined, apply: false, allowDuplicate: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--global') {
       opts.global = true;
     } else if (arg === '--project') {
+      opts.global = false;
       opts.projectDir = argv[i + 1];
       i += 1;
     } else if (arg.startsWith('--project=')) {
+      opts.global = false;
       opts.projectDir = arg.slice('--project='.length);
+    } else if (arg === '--allow-duplicate') {
+      opts.allowDuplicate = true;
     } else if (arg === '--apply') {
       opts.apply = true;
     } else if (arg === '--dry-run') {
@@ -60,7 +64,17 @@ function parseArgs(argv) {
       opts.error = `未知参数: ${arg}`;
     }
   }
+  if (opts.global === undefined) opts.global = true;
+  if (opts.projectDir === undefined) opts.projectDir = process.cwd();
   return opts;
+}
+
+function otherInstallBase(globalInstall) {
+  if (globalInstall) {
+    return path.join(process.env.CYBERTRON_PROJECT_CWD || process.cwd(), '.opencode');
+  }
+  const configHome = process.env.XDG_CONFIG_HOME || path.join(process.env.HOME, '.config');
+  return path.join(configHome, 'opencode');
 }
 
 const MARKS = { new: '+', update: '~', same: '=' };
@@ -92,6 +106,18 @@ function runInit(opts) {
     process.exit(1);
   }
 
+  const other = otherInstallBase(opts.global);
+  const duplicate = path.resolve(other) !== path.resolve(plan.base)
+    && existsSync(path.join(other, 'plugins', 'cybertron.js'));
+  if (duplicate && !opts.allowDuplicate) {
+    console.error(`检测到另一处 Cybertron 安装: ${other}`);
+    console.error('请先移除其中一处，或显式使用 --allow-duplicate（不推荐）。');
+    process.exitCode = 2;
+    return;
+  }
+  if (duplicate) console.log(`警告: 同时存在另一处安装 ${other}；两个插件会被重复加载。`);
+
+  console.log(`安装模式: ${opts.global ? '全局' : '项目'}`);
   console.log(`安装目标: ${plan.base}`);
   console.log(`payload: ${plan.payload.base}`);
   console.log(`模式: ${dryRun ? '预览（dry-run，加 --apply 写入）' : '写入（--apply）'}`);
@@ -144,14 +170,22 @@ function runDoctor(opts) {
   const runtime = path.join(base, 'cybertron-runtime', 'cybertron', 'plugin_cli.py');
   const config = path.join(base, 'opencode.jsonc');
   const expected = listMarkdown(payload.agents).length;
+  const other = otherInstallBase(opts.global);
+  const duplicate = path.resolve(other) !== path.resolve(base)
+    && existsSync(path.join(other, 'plugins', 'cybertron.js'));
 
   console.log(`目标: ${base}`);
+  console.log(`安装模式: ${opts.global ? '全局' : '项目'}`);
+  console.log(`另一处安装: ${duplicate ? `检测到 ${other}` : '无'}`);
   console.log(`已安装角色: ${agents.length}（期望 ${expected}）`);
   console.log(`已安装命令: ${commands.length}`);
   console.log(`运行时: ${existsSync(plugin) && existsSync(pluginHelper) && existsSync(pluginPolicy) && existsSync(runtime) ? '存在' : '缺失'}`);
   console.log(`配置: ${existsSync(config) ? '存在' : '缺失'}`);
   console.log(`node: ${process.version}`);
 
+  if (duplicate) {
+    console.log('提示: 检测到全局与项目重复安装；只保留一处，另一个插件会被重复加载。');
+  }
   if (agents.length !== expected) {
     console.log('提示: 角色数量不符，重新运行当前安装入口的 init --apply。');
   }
