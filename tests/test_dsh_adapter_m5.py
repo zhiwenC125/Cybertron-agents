@@ -41,6 +41,24 @@ class DshAdapterBundleTests(unittest.TestCase):
         self.assertEqual(host_rows, [])
         self.assertIn("python: python3", patch)
 
+    def test_preset_isolates_the_compaction_service_provider(self):
+        # A preset-mounted service provider must live in a cordis:group
+        # isolation realm; otherwise DSH's activation audit reports the preset
+        # as broken instead of composing it.
+        patch = (BUNDLE / "cordis.patch.yml").read_text()
+        self.assertIn("name: cordis:group", patch)
+        self.assertIn("isolate:", patch)
+        self.assertIn("compaction: true", patch)
+        # compaction-basic must be nested under the group, never a direct child
+        # of `plugins`.
+        direct = [
+            line for line in patch.splitlines()
+            if line.strip() == "- id: compaction-basic"
+        ]
+        self.assertEqual(len(direct), 1)
+        # Direct preset children indent by 10 spaces; group children by 14.
+        self.assertTrue(direct[0].startswith("              - id: compaction-basic"))
+
     def test_plugin_uses_the_transport_bridge_and_registers_five_tools(self):
         source = (BUNDLE / "index.js").read_text()
         self.assertIn("from './bridge.js'", source)

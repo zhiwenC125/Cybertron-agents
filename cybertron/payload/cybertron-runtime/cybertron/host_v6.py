@@ -18,8 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .access import (DEFAULT_ACCESS_MODE, normalize_access_mode, resolve_scope,
-                     slugify_title)
+from .access import (DEFAULT_ACCESS_MODE, is_external_scope, normalize_access_mode,
+                     resolve_scope, slugify_title)
 from .graph import GraphRejected, PlanGraph, PlanNode
 from .gates import diff_facts, risk_floor
 from .learning import (TemplateRejected, distill_template, instantiate, is_request_class,
@@ -27,7 +27,7 @@ from .learning import (TemplateRejected, distill_template, instantiate, is_reque
 from .metrics import MetricsError, collect, render_panel, run_metrics, summarize, template_summary
 from .profiles import run_check
 from .scope_guard import FileState, ScopeGuard, Snapshot
-from .scheduler_v6 import affected_subgraph, dispatchable
+from .scheduler_v6 import affected_subgraph, dispatchable, scopes_overlap
 
 
 class HostBridgeError(RuntimeError):
@@ -256,6 +256,68 @@ class V6HostBridge:
         result["slug"] = slug
         return result
 
+    def _plan_review(self, graph: PlanGraph) -> dict:
+        """Deterministic plan-feasibility review before the first dispatch."""
+        findings: list[dict] = []
+        blocking: list[dict] = []
+
+        def add(severity: str, code: str, message: str, node_id: str | None = None) -> None:
+            finding = {"severity": severity, "code": code, "message": message}
+            if node_id is not None:
+                finding["node_id"] = node_id
+            findings.append(finding)
+            if severity == "blocking":
+                blocking.append(finding)
+
+        try:
+            graph.validate()
+        except GraphRejected as exc:
+            add("blocking", "graph.invalid", str(exc))
+        for node in graph.nodes.values():
+            if not node.acceptance:
+                add("blocking", "node.acceptance", "node has no acceptance criteria", node.node_id)
+            if "scope_guard" not in node.verifiers:
+                add("blocking", "node.scope_guard",
+                    "node lacks the mandatory scope_guard verifier", node.node_id)
+            if node.kind == "device_op" or node.role == "megatronus":
+                add("warning", "device.operation",
+                    "physical device operation requires explicit human approval", node.node_id)
+            for scope in node.write_scope:
+                if is_external_scope(scope):
+                    add("warning", "scope.external",
+                        f"external write scope {scope!r} requires explicit authorization",
+                        node.node_id)
+        node_ids = list(graph.nodes)
+        for index, left_id in enumerate(node_ids):
+            left = graph.nodes[left_id]
+            if not left.write_scope:
+                continue
+            for right_id in node_ids[index + 1:]:
+                right = graph.nodes[right_id]
+                if right.write_scope and scopes_overlap(left.write_scope, right.write_scope):
+                    add("warning", "scope.overlap",
+                        f"{left_id} and {right_id} share write scope; the scheduler serializes "
+                        "overlapping writers, so verify the dependency order", left_id)
+        if graph.access_mode == "danger-full-access":
+            add("warning", "access.danger",
+                "danger-full-access requires explicit human authorization of the outer paths")
+        if not graph.gates:
+            add("info", "gates.none", "no extra gates declared; scope_guard still applies")
+        return {"approved": not blocking, "blocking": blocking, "findings": findings}
+
+    def review_plan(self, run_id: str) -> dict:
+        """Record prima's review of the current plan revision before dispatch."""
+        graph = self._graph(run_id)
+        review = self._plan_review(graph)
+        plan_path = self._dir(run_id) / "plan.json"
+        digest = _hash(plan_path.read_bytes())
+        self._append(run_id, "plan.reviewed", reviewer="prima",
+                     plan_revision=graph.revision, plan_sha256=digest,
+                     approved=review["approved"], findings=review["findings"])
+        state = self.state(run_id)
+        return {**review, "run_id": run_id, "plan_revision": graph.revision,
+                "plan_sha256": digest, "state": state}
+
     def state(self, run_id: str) -> dict:
         graph = self._graph(run_id)
         events = self.events(run_id)
@@ -343,6 +405,35 @@ class V6HostBridge:
                   "slug": metadata.get("slug") or created.get("slug"),
                   "run_dir": str(run_dir),
                   "event_seq": len(events), "events_path": str(run_dir / "events.jsonl")}
+        plan_path = run_dir / "plan.json"
+        plan_sha = _hash(plan_path.read_bytes()) if plan_path.is_file() else ""
+        reviews = [event for event in events if event["type"] == "plan.reviewed"]
+        current_review = next((event for event in reversed(reviews)
+                               if event.get("plan_revision") == graph.revision
+                               and event.get("plan_sha256") == plan_sha), None)
+        review = None if current_review is None else {
+            "reviewer": current_review.get("reviewer"),
+            "plan_revision": current_review.get("plan_revision"),
+            "approved": bool(current_review.get("approved")),
+            "findings": current_review.get("findings", []),
+        }
+        review_current = bool(current_review and current_review.get("approved"))
+        result.update({
+            "review_required": True,
+            "review": review,
+            "review_current": review_current,
+            "handoff": {
+                "run_id": run_id,
+                "plan_revision": graph.revision,
+                "next_agent": "prima",
+                "ready_nodes": ready,
+                "ready_cards": [self._card(graph.nodes[node_id]) for node_id in ready],
+                "access_mode": graph.access_mode,
+                "required_gates": sorted(required_gates),
+                "review_required": True,
+                "review_current": review_current,
+            },
+        })
         if len(nodes) == 1:
             result.update({"node_id": nodes[0]["node_id"], "card": nodes[0]["card"],
                            "write_scope": nodes[0]["write_scope"],

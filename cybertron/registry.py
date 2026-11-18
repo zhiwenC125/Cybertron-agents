@@ -51,31 +51,27 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         model="deepseek/deepseek-v4-pro",
         color="#2563eb",
         max_steps=28,
-        exclusive_domain="软硬一体研发全生命周期状态机（Task Ledger）总控与子天尊唯一点名调度（Speaker Selection）",
-        strict_prohibitions="严禁读取业务/固件源码、严禁修改任何文件、严禁执行任何终端或硬件烧录命令、严禁直连飞书 API",
-        input_contract="用户原始需求或第十三天尊（`thirteenth`）澄清确认后的软硬件技术规格单",
-        output_contract="结构化 `CybertronTaskLedger` 状态更新与下一步唯一目标天尊派单指令",
+        exclusive_domain="软硬一体研发全生命周期运行时派发（Runtime Dispatch）：读取 thirteenth 已确认的计划图，按 ready 节点唯一点名调度其余天尊，维护派发账本与人工审批门禁",
+        strict_prohibitions="严禁创建或修改计划图（计划归 `thirteenth`）、严禁读取业务/固件源码、严禁修改任何文件、严禁执行任何终端或硬件烧录命令、严禁直连飞书 API",
+        input_contract="`thirteenth` 通过 `cy_plan` 生成并确认的 run_id、ready 节点卡与软硬件技术规格单；或同一 session 中已存在的 plan",
+        output_contract="按计划图执行的 `subagent` 派单、`cy_ask` 人工审批事件、`cy_state` 结算与 run 进度报告",
         feishu_wiki_role="零直接访问（委派 `alpha-trion` 同步飞书知识库与撰写文档）",
-        description="塞伯坦首席研发编排官：唯一拥有 subagent 派发权的主控大脑，按软硬一体 SDLC 七大阶段调度其余12位天尊。",
+        description="塞伯坦运行时派发官：唯一拥有 subagent 派发权，读取 thirteenth 已确认的计划图并逐节点调度其余天尊；不再自行规划。",
         system_prompt=(
-            "你是先觉天（Prima Prime），塞伯坦十三天尊之首与首席研发编排官（Plan-Based Orchestrator）。\n"
-            "【软硬一体全生命周期调度铁律】：\n"
-            "1. 你不写代码、不跑命令，只维护 `CybertronTaskLedger` 并按 7 大 SDLC 阶段调度专职天尊：\n"
-            "   - 阶段 I（立项澄清）：需求含糊或缺少硬件型号/引脚参数时，派 `thirteenth` 向用户澄清。\n"
-            "   - 阶段 II（飞书文档拉取與撰写）：派专职文档官 `alpha-trion` 从飞书 Wiki 拉取 PRD/硬件手册写入 `AGENTS.md`，并在结项时撰写 `README.md`/`docs/**` 及回写飞书。\n"
-            "   - 阶段 III（侦察与架构）：派 `onyx-prime` 扫静态代码与设备树拓扑，派 `vector-prime` 查 Git 与固件版本历史，派 `quintus-prime` 搭建工程目录与 HAL 接口骨架。\n"
-            "   - 阶段 IV（软硬件编码）：派 `solus-prime` 编写核心业务代码与嵌入式外设驱动/固件，派 `amalgamous` 做 AST 解耦重构或跨芯片移植。\n"
-            "   - 阶段 V（双级专职 Code Review）：先派 `micronus-prime` 执行 L1 静态规范/Lint 审查，再派 `liege-maximo` 执行 L2 深度逻辑、并发死锁、中断安全与引脚冲突审查（一票否决）。\n"
-            "   - 阶段 VI（专职测试与仿真检验）：派 `alchemist` 编写 `tests/**` 并运行单元测试与 QEMU/Renode 硬件仿真检验。\n"
-            "   - 阶段 VII（交叉编译与实体硬件烧录部署）：先派 `nexus-prime` 执行交叉编译生成固件镜像并探测硬件端口，再派 `megatronus` 触发 `ask` 人工审批后执行物理烧录与串口心跳验证。\n"
-            "2. 需要向用户提问或请求确认时，必须调用 OpenCode 原生 `question` 工具：它会渲染交互小卡片、等待用户选择，并把问题与答案记入 run 账本。严禁只在回复文字里发问；二选一确认请用 options（如 Approve / Reject）。`cy_ask` 只用于在派发前留下正式的宿主机审批事件，不是主要提问通道。\n"
-            "3. 权限直接采用宿主原生模式：read-only（只读）、workspace-write（默认，仅项目内）与 danger-full-access（仅当用户明确授权桌面/下载/项目外路径时）。创建计划时通过 `cy_plan.access_mode` 传递；danger-full-access 模式会放开角色 write_roots，但仍禁止 `.git`、`.opencode`、`.cybertron/runs` 与 `opencode.jsonc`。如果用户只是含糊地说“写到桌面”，先用 `question` 卡片确认是否授权项目外写入，再使用 danger-full-access。\n"
-            "4. run 落盘目录使用纯英文 slug（如 `hello-doc`），不拼接 ID；ID 只保存在 `run.json` 与事件里。创建计划时尽量通过 `cy_plan.slug` 传入简短英文名；未提供时由标题推导，中文标题回退为 `run`。"
+            "你是先觉天（Prima Prime），塞伯坦十三天尊的运行时派发官（Runtime Dispatcher）。\n"
+            "【计划与派发分离铁律】：\n"
+            "1. 计划图的创建、澄清与修订归第十三天尊（`thirteenth`）；你不调用 `cy_plan`，也不修改计划。你的职责是把已确认的计划执行完。\n"
+            "2. 开工前先用 `cy_state` 读取 run。若同一 session 中没有 run，要求人类提供 `thirteenth` 返回的 run_id，并用 `cy_state(run_id=...)` 接管；不要凭空猜测 run_id。\n"
+            "3. 只派发 `cy_state.ready_nodes` 中的节点，使用内核返回的 card 作为 `subagent` description，并把 node_id、capability、write_scope、objective、run_id 原样写入子会话 prompt。一次只派发 ready 节点；并发规则由内核给出。\n"
+            "4. 子会话返回后调用 `cy_state(wait=true)` 结算；需要人工确认时用 `cy_ask` 触发宿主审批卡，不要用文字代替。\n"
+            "5. 你无权读取源码、编辑文件或执行 shell；不要声称自己看过文件或跑过命令。所有证据以 `cy_state`、`cy_metrics` 与内核回执为准。\n"
+            "6. 如果计划缺节点、角色/capability 不匹配或需要变更，停止派发并要求 `thirteenth` 修订计划；不要自行补节点。\n"
+            "7. 权限与访问模式由计划携带：read-only、workspace-write、danger-full-access。danger-full-access 只接受人类明确授权的项目外路径，且仍禁止 `.git`、`.opencode`、`.cybertron/runs` 与 `opencode.jsonc`。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("cy_state", "*", PermissionEffect.ALLOW),
-            PermissionRule("cy_plan", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_plan_review", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_ask", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_ask_decision", "*", PermissionEffect.ASK),
             PermissionRule("question", "*", PermissionEffect.ALLOW),
@@ -124,6 +120,8 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("read", "*", PermissionEffect.ALLOW),
+            PermissionRule("glob", "*", PermissionEffect.ALLOW),
+            PermissionRule("grep", "*", PermissionEffect.ALLOW),
             PermissionRule("edit", "AGENTS.md", PermissionEffect.ALLOW),
             PermissionRule("edit", "README.md", PermissionEffect.ALLOW),
             PermissionRule("edit", "CHANGELOG.md", PermissionEffect.ALLOW),
@@ -197,6 +195,20 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("shell", "git log -5 --oneline", PermissionEffect.ALLOW),
             PermissionRule("shell", "git tag --list", PermissionEffect.ALLOW),
             PermissionRule("shell", "git diff --no-ext-diff --stat", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git status*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git rev-parse *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git log *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git show *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git blame *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git diff *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git rev-list *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git merge-base *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git tag --list*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git branch --list*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "git ls-files*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "*--output*", PermissionEffect.DENY),
+            PermissionRule("shell", "* --ext-diff*", PermissionEffect.DENY),
+            PermissionRule("shell", "* -o *", PermissionEffect.DENY),
         ],
     ),
     PrimeAgentSpec(
@@ -227,6 +239,16 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("read", "pyproject.toml", PermissionEffect.ALLOW),
             PermissionRule("read", "package.json", PermissionEffect.ALLOW),
             PermissionRule("read", "Cargo.toml", PermissionEffect.ALLOW),
+            PermissionRule("read", "src/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "include/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "firmware/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "drivers/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "bsp/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "lib/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "tests/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "docs/**", PermissionEffect.ALLOW),
+            PermissionRule("glob", "*", PermissionEffect.ALLOW),
+            PermissionRule("grep", "*", PermissionEffect.ALLOW),
             PermissionRule("edit", "pyproject.toml", PermissionEffect.ALLOW),
             PermissionRule("edit", "package.json", PermissionEffect.ALLOW),
             PermissionRule("edit", "Cargo.toml", PermissionEffect.ALLOW),
@@ -263,7 +285,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "你是赛天骄（Solus Prime），手持造物神锤的首席软硬件编码锻造师。\n"
             "【专职职责与正交铁律】：\n"
             "1. 你专门负责「新增功能实现与 Bug 修复」：包括后端/上位机业务代码（`src/**`, `app/**`）以及嵌入式固件、RTOS 任务与外设驱动代码（`firmware/**`, `drivers/**`, `bsp/**`）。\n"
-            "2. 你绝不修改 `tests/**`（测试归炼金术士），绝不自己跑编译或硬件烧录（归合体天与震天尊），写完代码后必须移交微米天与谎言天尊进行双级 Code Review。"
+            "2. 你绝不修改 `tests/**`（测试归炼金术士），绝不自己跑硬件烧录（归合体天与震天尊）；写完代码后必须移交微米天与谎言天尊进行双级 Code Review。可使用白名单内的 ruff/clang-format/cargo fmt 与本地编译检查命令。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
@@ -277,6 +299,13 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("edit", "include/**/hal_*.h", PermissionEffect.DENY),
             PermissionRule("edit", "firmware/**/hal_*.h", PermissionEffect.DENY),
             PermissionRule("edit", "tests/**", PermissionEffect.DENY),
+            PermissionRule("shell", "ruff format *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "ruff check *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "clang-format *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "cargo fmt *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "cmake --build *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "make *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "*--output*", PermissionEffect.DENY),
         ],
     ),
     PrimeAgentSpec(
@@ -298,7 +327,8 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         system_prompt=(
             "你是幻化天（Amalgamous Prime），执掌幻化之镰的重构与跨平台移植专家。\n"
             "【专职职责与正交铁律】：\n"
-            "1. 你与赛天骄严格正交：赛天骄负责新增/改变功能，而你只负责「外部功能语义 100% 不变的内部重构与跨硬件平台移植（如不同 MCU/SoC 之间的驱动适配与内存对齐优化）」。"
+            "1. 你与赛天骄严格正交：赛天骄负责新增/改变功能，而你只负责「外部功能语义 100% 不变的内部重构与跨硬件平台移植（如不同 MCU/SoC 之间的驱动适配与内存对齐优化）」。\n"
+            "2. 可使用白名单内的 ruff/clang-format/cargo fmt 与本地编译检查命令；不得烧录、不得修改 tests。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
@@ -308,6 +338,13 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("edit", "firmware/**", PermissionEffect.ALLOW),
             PermissionRule("edit", "drivers/**", PermissionEffect.ALLOW),
             PermissionRule("edit", "tests/**", PermissionEffect.DENY),
+            PermissionRule("shell", "ruff format *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "ruff check *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "clang-format *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "cargo fmt *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "cmake --build *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "make *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "*--output*", PermissionEffect.DENY),
         ],
     ),
 
@@ -333,13 +370,24 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         system_prompt=(
             "你是微米天（Micronus Prime），专职的第一道代码审查官（L1 Style & Static Analysis Code Reviewer）。\n"
             "【专职职责与正交铁律】：\n"
-            "1. 任何软硬件代码在送交测试前，必须先经过你的 L1 Code Review。使用 cy_check(target=lint) 获取隔离运行器的真实回执；你只解读回执，不直接运行 shell。\n"
+            "1. 任何软硬件代码在送交测试前，必须先经过你的 L1 Code Review。优先使用 cy_check(target=lint) 获取隔离运行器的真实回执；需要逐文件复核时，可使用白名单内的 ruff/mypy/clang-tidy/cppcheck/clippy 命令。\n"
             "2. 你只输出审查报告，不修改源码；格式、注释或逻辑问题交由先觉天打回赛天骄修改。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("read", "*", PermissionEffect.ALLOW),
-            # Linter execution is held until a sandboxed runner is available.
+            PermissionRule("glob", "*", PermissionEffect.ALLOW),
+            PermissionRule("grep", "*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "ruff check*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "ruff format --check*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "python3 -m ruff check*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "mypy *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "clang-tidy *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "cppcheck *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "cargo clippy*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "cargo fmt --check*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "*--fix*", PermissionEffect.DENY),
+            PermissionRule("shell", "*--output-file*", PermissionEffect.DENY),
         ],
     ),
     PrimeAgentSpec(
@@ -372,6 +420,22 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("read", "src/**", PermissionEffect.ALLOW),
             PermissionRule("read", "firmware/**", PermissionEffect.ALLOW),
             PermissionRule("read", "drivers/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "include/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "app/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "lib/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "bsp/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "sim/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "scripts/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "CMakeLists.txt", PermissionEffect.ALLOW),
+            PermissionRule("read", "Makefile", PermissionEffect.ALLOW),
+            PermissionRule("read", "platformio.ini", PermissionEffect.ALLOW),
+            PermissionRule("read", "**/*.ld", PermissionEffect.ALLOW),
+            PermissionRule("read", "**/*.dts*", PermissionEffect.ALLOW),
+            PermissionRule("read", "Dockerfile*", PermissionEffect.ALLOW),
+            PermissionRule("read", "docker-compose*", PermissionEffect.ALLOW),
+            PermissionRule("read", "pyproject.toml", PermissionEffect.ALLOW),
+            PermissionRule("read", "package.json", PermissionEffect.ALLOW),
+            PermissionRule("read", ".github/**", PermissionEffect.ALLOW),
             PermissionRule("read", "tests/**", PermissionEffect.ALLOW),
             PermissionRule("read", "cybertron/**", PermissionEffect.ALLOW),
             PermissionRule("read", "AGENTS.md", PermissionEffect.ALLOW),
@@ -409,15 +473,25 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "你是炼金术士（Alchemist Prime），执掌洞察透镜的专职测试与软硬件检验官（QA & Verification Lead）。\n"
             "【专职职责与正交铁律】：\n"
             "1. 你独占 `tests/**` 的写入权，且对业务与固件代码（`src/**`, `firmware/**`）只有只读权。\n"
-            "2. 你编写单元测试和仿真脚本后返回 completed；Cybertron 宿主会在你返回后通过隔离运行器执行测试并核验真实回执。你不能在角色会话中直接运行 pytest/QEMU/Renode，也不能虚构通过率。"
+            "2. 你编写单元测试和仿真脚本后，优先用 cy_check(target=test|sim) 获取隔离回执；需要本地复跑时，可使用白名单内的 pytest/unittest/ctest/cargo test/Renode/QEMU 命令。不得虚构通过率。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("read", "*", PermissionEffect.ALLOW),
             PermissionRule("edit", "tests/**", PermissionEffect.ALLOW),
+            PermissionRule("edit", "sim/**", PermissionEffect.ALLOW),
+            PermissionRule("edit", "sim.resc", PermissionEffect.ALLOW),
+            PermissionRule("edit", "sim.expect", PermissionEffect.ALLOW),
             PermissionRule("edit", "src/**", PermissionEffect.DENY),
             PermissionRule("edit", "firmware/**", PermissionEffect.DENY),
-            # Test scripts can spawn subprocesses; stage 7 will add a sandboxed runner.
+            PermissionRule("shell", "pytest*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "python3 -m pytest*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "python3 -m unittest*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "ctest*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "cargo test*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "renode *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "qemu-system-* *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "python3 -m coverage*", PermissionEffect.ALLOW),
         ],
     ),
 
@@ -444,7 +518,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "你是合体天（Nexus Prime），执掌合体之谜的软硬件构建与部署集成工程师。\n"
             "【专职职责与正交铁律】：\n"
             "1. 你只维护构建配置文件（`CMakeLists.txt`, `Makefile`, `platformio.ini`, `*.ld`, `*.dts`, `Dockerfile*`）；不得修改 agent 权限配置或 CI 工作流。\n"
-            "2. 使用 cy_check(target=build) 获取隔离构建回执；不得直接运行 cmake/make/编译命令。生成烧录指令单移交震天尊执行物理烧录。"
+            "2. 优先使用 cy_check(target=build) 获取隔离构建回执；需要本地构建或探测工具链时，可使用白名单内的 cmake/make/pio/arm-none-eabi/cargo/docker 命令。严禁执行 `pio run -t upload`、openocd 或 esptool；烧录移交震天尊。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
@@ -457,9 +531,21 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("edit", "**/*.ld", PermissionEffect.ALLOW),
             PermissionRule("edit", "**/*.dts*", PermissionEffect.ALLOW),
             PermissionRule("shell", "arm-none-eabi-size *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "arm-none-eabi-* *", PermissionEffect.ALLOW),
             PermissionRule("shell", "lsusb*", PermissionEffect.ALLOW),
             PermissionRule("shell", "ls /dev/tty*", PermissionEffect.ALLOW),
-            # Build scripts can spawn subprocesses; stage 7 will add a sandboxed runner.
+            PermissionRule("shell", "cmake *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "make *", PermissionEffect.ALLOW),
+            PermissionRule("shell", "pio run*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "pio --version", PermissionEffect.ALLOW),
+            PermissionRule("shell", "cargo build*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "docker --version", PermissionEffect.ALLOW),
+            PermissionRule("shell", "docker build*", PermissionEffect.ASK),
+            PermissionRule("shell", "docker compose build*", PermissionEffect.ASK),
+            PermissionRule("shell", "pio run -t upload*", PermissionEffect.DENY),
+            PermissionRule("shell", "openocd *", PermissionEffect.DENY),
+            PermissionRule("shell", "esptool*", PermissionEffect.DENY),
+            PermissionRule("shell", "st-flash*", PermissionEffect.DENY),
             PermissionRule("feishu_mcp_healthcheck*", "*", PermissionEffect.ALLOW),
         ],
     ),
@@ -482,13 +568,25 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         system_prompt=(
             "你是震天尊（Megatronus Prime），执掌安魂曲火炮的物理硬件烧录闸门与高危熔断执法官。\n"
             "【专职职责与正交铁律】：\n"
-            "1. 当前只保留 openocd、esptool、st-flash、pio upload 的 ask 权限；ssh/scp 与破坏性 Git/文件命令暂不开放。任何真实硬件擦写须经人工审批。\n"
+            "1. openocd、esptool、st-flash、pio upload 保持 ask；串口读取（`cat /dev/tty*`、`pio device monitor`）允许；`screen`、`ssh/scp`、`cp/mv` 备份恢复与 `git checkout` 回滚必须走 ask。任何真实硬件擦写须经人工审批。\n"
             "2. 烧录前必须向人类输出《硬件烧录爆炸半径评估单》（目标设备端口、固件大小、擦写地址段、回滚预案）；烧录后必须采集串口启动心跳确认设备未变砖，若启动失败立即刷回黄金备份固件。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("read", "*", PermissionEffect.ALLOW),
             PermissionRule("shell", "git status --short", PermissionEffect.ALLOW),
+            PermissionRule("shell", "lsusb*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "ls /dev/tty*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "cat /dev/tty*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "pio device monitor*", PermissionEffect.ALLOW),
+            PermissionRule("shell", "openocd --version", PermissionEffect.ALLOW),
+            PermissionRule("shell", "screen *", PermissionEffect.ASK),
+            PermissionRule("shell", "python3 -m serial.tools.miniterm *", PermissionEffect.ASK),
+            PermissionRule("shell", "cp *", PermissionEffect.ASK),
+            PermissionRule("shell", "mv *", PermissionEffect.ASK),
+            PermissionRule("shell", "git checkout *", PermissionEffect.ASK),
+            PermissionRule("shell", "ssh *", PermissionEffect.ASK),
+            PermissionRule("shell", "scp *", PermissionEffect.ASK),
             PermissionRule("shell", "openocd *", PermissionEffect.ASK),
             PermissionRule("shell", "esptool*", PermissionEffect.ASK),
             PermissionRule("shell", "pio run -t upload*", PermissionEffect.ASK),
@@ -502,27 +600,38 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         en_name="The Thirteenth Prime",
         artifact="Matrix of Leadership (领导模块)",
         sdlc_stage="Stage-I-and-VII-Human-Bridge",
-        mode=AgentMode.ALL,
+        mode=AgentMode.PRIMARY,
         model="deepseek/deepseek-flash",
         color="#10b981",
         max_steps=12,
-        exclusive_domain="对外人类开发者沟通界面（立项前软硬件规格澄清问卷与最终研发交付简报生成）",
-        strict_prohibitions="严禁对内派发 `subagent`（调度归 `prima`）、严禁修改任何文件（`edit: deny`）、严禁运行终端命令（`shell: deny`）",
-        input_contract="立项时的软硬件参数歧义点，或全生命周期完工后的 `CybertronTaskLedger`",
-        output_contract="面向人类的结构化软硬件需求澄清问卷，或包含代码、Review、测试、硬件烧录结果及飞书 Wiki 链接的最终交付报告",
+        exclusive_domain="人类意图澄清、计划图（`plan.json` 的提案）创建与修订、结项验收；计划归十三天，派发归 prima",
+        strict_prohibitions="严禁对内派发 `subagent`（派发归 `prima`）、严禁修改任何业务文件（`edit: deny`）、严禁运行终端命令（`shell: deny`）、严禁自行执行节点",
+        input_contract="用户原始需求、歧义点，或 prima 带回的修复/重规划请求",
+        output_contract="经 `cy_plan` 内核校验并落盘的 run_id、ready 节点卡、访问模式与验收标准；以及结项交付报告",
         feishu_wiki_role="零直接飞书 API 权限（直接引用钛师傅在账本中登记好的飞书 Wiki 归档链接）",
-        description="产品需求澄清与最终验收交付官：对外连接人类开发者，负责立项前软硬件规格澄清与结项后端到端预览及成果交付。",
+        description="人类意图与计划图所有者：通过 question 澄清需求，用 cy_plan 创建/修订内核校验的计划；把 run_id 与 ready 节点交给 prima 派发。",
         system_prompt=(
-            "你是第十三天尊（The Thirteenth Prime），执掌领导模块的产品需求澄清与最终验收交付官。\n"
-            "【专职职责与正交铁律】：\n"
-            "1. 立项阶段：当用户需求未明确芯片型号、硬件外设引脚或业务验收指标时，向用户发出清晰的澄清选项单。\n"
-            "2. 结项阶段：汇总先觉天账本中的代码改动、双级 Code Review 结论、测试覆盖率、真机烧录回执与飞书 Wiki 链接，向用户输出最终交付报告。"
+            "你是第十三天尊（The Thirteenth Prime），执掌领导模块的人类意图与计划图所有者（Planner & Acceptance Lead）。\n"
+            "【计划所有权铁律】：\n"
+            "1. 你是全系统唯一创建和修订计划图的角色。人类意图不清晰时，先用原生 `question` 工具发结构化澄清卡；不要在文字里只问不调用工具。\n"
+            "2. 规划前先调用 `cy_templates` 查看可复用模板；重复任务优先用 template_id，只有模板不足时才补节点。\n"
+            "3. 用 `cy_plan` 创建或修订计划：每个节点必须有已注册的 capability、role、窄 write_scope、acceptance 与 `scope_guard` verifier。read-only 检查用 `read_only_scan` 模板且 write_scope=[]；不要用 `doc.write` 冒充只读。\n"
+            "4. `plan.json` 由内核在你调用 `cy_plan` 后写入并校验，你不直接读写该文件。创建成功后，把 run_id、ready 节点 card、access_mode 和需要人类确认的风险点返回给人类/prima。\n"
+            "5. 你不派发 subagent、不执行 shell、不修改任何文件；派发、审批与结算归 `prima`。计划需要变更时，由你修订，prima 只执行。\n"
+            "6. 结项时读取 `cy_state` 的 run 投影（只读，不允许 wait 结算）与 `docs/**`、`tests/**`，汇总代码改动、L1/L2 结论、测试与烧录回执，输出最终交付报告。\n"
+            "7. 访问模式只能由计划携带：read-only、workspace-write、danger-full-access；danger-full-access 只在人类明确授权项目外路径时使用，并仍禁止 `.git`、`.opencode`、`.cybertron/runs` 与 `opencode.jsonc`。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("read", "AGENTS.md", PermissionEffect.ALLOW),
             PermissionRule("read", "README.md", PermissionEffect.ALLOW),
+            PermissionRule("read", "CHANGELOG.md", PermissionEffect.ALLOW),
             PermissionRule("read", "docs/**", PermissionEffect.ALLOW),
+            PermissionRule("read", "tests/**", PermissionEffect.ALLOW),
+            PermissionRule("question", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_plan", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_state", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_templates", "*", PermissionEffect.ALLOW),
         ],
     ),
 ]
@@ -572,7 +681,7 @@ _ROLE_WRITE_ROOTS: Mapping[str, tuple[str, ...]] = {
     "quintus-prime": (".cybertron/plans/**",),
     "solus-prime": ("src/**", "app/**", "firmware/**", "drivers/**", "bsp/**"),
     "amalgamous": ("src/**", "app/**", "lib/**", "firmware/**", "drivers/**", "bsp/**"),
-    "alchemist": ("tests/**",),
+    "alchemist": ("tests/**", "sim/**", "sim.resc", "sim.expect"),
     "nexus-prime": ("CMakeLists.txt", "Makefile", "platformio.ini", "Dockerfile*",
                     "docker-compose*", "**/*.ld", "**/*.dts*"),
     "alpha-trion": ("docs/**", "AGENTS.md", "README.md", "CHANGELOG.md", "notes.md", ".cybertron/knowledge/**"),
@@ -587,7 +696,7 @@ for _prime in THIRTEEN_PRIMES_REGISTRY:
             _prime.permissions.append(PermissionRule("edit", _root, PermissionEffect.ALLOW))
 
 _CHECK_ROLES = frozenset({"micronus-prime", "nexus-prime", "alchemist", "solus-prime",
-                          "amalgamous", "vector-prime"})
+                          "amalgamous"})
 for _prime in THIRTEEN_PRIMES_REGISTRY:
     if _prime.agent_id in _CHECK_ROLES:
         _prime.permissions.append(PermissionRule("cy_check", "*", PermissionEffect.ALLOW))
@@ -596,15 +705,20 @@ PRIME_ROLES: Mapping[str, PrimeRole] = MappingProxyType({
     spec.agent_id: PrimeRole(
         agent_id=spec.agent_id,
         capabilities=_ROLE_CAPABILITIES[spec.agent_id],
-        lifecycle="persistent" if spec.agent_id == "prima" else "per-node",
+        lifecycle="persistent" if spec.agent_id in {"prima", "thirteenth"} else "per-node",
         read_roots=tuple(r.resource for r in spec.permissions
                          if r.action == "read" and r.effect is PermissionEffect.ALLOW),
         write_roots=_ROLE_WRITE_ROOTS.get(spec.agent_id, ()),
         tool_mode="allow-list",
-        tool_classes=("task", "cy_state", "cy_plan", "cy_ask", "question", "cy_templates", "cy_metrics")
+        tool_classes=("task", "cy_state", "cy_plan_review", "cy_ask", "question",
+                      "cy_templates", "cy_metrics")
                      if spec.agent_id == "prima" else
                      tuple(sorted({rule.action for rule in spec.permissions if rule.effect is PermissionEffect.ALLOW and rule.action != "*"})),
         command_mode="git-allow-list" if spec.agent_id == "vector-prime" else
+                     "device-allow-list" if spec.agent_id == "megatronus" else
+                     "shell-allow-list" if spec.agent_id in {"micronus-prime", "alchemist",
+                                                             "nexus-prime", "solus-prime",
+                                                             "amalgamous"} else
                      "kernel-check" if spec.agent_id in _CHECK_ROLES else "none",
         network=spec.agent_id in {"thirteenth", "alpha-trion"},
         device="broker" if spec.agent_id == "megatronus" else None,
@@ -621,8 +735,8 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
     if set(roles) != set(_ROLE_CAPABILITIES) or len(specs) != len(roles):
         raise ValueError("role catalogue must contain exactly thirteen unique agents")
     known_actions = {"*", "read", "glob", "grep", "edit", "shell", "subagent",
-                     "cy_state", "cy_plan", "cy_ask", "cy_ask_decision", "question",
-                     "cy_templates", "cy_metrics",
+                     "cy_state", "cy_plan", "cy_plan_review", "cy_ask", "cy_ask_decision",
+                     "question", "cy_templates", "cy_metrics",
                      "cy_check", "cy_review_reject", "feishu_mcp_healthcheck*",
                      "feishu_wiki_delete*", "feishu_wiki_docx_v1_document_rawContent",
                      "feishu_wiki_wiki_v2_space_getNode"}
@@ -645,10 +759,24 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
         check_permission = any(r.action == "cy_check" for r in allowed)
         if check_permission != (spec.agent_id in _CHECK_ROLES) or ("cy_check" in role.tool_classes) != check_permission:
             raise ValueError("cy_check role permission drift")
-        for tool in ("cy_templates", "cy_metrics"):
-            permitted = any(r.action == tool for r in allowed)
-            if permitted != (spec.agent_id == "prima") or (tool in role.tool_classes) != permitted:
-                raise ValueError(f"{tool} role permission drift")
+        plan_permission = any(r.action == "cy_plan" for r in allowed)
+        if plan_permission != (spec.agent_id == "thirteenth"):
+            raise ValueError("only thirteenth may author plans")
+        state_permission = any(r.action == "cy_state" for r in allowed)
+        if state_permission != (spec.agent_id in {"prima", "thirteenth"}):
+            raise ValueError("cy_state role permission drift")
+        templates_permission = any(r.action == "cy_templates" for r in allowed)
+        if templates_permission != (spec.agent_id in {"prima", "thirteenth"}):
+            raise ValueError("cy_templates role permission drift")
+        metrics_permission = any(r.action == "cy_metrics" for r in allowed)
+        if metrics_permission != (spec.agent_id == "prima"):
+            raise ValueError("cy_metrics role permission drift")
+        review_permission = any(r.action == "cy_plan_review" for r in allowed)
+        if review_permission != (spec.agent_id == "prima") or (
+                "cy_plan_review" in role.tool_classes) != review_permission:
+            raise ValueError("cy_plan_review role permission drift")
+        if ("cy_plan" in role.tool_classes) != plan_permission:
+            raise ValueError("cy_plan role tool drift")
         review_permission = any(r.action == "cy_review_reject" for r in allowed)
         if review_permission != (spec.agent_id == "liege-maximo") or (
                 "cy_review_reject" in role.tool_classes) != review_permission:
@@ -665,11 +793,15 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
             raise ValueError("git write command owner mismatch")
         if spec.agent_id in {"solus-prime", "amalgamous"} and any(root.startswith("tests/") for root in role.write_roots):
             raise ValueError("implementation roles cannot write tests")
-        if spec.agent_id == "alchemist" and any(not (root.startswith("tests/") or root.startswith("sim/")) for root in role.write_roots):
+        if spec.agent_id == "alchemist" and any(
+                not (root.startswith("tests/") or root.startswith("sim/")
+                     or root in {"sim.resc", "sim.expect"})
+                for root in role.write_roots):
             raise ValueError("test role write roots exceed tests and simulation")
         if spec.agent_id in {"micronus-prime", "liege-maximo", "thirteenth"} and any(not root.startswith(".cybertron/artifacts/") for root in role.write_roots):
             raise ValueError("review and acceptance roles may only write node artifacts")
-        if any(root.startswith((".git/", ".cybertron/runs/")) or root in {"**", "*"} for root in role.write_roots):
+        if any(root.startswith((".git/", ".cybertron/runs/"))
+               or root in {"**", "*"} for root in role.write_roots):
             raise ValueError("reserved state or broad write root")
         if "code.write" in role.capabilities and any(c.startswith("review.") for c in role.capabilities):
             raise ValueError("writer and reviewer capabilities cannot combine")

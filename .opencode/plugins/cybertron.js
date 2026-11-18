@@ -6,9 +6,25 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { nativeDispatch, childSession, nativeToolStatus } from './hook_logic.mjs';
+import shellPolicy from './shell_policy.mjs';
 
 const pluginDirectory = path.dirname(fileURLToPath(import.meta.url));
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const globToRegExp = pattern => {
+  let source = '^';
+  for (const char of pattern) {
+    if (char === '*') source += '.*';
+    else if (char === '?') source += '.';
+    else source += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+  return new RegExp(source + '$');
+};
+const shellVerdict = (policy, command) => {
+  const match = pattern => globToRegExp(pattern).test(command);
+  if ((policy.deny || []).some(match)) return 'deny';
+  if ((policy.allow || []).some(match) || (policy.ask || []).some(match)) return 'allow';
+  return 'unlisted';
+};
 const noWriteRequested = text => /只读|不(?:要|得)?(?:创建|修改|删除|写入).*文件|read[- ]only|do not (?:write|modify|create|delete) (?:any )?files?/i.test(text);
 const writeNowRequested = text => /(?:允许|可以|同意)(?:现在|继续)?(?:写入|修改|创建).*文件|(?:you may|please) (?:write|modify|create) (?:the )?files?/i.test(text);
 const fullAccessRequested = text =>
@@ -153,7 +169,8 @@ export default Plugin.define({
           }, required: ['op', 'op_id', 'plan_revision'], additionalProperties: true },
         }, additionalProperties: false },
         execute: async (input, context) => {
-          if (context.agent !== 'prima') throw new Error('Only prima may create plans');
+          if (!['prima', 'thirteenth'].includes(context.agent))
+            throw new Error('Only thirteenth may author plans; prima only dispatches');
           const run_id = await ctx.storage.get(`run/${context.sessionID}`);
           const session = await ctx.session.get({ sessionID: context.sessionID });
           let access_mode = input.access_mode || await ctx.storage.get(`access/${context.sessionID}`) || 'workspace-write';
@@ -190,12 +207,46 @@ export default Plugin.define({
         },
       });
       editor.add({
-        name: 'cy_state', description: 'Read the v6 run; wait for the native child to finish before settling the node.',
-        input: { type: 'object', properties: { wait: { type: 'boolean' } }, additionalProperties: false },
+        name: 'cy_plan_review',
+        description: 'Review the current plan revision before dispatch. Records plan.reviewed with deterministic feasibility findings; prima must call this on the current revision before the first subagent dispatch.',
+        input: { type: 'object', properties: {
+          run_id: { type: 'string', description: 'Optional run id to adopt and review.' },
+        }, additionalProperties: false },
         execute: async (input, context) => {
-          if (context.agent !== 'prima') throw new Error('Only prima may read the run state');
-          const run_id = await ctx.storage.get(`run/${context.sessionID}`);
-          if (!run_id) throw new Error('No v6 run in this session; call cy_plan first');
+          if (context.agent !== 'prima') throw new Error('Only prima may review a plan');
+          let run_id = await ctx.storage.get(`run/${context.sessionID}`);
+          if (input.run_id !== undefined) {
+            if (typeof input.run_id !== 'string' || !input.run_id.trim())
+              throw new Error('run_id must be a non-empty string');
+            run_id = input.run_id.trim();
+            await ctx.storage.set(`run/${context.sessionID}`, run_id);
+          }
+          if (!run_id) throw new Error('No v6 run in this session; ask thirteenth for the run_id');
+          const result = await bridge('review_plan', project, { run_id }, context.signal);
+          return { content: JSON.stringify(result) };
+        },
+      });
+      editor.add({
+        name: 'cy_state', description: 'Read the v6 run; wait for the native child to finish before settling the node.',
+        input: { type: 'object', properties: {
+          wait: { type: 'boolean' },
+          run_id: { type: 'string', description: 'Adopt a run created by thirteenth in another session.' },
+        }, additionalProperties: false },
+        execute: async (input, context) => {
+          if (!['prima', 'thirteenth'].includes(context.agent))
+            throw new Error('Only prima may settle and thirteenth may read the run state');
+          if (context.agent === 'thirteenth' && input.wait)
+            throw new Error('The planner may read the run but prima owns wait/settle');
+          let run_id = await ctx.storage.get(`run/${context.sessionID}`);
+          if (input.run_id !== undefined) {
+            if (typeof input.run_id !== 'string' || !input.run_id.trim())
+              throw new Error('run_id must be a non-empty string');
+            run_id = input.run_id.trim();
+            await ctx.storage.set(`run/${context.sessionID}`, run_id);
+          }
+          if (!run_id) throw new Error(context.agent === 'thirteenth'
+            ? 'No v6 run in this session; call cy_plan first'
+            : 'No v6 run in this session; ask thirteenth for the run_id');
           let state = await bridge('state', project, { run_id }, context.signal);
           if (input.wait && state.status === 'running') {
             for (const active of state.active_dispatches || []) {
@@ -239,7 +290,8 @@ export default Plugin.define({
         name: 'cy_templates', description: 'List learned plan templates from completed runs, with their node, dispatch, and human-intervention counts.',
         input: { type: 'object', properties: {}, additionalProperties: false },
         execute: async (input, context) => {
-          if (context.agent !== 'prima') throw new Error('Only prima may read templates');
+          if (!['prima', 'thirteenth'].includes(context.agent))
+            throw new Error('Only thirteenth and prima may read templates');
           const result = await bridge('templates', project, {}, context.signal);
           return { content: JSON.stringify(result) };
         },
@@ -260,9 +312,17 @@ export default Plugin.define({
           run_id: { type: 'string' },
         }, required: ['target'], additionalProperties: false },
         execute: async (input, context) => {
-          const allowed = new Set(['micronus-prime', 'nexus-prime', 'alchemist',
-            'solus-prime', 'amalgamous', 'vector-prime']);
-          if (!allowed.has(context.agent)) throw new Error('This role cannot run cy_check');
+          const targets = {
+            'micronus-prime': ['lint'],
+            'solus-prime': ['lint'],
+            'amalgamous': ['lint'],
+            'alchemist': ['test', 'sim'],
+            'nexus-prime': ['build'],
+          };
+          const allowed = new Set(Object.keys(targets));
+          if (!allowed.has(context.agent) ||
+              !targets[context.agent].includes(input.target))
+            throw new Error(`This role cannot run cy_check target ${input.target}`);
           const result = await bridge('check', project,
             { target: input.target, run_id: input.run_id }, context.signal);
           return { content: JSON.stringify(result) };
@@ -291,11 +351,35 @@ export default Plugin.define({
       });
     });
     await ctx.tool.hook('execute.before', async event => {
+      if (event.tool === 'shell' || event.tool === 'bash') {
+        const role = event.agent;
+        const policy = shellPolicy.roles?.[role];
+        if (!policy) {
+          if ((shellPolicy.cybertronRoles || []).includes(role))
+            throw new Error(`Cybertron: ${role} has no shell allow-list`);
+          return;
+        }
+        const command = typeof event.input === 'string'
+          ? event.input : (event.input?.command ?? event.input?.cmd);
+        if (typeof command !== 'string' || !command.trim())
+          throw new Error('Cybertron: shell command must be a non-empty string');
+        if (/[\n\r;|&<>`]|\$\(/.test(command))
+          throw new Error('Cybertron: shell chaining, redirection, or substitution is denied');
+        const verdict = shellVerdict(policy, command);
+        if (verdict === 'deny')
+          throw new Error(`Cybertron: shell command denied by policy: ${command}`);
+        if (verdict === 'unlisted')
+          throw new Error(`Cybertron: shell command is not allow-listed for ${role}: ${command}`);
+        return;
+      }
       if (event.tool !== 'subagent') return;
       const parent = await ctx.session.get({ sessionID: event.sessionID });
       if (parent.agent !== 'prima') throw new Error('Only prima may dispatch a native subagent');
       const run_id = await ctx.storage.get(`run/${event.sessionID}`);
       if (!run_id) throw new Error('No ready Cybertron node; call cy_plan first');
+      const reviewState = await bridge('state', project, { run_id }, event.signal);
+      if (!reviewState.review_current)
+        throw new Error('Plan review required: call cy_plan_review on the current plan revision before dispatch');
       const { nodeID, role, callID, card } = nativeDispatch(event);
       const active_token = await ctx.storage.get(`token/${run_id}`);
       const result = await bridge('before', project,
@@ -324,7 +408,7 @@ export default Plugin.define({
         const call_id = event.callID || event.id || event.toolCallID;
         if (event.status !== 'completed') return;
         const selected = await ctx.session.get({ sessionID: event.sessionID });
-        if (selected.agent !== 'prima') return;
+        if (!['prima', 'thirteenth'].includes(selected.agent)) return;
         const run_id = await ctx.storage.get(`run/${event.sessionID}`);
         if (!run_id) return;
         const asked = Array.isArray(event.input?.questions)
@@ -363,6 +447,23 @@ export default Plugin.define({
       }
     });
     await ctx.session.hook('context', async event => {
+      if (event.agent === 'thirteenth') {
+        const session = await ctx.session.get({ sessionID: event.sessionID });
+        if (!session.parentID) {
+          delete event.tools.cy_ask;
+          delete event.tools.cy_ask_decision;
+          delete event.tools.cy_plan_review;
+          delete event.tools.cy_metrics;
+          delete event.tools.cy_check;
+          delete event.tools.cy_review_reject;
+          delete event.tools.subagent;
+          event.system.push({ type: 'text', text:
+            'Cybertron planner: you are thirteenth, the only role that authors the plan. Clarify the human intent with `question`, check `cy_templates` before planning, then create or revise the kernel-validated graph with `cy_plan`. The kernel writes and validates plan.json; do not read or edit it directly. Do not dispatch `subagent`, run shell, or edit files: dispatch, approval, and settlement belong to prima. After `cy_plan` returns, give the human and prima the run_id, ready node cards, access_mode, gates, and any risk that needs human confirmation.' });
+          event.system.push({ type: 'text', text:
+            'When the user requests a read-only inspection or says not to modify files, create the read_only_scan template with a short objective: onyx-prime / scan.static and write_scope=[]. Do not substitute doc.write or a writing node. If the user asks for approval before execution, ask with the native question tool and do not hand off until the answer approves. Use a short English slug (for example hello-doc) for cy_plan.slug; the on-disk run folder uses only that slug and stores the UUID inside run.json. Access modes are host-native: read-only (no writes), workspace-write (default; project and node write_scope only), and danger-full-access (only when the user explicitly authorizes Desktop/Downloads/paths outside the project). Pass access_mode to cy_plan. In danger-full-access mode role write roots relax, but .git, .opencode, .cybertron/runs, and opencode.jsonc stay forbidden. If an outside-project write is ambiguous, ask with the native question tool before planning; never select danger-full-access without explicit authorization.' });
+          return;
+        }
+      }
       if (event.agent !== 'prima') {
         const session = await ctx.session.get({ sessionID: event.sessionID });
         const parentRun = session.parentID && await ctx.storage.get(`run/${session.parentID}`);
@@ -409,6 +510,7 @@ export default Plugin.define({
         }
         delete event.tools.cy_state;
         delete event.tools.cy_plan;
+        delete event.tools.cy_plan_review;
         delete event.tools.cy_ask;
         delete event.tools.question;
         delete event.tools.cy_templates;
@@ -416,11 +518,12 @@ export default Plugin.define({
         delete event.tools.subagent;
         if (event.agent !== 'liege-maximo') delete event.tools.cy_review_reject;
         if (!['micronus-prime', 'nexus-prime', 'alchemist', 'solus-prime',
-          'amalgamous', 'vector-prime'].includes(event.agent)) delete event.tools.cy_check;
+          'amalgamous'].includes(event.agent)) delete event.tools.cy_check;
         return;
       }
       delete event.tools.cy_check;
       delete event.tools.cy_review_reject;
+      delete event.tools.cy_plan;
       if (!event.tools.subagent && !event.tools.execute)
         throw new Error('Native subagent tool is unavailable for prima; disable the legacy cybertron.runtime plugin in this project with plugins: ["-cybertron.runtime"] and restart OpenCode');
       const expected = primaryModel(project);
@@ -436,11 +539,9 @@ export default Plugin.define({
           `Cybertron: active session model ${activeName} differs from the configured Prima default ${expectedName}. Continue with the session-selected model; do not claim a model switch.` });
       }
       event.system.push({ type: 'text', text:
-        'Cybertron v6 M5: plan the smallest valid task graph for the user request with cy_plan. Use node for one task, nodes for a dependency graph, template_id for a learned template, or the optional bug_fix template. cy_templates lists templates distilled from completed runs; reuse one with cy_plan template_id, objective, write_scope, and request_class when the request matches that class, then add nodes only if the seed is insufficient. cy_metrics reports ledger facts for this project. For a single requested Markdown file within alpha-trion allowed paths, use capability doc.write, role alpha-trion, write_scope containing only that path, and scope_guard verifier; keep the requested content exact. Each task needs a registered capability and role, narrow write_scope, acceptance, and scope_guard verifier. Whenever the user must answer or confirm, call the native question tool: it renders the OpenCode ask card and its answers are recorded in the run ledger. Never ask only in prose. Use options such as Approve/Reject for a yes/no gate. cy_ask is only a formal host approval event before dispatch. Never treat a recorded question as an answer. Dispatch only a ready node through the native subagent tool; use its exact returned card as description and include node_id, capability, write_scope, objective, and run_id in the child prompt. Call cy_state with wait=true after each child returns. The kernel derives risk gates from the actual workspace diff; cy_check runs fixed lint/build/test/sim targets for eligible roles, and a run_id binds its receipt to the run. Required gates cannot be removed; mark_not_applicable and complete_run remain fail-closed until trusted verifier facts exist. Background is still running; cancellation is terminal. Never claim model text as tool evidence.' });
+        'Cybertron dispatcher: the plan is authored and revised by thirteenth, not by you. Read or adopt the run with cy_state (pass run_id when thirteenth created it in another session; never invent an id). Before the first dispatch, call cy_plan_review on the current plan revision; a revision change invalidates the review and blocks dispatch until you review again. Dispatch only ready nodes through the native subagent tool, using the exact kernel card as the description and including node_id, capability, write_scope, objective, and run_id in the child prompt. Call cy_state with wait=true after each child returns. Use cy_ask for formal host approval before a risky dispatch; use the native question tool only when the human must choose. Do not call cy_plan, do not edit files, and never claim model text as tool evidence.' });
       event.system.push({ type: 'text', text:
-        'When the user requests a read-only inspection or says not to modify files, create the read_only_scan template with a short objective. It uses onyx-prime / scan.static and write_scope=[]. Do not substitute doc.write or any writing node. Plan first, then ask with the native question tool if the user asks for approval before execution; do not dispatch until the answer approves. If cy_plan rejects an explicit capability, use the registered capability in its error instead of guessing names.' });
-      event.system.push({ type: 'text', text:
-        'Use a short English slug (for example hello-doc) for cy_plan.slug; the on-disk run folder uses only that slug and stores the UUID inside run.json. Access modes are the host-native sandbox modes: read-only (no writes), workspace-write (default; writes only inside the project and node write_scope), and danger-full-access (only when the user explicitly authorizes Desktop/Downloads/paths outside the project). Pass access_mode to cy_plan. In danger-full-access mode, role write roots are relaxed but generated config (.git, .opencode, .cybertron/runs, opencode.jsonc) stays forbidden. If an outside-project write is ambiguous, ask with the native question tool before planning. Never select danger-full-access without the user explicitly requesting an outside path.' });
+        'If no run exists, the plan has not been authored yet: ask thirteenth for the run_id, or ask the human to plan with thirteenth first. Do not create nodes, revise scopes, or change access_mode yourself; read access_mode, write_scope, and gates from cy_state.' });
     });
   },
 });

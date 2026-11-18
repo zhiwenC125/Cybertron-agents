@@ -2,7 +2,7 @@
   "$schema": "https://opencode.ai/config.json",
   "agents": {
     "prima": {
-      "description": "[先觉天] 塞伯坦首席研发编排官：唯一拥有 subagent 派发权的主控大脑，按软硬一体 SDLC 七大阶段调度其余12位天尊。",
+      "description": "[先觉天] 塞伯坦运行时派发官：唯一拥有 subagent 派发权，读取 thirteenth 已确认的计划图并逐节点调度其余天尊；不再自行规划。",
       "mode": "primary",
       "model": "deepseek/deepseek-v4-pro",
       "steps": 28,
@@ -19,7 +19,7 @@
           "effect": "allow"
         },
         {
-          "action": "cy_plan",
+          "action": "cy_plan_review",
           "resource": "*",
           "effect": "allow"
         },
@@ -124,6 +124,16 @@
         },
         {
           "action": "read",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "glob",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "grep",
           "resource": "*",
           "effect": "allow"
         },
@@ -256,14 +266,79 @@
           "effect": "allow"
         },
         {
-          "action": "subagent",
-          "resource": "*",
+          "action": "shell",
+          "resource": "git status*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git rev-parse *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git log *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git show *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git blame *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git diff *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git rev-list *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git merge-base *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git tag --list*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git branch --list*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git ls-files*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "*--output*",
           "effect": "deny"
         },
         {
-          "action": "cy_check",
+          "action": "shell",
+          "resource": "* --ext-diff*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "* -o *",
+          "effect": "deny"
+        },
+        {
+          "action": "subagent",
           "resource": "*",
-          "effect": "allow"
+          "effect": "deny"
         }
       ]
     },
@@ -297,6 +372,56 @@
         {
           "action": "read",
           "resource": "Cargo.toml",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "src/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "include/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "firmware/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "drivers/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "bsp/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "lib/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "tests/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "docs/**",
+          "effect": "allow"
+        },
+        {
+          "action": "glob",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "grep",
+          "resource": "*",
           "effect": "allow"
         },
         {
@@ -424,6 +549,41 @@
           "effect": "deny"
         },
         {
+          "action": "shell",
+          "resource": "ruff format *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "ruff check *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "clang-format *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "cargo fmt *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "cmake --build *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "make *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "*--output*",
+          "effect": "deny"
+        },
+        {
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
@@ -478,6 +638,41 @@
           "effect": "deny"
         },
         {
+          "action": "shell",
+          "resource": "ruff format *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "ruff check *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "clang-format *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "cargo fmt *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "cmake --build *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "make *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "*--output*",
+          "effect": "deny"
+        },
+        {
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
@@ -517,6 +712,66 @@
           "effect": "allow"
         },
         {
+          "action": "glob",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "grep",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "ruff check*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "ruff format --check*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "python3 -m ruff check*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "mypy *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "clang-tidy *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "cppcheck *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "cargo clippy*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "cargo fmt --check*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "*--fix*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "*--output-file*",
+          "effect": "deny"
+        },
+        {
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
@@ -553,6 +808,86 @@
         {
           "action": "read",
           "resource": "drivers/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "include/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "app/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "lib/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "bsp/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "sim/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "scripts/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "CMakeLists.txt",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "Makefile",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "platformio.ini",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "**/*.ld",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "**/*.dts*",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "Dockerfile*",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "docker-compose*",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "pyproject.toml",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "package.json",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": ".github/**",
           "effect": "allow"
         },
         {
@@ -641,6 +976,21 @@
         },
         {
           "action": "edit",
+          "resource": "sim/**",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
+          "resource": "sim.resc",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
+          "resource": "sim.expect",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
           "resource": "src/**",
           "effect": "deny"
         },
@@ -648,6 +998,46 @@
           "action": "edit",
           "resource": "firmware/**",
           "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "pytest*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "python3 -m pytest*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "python3 -m unittest*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "ctest*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "cargo test*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "renode *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "qemu-system-* *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "python3 -m coverage*",
+          "effect": "allow"
         },
         {
           "action": "subagent",
@@ -720,6 +1110,11 @@
         },
         {
           "action": "shell",
+          "resource": "arm-none-eabi-* *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
           "resource": "lsusb*",
           "effect": "allow"
         },
@@ -727,6 +1122,66 @@
           "action": "shell",
           "resource": "ls /dev/tty*",
           "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "cmake *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "make *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "pio run*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "pio --version",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "cargo build*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "docker --version",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "docker build*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "docker compose build*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "pio run -t upload*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "openocd *",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "esptool*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "st-flash*",
+          "effect": "deny"
         },
         {
           "action": "feishu_mcp_healthcheck*",
@@ -769,6 +1224,66 @@
         },
         {
           "action": "shell",
+          "resource": "lsusb*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "ls /dev/tty*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "cat /dev/tty*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "pio device monitor*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "openocd --version",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "screen *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "python3 -m serial.tools.miniterm *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "cp *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "mv *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git checkout *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "ssh *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "scp *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
           "resource": "openocd *",
           "effect": "ask"
         },
@@ -800,8 +1315,8 @@
       ]
     },
     "thirteenth": {
-      "description": "[第十三天尊] 产品需求澄清与最终验收交付官：对外连接人类开发者，负责立项前软硬件规格澄清与结项后端到端预览及成果交付。",
-      "mode": "all",
+      "description": "[第十三天尊] 人类意图与计划图所有者：通过 question 澄清需求，用 cy_plan 创建/修订内核校验的计划；把 run_id 与 ready 节点交给 prima 派发。",
+      "mode": "primary",
       "model": "deepseek/deepseek-flash",
       "steps": 12,
       "color": "#10b981",
@@ -823,7 +1338,37 @@
         },
         {
           "action": "read",
+          "resource": "CHANGELOG.md",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
           "resource": "docs/**",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "tests/**",
+          "effect": "allow"
+        },
+        {
+          "action": "question",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "cy_plan",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "cy_state",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "cy_templates",
+          "resource": "*",
           "effect": "allow"
         },
         {

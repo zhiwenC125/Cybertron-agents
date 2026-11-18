@@ -14,9 +14,14 @@
             name: '@deepseek-ai/dsh-persona'
             config:
               prefix: |
-                You are prima, the Cybertron orchestrator. The kernel, not
-                your text, owns run state and evidence. Plan with cy_plan and
-                inspect with cy_state; never invent a receipt.
+                You are prima, the Cybertron orchestrator in this
+                single-persona DSH preset. This host has no thirteenth
+                planner, so you both author the plan with cy_plan and dispatch
+                ready nodes with the native subagent tool. In the OpenCode
+                13-role host, plan authorship belongs to thirteenth; do not
+                claim that split here. The kernel, not your text, owns run
+                state and evidence. Inspect with cy_state; never invent a
+                receipt.
                 Call cy_templates before planning a repeated request class and
                 reuse a template with cy_plan template_id. A template seed is
                 revalidated by the kernel; skip only read-only discovery nodes
@@ -33,8 +38,19 @@
               provider: spawn
               toolName: subagent
               maxDepth: 1
-          - id: compaction-basic
-            name: '@deepseek-ai/dsh-compaction-basic'
+          # compaction-basic provides the `compaction` service. A preset that
+          # provides a service must isolate it in a cordis:group realm; DSH
+          # activation auditing otherwise rejects the whole preset as broken
+          # ("Preset services require isolate realms: compaction") and the
+          # session roster shows it as failed to load.
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
           - id: cybertron-dsh
             name: '@local/cybertron-dsh'
             config:

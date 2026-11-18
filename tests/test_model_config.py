@@ -42,7 +42,9 @@ class ModelConfigTests(unittest.TestCase):
         save_profile(path, profile, self.base)
         self.assertEqual(effective_profile(self.project), profile)
         self.assertIn("model: company/model-37", (self.base / "agents/prima.md").read_text())
-        self.assertIn("model: company/model-37", (self.base / "commands/cybertron.md").read_text())
+        command_text = (self.base / "commands/cybertron.md").read_text()
+        self.assertIn("agent: thirteenth", command_text)
+        self.assertIn("model: company/model-18", command_text)
         self.assertEqual(profile_digest(self.project), __import__("hashlib").sha256(path.read_bytes()).hexdigest())
 
     def test_private_cross_provider_change_one_role_and_rollback(self):

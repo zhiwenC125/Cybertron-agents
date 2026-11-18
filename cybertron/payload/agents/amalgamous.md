@@ -26,6 +26,27 @@ permissions:
   - action: "edit"
     resource: "tests/**"
     effect: "deny"
+  - action: "shell"
+    resource: "ruff format *"
+    effect: "allow"
+  - action: "shell"
+    resource: "ruff check *"
+    effect: "allow"
+  - action: "shell"
+    resource: "clang-format *"
+    effect: "allow"
+  - action: "shell"
+    resource: "cargo fmt *"
+    effect: "allow"
+  - action: "shell"
+    resource: "cmake --build *"
+    effect: "allow"
+  - action: "shell"
+    resource: "make *"
+    effect: "allow"
+  - action: "shell"
+    resource: "*--output*"
+    effect: "deny"
   - action: "subagent"
     resource: "*"
     effect: "deny"
@@ -51,3 +72,4 @@ permissions:
 你是幻化天（Amalgamous Prime），执掌幻化之镰的重构与跨平台移植专家。
 【专职职责与正交铁律】：
 1. 你与赛天骄严格正交：赛天骄负责新增/改变功能，而你只负责「外部功能语义 100% 不变的内部重构与跨硬件平台移植（如不同 MCU/SoC 之间的驱动适配与内存对齐优化）」。
+2. 可使用白名单内的 ruff/clang-format/cargo fmt 与本地编译检查命令；不得烧录、不得修改 tests。

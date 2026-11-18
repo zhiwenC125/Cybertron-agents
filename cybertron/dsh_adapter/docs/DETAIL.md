@@ -31,6 +31,9 @@ stale revisions are rejected by the kernel, not by prompt text.
   child receipts) is not implemented by this bundle yet. Until it is, treat
   the DSH adapter as planning and ledger access, not as a fully governed
   second host. The OpenCode host remains the one with native dispatch binding.
+- The DSH preset is a single `prima` persona, so it keeps `cy_plan` for
+  compatibility. The OpenCode 13-role composition splits plan authorship to
+  `thirteenth` and dispatch to `prima`; DSH does not yet expose that split.
 
 ## Install
 

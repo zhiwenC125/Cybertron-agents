@@ -119,12 +119,19 @@ def _replace_model(raw: str, model: str) -> str:
     return MODEL_LINE.sub("model: " + model, raw, count=1)
 
 
-def _render_command(raw: str, model: str) -> str:
-    if not raw.startswith("---\n") or "\nagent: prima\n" not in raw:
+def _command_agent(raw: str) -> str:
+    match = re.search(r"(?m)^agent: ([a-z][a-z0-9-]*)$", raw)
+    if not match:
+        raise ModelConfigError("/cybertron 命令缺少有效的 agent 字段")
+    return match.group(1)
+
+
+def _render_command(raw: str, model: str, agent_id: str) -> str:
+    if not raw.startswith("---\n") or f"\nagent: {agent_id}\n" not in raw:
         raise ModelConfigError("/cybertron 命令格式无效")
     if MODEL_LINE.search(raw):
         return _replace_model(raw, model)
-    return raw.replace("\nagent: prima\n", f"\nagent: prima\nmodel: {model}\n", 1)
+    return raw.replace(f"\nagent: {agent_id}\n", f"\nagent: {agent_id}\nmodel: {model}\n", 1)
 
 
 def _write_atomic(path: Path, content: bytes) -> None:
@@ -164,7 +171,13 @@ def apply_to_install(base: Path, profile: dict) -> None:
     if not command.is_file() or command.is_symlink():
         raise ModelConfigError("缺少已安装的 /cybertron 命令")
     before = command.read_bytes()
-    updates.append((command, before, _render_command(before.decode(), profile["agents"]["prima"]).encode()))
+    command_text = before.decode("utf-8")
+    command_agent = _command_agent(command_text)
+    if command_agent not in profile["agents"]:
+        raise ModelConfigError(f"/cybertron 命令指向未知角色: {command_agent}")
+    updates.append((command, before,
+                    _render_command(command_text, profile["agents"][command_agent],
+                                    command_agent).encode()))
     changed = []
     try:
         for target, before, after in updates:
