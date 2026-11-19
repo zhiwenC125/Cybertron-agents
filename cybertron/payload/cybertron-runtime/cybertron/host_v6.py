@@ -1214,6 +1214,29 @@ class V6HostBridge:
         return {"status": "running", "token": token,
                 "child_session_id": child_session_id, "call_id": call_id}
 
+    def _collect_scope_artifacts(self, paths: list[str], *,
+                                 max_files: int = 5000) -> dict[str, str]:
+        """Hash declared files, or files under a declared directory scope."""
+        artifacts: dict[str, str] = {}
+        for target in paths:
+            path = Path(target)
+            if path.is_symlink():
+                continue
+            if path.is_file():
+                artifacts[str(path)] = _hash(path.read_bytes())
+                continue
+            if not path.is_dir():
+                continue
+            for child in sorted(path.rglob("*")):
+                if len(artifacts) >= max_files:
+                    break
+                if child.is_symlink() or not child.is_file():
+                    continue
+                if ".cybertron" in child.parts and "runs" in child.parts:
+                    continue
+                artifacts[str(child)] = _hash(child.read_bytes())
+        return artifacts
+
     def finish(self, run_id: str, token: str, child_session_id: str | None,
                *, call_id: str | None = None) -> dict:
         state = self.state(run_id)
@@ -1282,20 +1305,18 @@ class V6HostBridge:
         if graph.access_mode == "danger-full-access":
             # Full access does not snapshot the workspace. Hash the declared
             # artifacts directly so a completed child still has real evidence.
-            for scope in node.write_scope:
-                target = resolve_scope(scope, self.project)
-                if target.is_file() and not target.is_symlink():
-                    artifacts[str(target)] = _hash(target.read_bytes())
+            # A write_scope may name a directory (for example a temp tree).
+            declared = [str(resolve_scope(scope, self.project))
+                        for scope in node.write_scope]
+            artifacts.update(self._collect_scope_artifacts(declared))
         external_artifacts: dict[str, str] = {}
         unapproved_external: list[str] = []
         host = self._host(run_id)
         if node.external_scope:
             # Outside the project there is no baseline to diff or roll back.
             # Evidence is the artifact hash plus proof that the host gate ran.
-            for target in self._external_paths(node):
-                path = Path(target)
-                if path.is_file() and not path.is_symlink():
-                    external_artifacts[str(path)] = _hash(path.read_bytes())
+            external_artifacts = self._collect_scope_artifacts(
+                [str(path) for path in self._external_paths(node)])
             requested = {resource for event in all_events
                          if event["type"] in {"permission.requested", "permission.granted"}
                          and event.get("call_id") == call_id

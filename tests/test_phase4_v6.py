@@ -132,6 +132,18 @@ class StandingGrantTests(unittest.TestCase):
         self.assertIsNotNone(self.bridge.check_grant(
             self.run_id, "n1", "external.write", {"space_id": "space-1"}))
 
+    def test_directory_scope_collects_nested_artifacts(self):
+        target = Path(self.temp.name) / "out"
+        target.mkdir()
+        (target / "marker.txt").write_text("hello", encoding="utf-8")
+        nested = target / "nested"
+        nested.mkdir()
+        (nested / "data.bin").write_bytes(b"x")
+        artifacts = self.bridge._collect_scope_artifacts([str(target)])
+        self.assertEqual(len(artifacts), 2)
+        self.assertTrue(any(path.endswith("marker.txt") for path in artifacts))
+        self.assertTrue(any(path.endswith("data.bin") for path in artifacts))
+
     def test_capability_catalog(self):
         capabilities = self.bridge.capabilities()
         self.assertIn("alpha-trion", capabilities["doc.write"])
