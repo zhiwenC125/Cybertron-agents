@@ -76,6 +76,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("cy_plan_review", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_ask", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_escalate", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_new_run", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_ask_decision", "*", PermissionEffect.ASK),
             PermissionRule("question", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_templates", "*", PermissionEffect.ALLOW),
@@ -787,6 +788,9 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
         check_permission = any(r.action == "cy_check" for r in allowed)
         if check_permission != (spec.agent_id in _CHECK_ROLES) or ("cy_check" in role.tool_classes) != check_permission:
             raise ValueError("cy_check role permission drift")
+        new_run_permission = any(r.action == "cy_new_run" for r in allowed)
+        if new_run_permission != (spec.agent_id == "prima") or ("cy_new_run" in role.tool_classes) != new_run_permission:
+            raise ValueError("cy_new_run permission must belong to prima only")
         plan_permission = any(r.action == "cy_plan" for r in allowed)
         if plan_permission != (spec.agent_id == "thirteenth"):
             raise ValueError("only thirteenth may author plans")

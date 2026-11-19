@@ -34,6 +34,11 @@
           "effect": "allow"
         },
         {
+          "action": "cy_new_run",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
           "action": "cy_ask_decision",
           "resource": "*",
           "effect": "ask"

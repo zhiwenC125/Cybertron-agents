@@ -76,6 +76,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("cy_plan_review", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_ask", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_escalate", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_new_run", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_ask_decision", "*", PermissionEffect.ASK),
             PermissionRule("question", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_templates", "*", PermissionEffect.ALLOW),
