@@ -89,6 +89,9 @@ permissions:
   - action: "cy_check"
     resource: "*"
     effect: "allow"
+  - action: "cy_delete"
+    resource: "*"
+    effect: "allow"
 ---
 
 # 合体天 (Nexus Prime) — 神器：Enigma of Combination (合体之谜)

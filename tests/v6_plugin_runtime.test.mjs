@@ -88,7 +88,7 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
   await assert.rejects(shell({ tool: 'shell', agent: 'prima', sessionID: 'parent',
     input: { command: 'git status' } }), /no shell allow-list/);
   assert.deepEqual([...tools.keys()], ['cy_plan', 'cy_plan_review', 'cy_state', 'cy_ask', 'cy_new_run', 'cy_escalate',
-    'cy_templates', 'cy_capabilities', 'cy_metrics', 'cy_check', 'cy_review_reject']);
+    'cy_templates', 'cy_capabilities', 'cy_metrics', 'cy_check', 'cy_delete', 'cy_review_reject']);
   assert.deepEqual(tools.get('cy_plan').input.properties.nodes.items.properties.kind.enum,
     ['task', 'review']);
   assert.deepEqual(tools.get('cy_plan').input.properties.node.properties.kind.enum,

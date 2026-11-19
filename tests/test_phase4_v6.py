@@ -90,6 +90,29 @@ class ToolGateTests(unittest.TestCase):
             self.assertEqual(again["action"], "needs_grant")
 
 
+class DeletePathTests(unittest.TestCase):
+    def test_delete_requires_confirm_and_removes_exact_scope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            target = project / "target"
+            target.mkdir()
+            (target / "marker.txt").write_text("x", encoding="utf-8")
+            bridge = V6HostBridge(project)
+            node = PlanNode("n1", "task", "code.write", "solus-prime",
+                            "delete temp", write_scope=(str(target),),
+                            acceptance=("gone",), verifiers=("scope_guard",),
+                            requires=("dangerous.confirm",))
+            plan = bridge.plan(node.to_dict(), "session", objective="delete",
+                               access_mode="danger-full-access")
+            self.assertEqual(bridge.delete_path(plan["run_id"], "n1", str(target))["status"],
+                             "needs_grant")
+            request = bridge.grant_request(plan["run_id"], "n1", "dangerous.confirm")
+            bridge.grant_approve(plan["run_id"], request["request_id"])
+            self.assertEqual(bridge.delete_path(plan["run_id"], "n1", str(target))["status"],
+                             "deleted")
+            self.assertFalse(target.exists())
+
+
 class WriteRoleTests(unittest.TestCase):
     def test_write_scope_requires_a_role_with_write_permission(self):
         with tempfile.TemporaryDirectory() as directory:

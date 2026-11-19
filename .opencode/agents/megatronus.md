@@ -68,6 +68,9 @@ permissions:
   - action: "subagent"
     resource: "*"
     effect: "deny"
+  - action: "cy_delete"
+    resource: "*"
+    effect: "allow"
 ---
 
 # 震天尊 (Megatronus Prime) — 神器：Requiem Blaster (安魂曲火炮)

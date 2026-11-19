@@ -20,7 +20,7 @@ def main(argv: list[str] | None = None) -> int:
                                              "check", "templates", "metrics",
                                              "grant_request", "grant_approve", "grant_deny",
                                              "grant_revoke", "grants", "intercept",
-                                             "gate_tool", "capabilities"))
+                                             "gate_tool", "capabilities", "delete_path"))
     parser.add_argument("--project", type=Path, required=True)
     args = parser.parse_args(argv)
     data = json.load(sys.stdin)
@@ -61,6 +61,8 @@ def main(argv: list[str] | None = None) -> int:
                                       data["tool"], data.get("input"))
         elif args.operation == "capabilities":
             result = bridge.capabilities()
+        elif args.operation == "delete_path":
+            result = bridge.delete_path(data["run_id"], data["node_id"], data["path"])
         elif args.operation == "metrics":
             result = V6HostBridge(args.project).metrics(data.get("run_id"))
         elif args.operation == "plan":

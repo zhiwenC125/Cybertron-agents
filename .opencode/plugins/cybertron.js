@@ -475,6 +475,24 @@ export default Plugin.define({
         },
       });
       editor.add({
+        name: 'cy_delete', description: 'Delete exactly one path declared in the node write_scope. Requires a dangerous.confirm grant; this is the controlled replacement for rm -rf in a subagent without a shell.',
+        input: { type: 'object', properties: { path: { type: 'string' } },
+          required: ['path'], additionalProperties: false },
+        execute: async (input, context) => {
+          if (!['solus-prime', 'nexus-prime', 'megatronus'].includes(context.agent))
+            throw new Error('This role may not delete paths');
+          const binding = await ctx.storage.get(`child/${context.sessionID}`);
+          if (!binding || !await ctx.storage.get(`bound/${context.sessionID}`))
+            throw new Error('cy_delete needs a verified node binding');
+          const result = await bridge('delete_path', project, {
+            run_id: binding.run_id, node_id: binding.node_id, path: input.path,
+          }, context.signal);
+          if (result.status === 'needs_grant')
+            throw new Error('Cybertron: dangerous.confirm grant required; call cy_escalate(kind=dangerous.confirm, node_id=...) then cy_ask');
+          return { content: JSON.stringify(result) };
+        },
+      });
+      editor.add({
         name: 'cy_review_reject',
         description: 'Record a blocking L2 finding against a direct producer of this review node.',
         input: { type: 'object', properties: {
@@ -769,6 +787,7 @@ export default Plugin.define({
           delete event.tools.cy_metrics;
           delete event.tools.cy_check;
           delete event.tools.cy_review_reject;
+          delete event.tools.cy_delete;
           delete event.tools.subagent;
           event.system.push({ type: 'text', text:
             'Cybertron planner: you are thirteenth, the only role that authors the plan. Clarify the human intent with `question`, check `cy_capabilities` if the role/capability mapping is unclear, check `cy_templates` before planning, then turn the clarified intent into a contract (goal, done criteria with ids and evidence, non_goals, forbidden capabilities/paths) and create or revise the kernel-validated graph with `cy_plan`. Every done criterion must be covered by at least one node `satisfies` list. Do not create the run until the human has confirmed the contract; set confirmed=true only after that confirmation. The kernel writes and validates plan.json; do not read or edit it directly. Do not dispatch `subagent`, run shell, or edit files: dispatch, approval, and settlement belong to prima. After `cy_plan` returns, give the human and prima the run_id, ready node cards, access_mode, gates, and any risk that needs human confirmation.' });
@@ -794,6 +813,7 @@ export default Plugin.define({
           delete event.tools.cy_metrics;
           delete event.tools.cy_check;
           delete event.tools.cy_review_reject;
+          delete event.tools.cy_delete;
           delete event.tools.subagent;
           event.system.push({ type: 'text', text:
             'Cybertron planning child: you are thirteenth, dispatched by prima to clarify the human intent and author the plan. Ask the human with the native `question` tool, check `cy_capabilities` when unsure about role/capability, check `cy_templates`, then create the kernel-validated graph with `cy_plan`, including the intent contract and each node `satisfies` coverage. Do not create the run before the human confirms the contract; set confirmed=true only then. The kernel writes plan.json; do not edit it. Do not dispatch subagent, run shell, edit files, review plans, or settle nodes. When the plan is ready, return the plan summary, ready cards, access_mode, and gates; prima will review and dispatch.' });

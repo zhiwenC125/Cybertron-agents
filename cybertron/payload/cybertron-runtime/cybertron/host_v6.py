@@ -12,6 +12,7 @@ import itertools
 import json
 import os
 import re
+import shutil
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -421,6 +422,40 @@ class V6HostBridge:
                     not isinstance(item, str) or not item for item in done_ids):
                 raise HostBridgeError(f"satisfies for {node_id!r} must be a string list")
             by_id[node_id].satisfies = tuple(done_ids)
+
+    def delete_path(self, run_id: str, node_id: str, path: str) -> dict:
+        """Delete exactly one declared node path after a dangerous.confirm grant."""
+        if not isinstance(path, str) or not path:
+            raise HostBridgeError("delete path must be a nonempty string")
+        graph = self._graph(run_id)
+        node = graph.nodes.get(node_id)
+        if node is None:
+            raise HostBridgeError("delete path needs a node in this run")
+        target = Path(path).resolve()
+        allowed = {resolve_scope(scope, self.project) for scope in node.write_scope}
+        if target not in allowed:
+            raise HostBridgeError("delete path is outside the node write_scope")
+        forbidden = {Path("/"), Path.home().resolve(),
+                     Path(self.project).resolve()}
+        if target in forbidden or any(part in {".git", ".opencode", ".cybertron"}
+                                      for part in target.parts):
+            raise HostBridgeError("delete path is hard-denied")
+        grant = self.check_grant(run_id, node_id, "dangerous.confirm", {})
+        if grant is None:
+            return {"status": "needs_grant", "node_id": node_id,
+                    "kind": "dangerous.confirm"}
+        self.consume_grant(run_id, grant["grant_id"], node_id, None)
+        if not target.exists() and not target.is_symlink():
+            self._append(run_id, "delete.absent", node_id=node_id, path=str(target))
+            return {"status": "absent", "path": str(target)}
+        if target.is_symlink():
+            target.unlink()
+        elif target.is_dir():
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+        self._append(run_id, "delete.performed", node_id=node_id, path=str(target))
+        return {"status": "deleted", "path": str(target)}
 
     def gate_tool(self, run_id: str, node_id: str, tool: str,
                   payload: dict | str | None = None) -> dict:
