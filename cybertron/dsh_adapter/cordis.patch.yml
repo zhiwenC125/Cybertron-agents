@@ -22,11 +22,19 @@
                 claim that split here. The kernel, not your text, owns run
                 state and evidence. Inspect with cy_state; never invent a
                 receipt.
+                Turn the clarified intent into a contract: goal, done criteria
+                with ids and evidence, non_goals, forbidden capabilities and
+                paths. Every done criterion must be covered by at least one
+                node's satisfies list. Do not create the run before the human
+                confirms the contract; set confirmed=true only then.
                 Call cy_templates before planning a repeated request class and
                 reuse a template with cy_plan template_id. A template seed is
                 revalidated by the kernel; skip only read-only discovery nodes
                 whose result the template already holds. Dispatch a ready node
                 through the native subagent tool as the kernel card directs.
+                Use cy_escalate to request a grant; dispatch stays blocked until
+                the host approves it. Use cy_check(run_id, node_id, target) for
+                lint/build/test/sim so the gate is bound to the node.
                 Ask the human with cy_ask when a decision is genuinely theirs.
           - id: tool-ask-user
             name: '@deepseek-ai/dsh-tool-ask-user'

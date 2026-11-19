@@ -73,9 +73,11 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("cy_state", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_plan_review", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_ask", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_escalate", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_ask_decision", "*", PermissionEffect.ASK),
             PermissionRule("question", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_templates", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_capabilities", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_metrics", "*", PermissionEffect.ALLOW),
             PermissionRule("subagent", "thirteenth", PermissionEffect.ALLOW),
             PermissionRule("subagent", "alpha-trion", PermissionEffect.ALLOW),
@@ -614,7 +616,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "你是第十三天尊（The Thirteenth Prime），执掌领导模块的人类意图与计划图所有者（Planner & Acceptance Lead）。\n"
             "【计划所有权铁律】：\n"
             "1. 你是全系统唯一创建和修订计划图的角色。人类意图不清晰时，先用原生 `question` 工具发结构化澄清卡；不要在文字里只问不调用工具。\n"
-            "2. 规划前先调用 `cy_templates` 查看可复用模板；重复任务优先用 template_id，只有模板不足时才补节点。\n"
+            "2. 规划前先调用 `cy_capabilities` 确认 capability/role 映射，再调用 `cy_templates` 查看可复用模板；重复任务优先用 template_id，只有模板不足时才补节点。\n"
             "3. 用 `cy_plan` 创建或修订计划：每个节点必须有已注册的 capability、role、窄 write_scope、acceptance 与 `scope_guard` verifier。read-only 检查用 `read_only_scan` 模板且 write_scope=[]；不要用 `doc.write` 冒充只读。\n"
             "4. `plan.json` 由内核在你调用 `cy_plan` 后写入并校验，你不直接读写该文件。创建成功后，把 run_id、ready 节点 card、access_mode 和需要人类确认的风险点返回给人类/prima。\n"
             "5. 你不派发 subagent、不执行 shell、不修改任何文件；派发、审批与结算归 `prima`。计划需要变更时，由你修订，prima 只执行。\n"
@@ -632,6 +634,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("cy_plan", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_state", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_templates", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_capabilities", "*", PermissionEffect.ALLOW),
         ],
     ),
 ]
@@ -700,6 +703,26 @@ _CHECK_ROLES = frozenset({"micronus-prime", "nexus-prime", "alchemist", "solus-p
 for _prime in THIRTEEN_PRIMES_REGISTRY:
     if _prime.agent_id in _CHECK_ROLES:
         _prime.permissions.append(PermissionRule("cy_check", "*", PermissionEffect.ALLOW))
+    if _prime.agent_id == "thirteenth":
+        # Acceptance needs to read the artifacts it is asked to verify.
+        _prime.permissions.append(PermissionRule("read", "*", PermissionEffect.ALLOW))
+    if _prime.agent_id in {"liege-maximo", "micronus-prime"}:
+        # Reviewer A: project-root read, then explicit secret deny-list.
+        if not any(rule.action == "read" and rule.resource == "*"
+                   and rule.effect is PermissionEffect.ALLOW
+                   for rule in _prime.permissions):
+            _prime.permissions.append(PermissionRule("read", "*", PermissionEffect.ALLOW))
+        for _deny in (".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx",
+                      "*.keystore", "*.jks", "id_rsa*", "id_ed25519*",
+                      ".ssh/**", ".aws/**", ".config/gcloud/**", ".npmrc",
+                      ".pypirc", ".netrc", ".docker/config.json", "kubeconfig*",
+                      "secrets/**", "**/secrets/**", "credentials*", ".git/**"):
+            _prime.permissions.append(PermissionRule("read", _deny, PermissionEffect.DENY))
+    if _prime.agent_id == "vector-prime":
+        # Phase 3: vector owns Git commit/push; the host asks, and the node
+        # must carry a vcs.write / vcs.push grant.
+        for _command in ("git add *", "git commit *", "git tag *", "git push *"):
+            _prime.permissions.append(PermissionRule("shell", _command, PermissionEffect.ASK))
 
 PRIME_ROLES: Mapping[str, PrimeRole] = MappingProxyType({
     spec.agent_id: PrimeRole(
@@ -710,8 +733,8 @@ PRIME_ROLES: Mapping[str, PrimeRole] = MappingProxyType({
                          if r.action == "read" and r.effect is PermissionEffect.ALLOW),
         write_roots=_ROLE_WRITE_ROOTS.get(spec.agent_id, ()),
         tool_mode="allow-list",
-        tool_classes=("task", "cy_state", "cy_plan_review", "cy_ask", "question",
-                      "cy_templates", "cy_metrics")
+        tool_classes=("task", "cy_state", "cy_plan_review", "cy_ask", "cy_escalate",
+                      "question", "cy_templates", "cy_capabilities", "cy_metrics")
                      if spec.agent_id == "prima" else
                      tuple(sorted({rule.action for rule in spec.permissions if rule.effect is PermissionEffect.ALLOW and rule.action != "*"})),
         command_mode="git-allow-list" if spec.agent_id == "vector-prime" else
@@ -735,8 +758,8 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
     if set(roles) != set(_ROLE_CAPABILITIES) or len(specs) != len(roles):
         raise ValueError("role catalogue must contain exactly thirteen unique agents")
     known_actions = {"*", "read", "glob", "grep", "edit", "shell", "subagent",
-                     "cy_state", "cy_plan", "cy_plan_review", "cy_ask", "cy_ask_decision",
-                     "question", "cy_templates", "cy_metrics",
+                     "cy_state", "cy_plan", "cy_plan_review", "cy_ask", "cy_escalate", "cy_capabilities",
+                     "cy_ask_decision", "question", "cy_templates", "cy_metrics",
                      "cy_check", "cy_review_reject", "feishu_mcp_healthcheck*",
                      "feishu_wiki_delete*", "feishu_wiki_docx_v1_document_rawContent",
                      "feishu_wiki_wiki_v2_space_getNode"}
@@ -787,9 +810,9 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
             raise ValueError("subagent task must be explicitly denied")
         if role.device and spec.agent_id != "megatronus" or role.external_write and spec.agent_id != "alpha-trion":
             raise ValueError("device or external write owner mismatch")
-        if role.command_mode == "git-write" and spec.agent_id != "nexus-prime":
+        if role.command_mode == "git-write" and spec.agent_id != "vector-prime":
             raise ValueError("git write owner mismatch")
-        if any(r.action == "shell" and r.resource.startswith(("git commit", "git push", "git add", "git reset")) for r in allowed) and spec.agent_id != "nexus-prime":
+        if any(r.action == "shell" and r.resource.startswith(("git commit", "git push", "git add", "git reset")) for r in allowed) and spec.agent_id != "vector-prime":
             raise ValueError("git write command owner mismatch")
         if spec.agent_id in {"solus-prime", "amalgamous"} and any(root.startswith("tests/") for root in role.write_roots):
             raise ValueError("implementation roles cannot write tests")
@@ -814,3 +837,5 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
         for root in role.write_roots:
             if not any(root == host or (host.endswith("/**") and root.startswith(host[:-3] + "/")) for host in host_writes):
                 raise ValueError(f"{spec.agent_id}: write root {root} exceeds host permission")
+    from .authority import assert_authority
+    assert_authority()

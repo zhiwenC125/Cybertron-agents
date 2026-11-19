@@ -34,11 +34,25 @@ function usage() {
   cybertron init [--project DIR | --global] [--apply] [--dry-run]   # 默认全局
   cybertron doctor [--project DIR | --global]
   cybertron models setup|show|doctor|rollback [--global | --project DIR]
+  cybertron v6 runs|show|grants|lineage [--project DIR]
   cybertron dsh path
   cybertron --version
   cybertron --help
 
 默认 init 安装到全局 OpenCode 配置；只预览（dry-run），加 --apply 才写入。`);
+}
+
+function runV6Cli(args) {
+  const runtime = existsSync(path.join(pkgRoot, '.opencode', 'agents'))
+    ? pkgRoot : path.join(pkgRoot, 'payload', 'cybertron-runtime');
+  const result = spawnSync(process.env.CYBERTRON_PYTHON || 'python3',
+    ['-m', 'cybertron.v6_cli', ...args], {
+      cwd: runtime, stdio: 'inherit', shell: false,
+      env: { ...process.env, CYBERTRON_PROJECT_CWD: process.cwd(),
+        PYTHONPATH: [runtime, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) },
+  });
+  if (result.error) throw result.error;
+  return result.status ?? 1;
 }
 
 function parseArgs(argv) {
@@ -208,6 +222,7 @@ if (argv.length === 0 || argv.includes('--help') || argv.includes('-h')) {
 
 const cmd = argv[0];
 if (cmd === 'models') process.exit(runModelCli(argv.slice(1)));
+if (cmd === 'v6') process.exit(runV6Cli(argv.slice(1)));
 if (cmd === 'dsh') {
   if (argv[1] === 'path') {
     runDshPath();

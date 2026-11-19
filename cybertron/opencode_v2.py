@@ -76,22 +76,11 @@ def main() -> None:
                         help="Enable Feishu MCP; requires valid credentials and npx")
     args = parser.parse_args()
     files = compile_opencode_v2_assets(args.output, include_feishu=args.include_feishu)
-    launcher = args.output / "run_first_agent.py"
-    package_root = Path(__file__).resolve().parent.parent
-    launcher.write_text(
-        "from pathlib import Path\n"
-        "import sys\n"
-        f"sys.path.insert(0, {str(package_root)!r})\n"
-        "from cybertron.opencode_run import main\n"
-        "main()\n",
-        encoding="utf-8",
-    )
     errors = validate_bundle(args.output)
     if errors:
         parser.exit(1, "\n".join(errors) + "\n")
     print(f"Validated {len(files)} OpenCode V2 files in {args.output.resolve()}")
     print("Next: run `opencode2 debug config` from that directory to check host loading.")
-    print("Then run `python3 run_first_agent.py <request>` there for the live role test.")
 
 
 if __name__ == "__main__":

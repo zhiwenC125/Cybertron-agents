@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nativeDispatch, childSession, nativeToolStatus, childPermissionRules, externalGate, grantCovers, runIsTerminal } from './hook_logic.mjs';
+import { nativeDispatch, childSession, nativeToolStatus, childPermissionRules, externalGate, grantCovers, runIsTerminal, reviewerPathDenied } from './hook_logic.mjs';
 import shellPolicy from './shell_policy.mjs';
 
 const pluginDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -95,6 +95,8 @@ const nodeInput = {
     external_scope: { type: 'array', items: { type: 'string' } },
     acceptance: { type: 'array', items: { type: 'string' } },
     verifiers: { type: 'array', items: { type: 'string' } },
+    satisfies: { type: 'array', items: { type: 'string' } },
+    requires: { type: 'array', items: { type: 'string' } },
   },
   required: ['node_id', 'kind', 'capability', 'role', 'objective', 'write_scope', 'acceptance', 'verifiers'],
   additionalProperties: false,
@@ -147,7 +149,7 @@ export default Plugin.define({
     });
     await ctx.tool.transform(editor => {
       editor.add({
-        name: 'cy_plan', description: 'Create a validated v6 task graph. For a read-only inspection use template {type:"read_only_scan",objective:"..."} (write_scope=[]). For fixes use bug_fix or explicit nodes. Pass access_mode read-only/workspace-write/danger-full-access. Under workspace-write, list intended outside paths in the node external_scope; each write then needs a host approval (once/always/reject). Use danger-full-access only for explicit blanket authorization of Desktop/Downloads/outside paths. Pass an English slug for the on-disk run folder. Returns ready native subagent cards.',
+        name: 'cy_plan', description: 'Create a validated v6 task graph. For a read-only inspection use template {type:"read_only_scan",objective:"..."} (write_scope=[]). For fixes use bug_fix or explicit nodes. Pass an intent contract (goal + done criteria) and mark which nodes satisfy each done id. Pass access_mode read-only/workspace-write/danger-full-access. Under workspace-write, list intended outside paths in the node external_scope; each write then needs a host approval (once/always/reject). Use danger-full-access only for explicit blanket authorization of Desktop/Downloads/outside paths. Pass an English slug for the on-disk run folder. Returns ready native subagent cards.',
         input: { type: 'object', properties: {
           node: nodeInput, nodes: { type: 'array', items: nodeInput, minItems: 1 },
           template: { type: 'object', properties: {
@@ -161,6 +163,24 @@ export default Plugin.define({
           test_scope: { type: 'array', items: { type: 'string' } },
           skip: { type: 'array', items: { type: 'string' } },
           request_class: { type: 'string' },
+          new_run: { type: 'boolean' },
+          change_reason: { type: 'string' },
+          seed_from_run_id: { type: 'string' },
+          satisfies: { type: 'object', additionalProperties: {
+            type: 'array', items: { type: 'string' },
+          } },
+          intent: { type: 'object', properties: {
+            goal: { type: 'string' },
+            source: { type: 'string' },
+            done: { type: 'array', minItems: 1, items: { type: 'object', properties: {
+              id: { type: 'string' }, criterion: { type: 'string' },
+              evidence: { type: 'string', enum: ['artifact', 'test', 'review', 'receipt'] },
+            }, required: ['id', 'criterion'], additionalProperties: false } },
+            non_goals: { type: 'array', items: { type: 'string' } },
+            forbidden_capabilities: { type: 'array', items: { type: 'string' } },
+            forbidden_paths: { type: 'array', items: { type: 'string' } },
+            confirmed: { type: 'boolean' },
+          }, required: ['goal', 'done', 'confirmed'], additionalProperties: false },
           access_mode: { type: 'string', enum: ['read-only', 'workspace-write', 'danger-full-access'] },
           operation: { type: 'object', properties: {
             op: { type: 'string', enum: ['add_node', 'add_edge', 'reassign_role', 'split_node',
@@ -174,26 +194,35 @@ export default Plugin.define({
             throw new Error('Only thirteenth may author plans; prima only dispatches');
           let run_id = await ctx.storage.get(`run/${context.sessionID}`);
           const session = await ctx.session.get({ sessionID: context.sessionID });
+          let previous_run_id = null;
           if (run_id) {
             const current = await bridge('state', project, { run_id }, context.signal);
+            if (input.new_run &&
+                (current.status === 'running' || (current.active_dispatches || []).length))
+              throw new Error('Cannot start a new run while a dispatch is active');
             if (runIsTerminal(current)) {
               // A finished run cannot accept new nodes; start a fresh one for
               // the new request instead of failing on 'Existing run requires
               // one graph operation'.
+              previous_run_id = run_id;
               await ctx.storage.remove(`run/${context.sessionID}`);
               run_id = null;
             }
           }
           let access_mode = input.access_mode || await ctx.storage.get(`access/${context.sessionID}`) || 'workspace-write';
           if (input.template?.type === 'read_only_scan') access_mode = 'read-only';
-          if (run_id && (input.node || input.nodes || input.template || input.template_id || !input.operation))
-            throw new Error('Existing run requires one graph operation');
-          if (!run_id && ([input.node, input.nodes, input.template, input.template_id].filter(Boolean).length !== 1 || input.operation))
-            throw new Error('New run requires exactly one node, nodes, template, or template_id');
+          if (run_id && input.new_run && !input.change_reason?.trim())
+            throw new Error('Starting a new run over an existing run requires change_reason');
+          if (run_id && !input.new_run && (input.node || input.nodes || input.template || input.template_id || !input.operation))
+            throw new Error('Existing run requires one graph operation; pass new_run=true to supersede it');
+          if (!run_id && ([input.node, input.nodes, input.template, input.template_id, input.seed_from_run_id].filter(Boolean).length !== 1 || input.operation))
+            throw new Error('New run requires exactly one node, nodes, template, template_id, or seed_from_run_id');
           if (input.template_id && !input.objective)
             throw new Error('A template seed requires the new objective');
           if (input.skip && !input.template_id)
             throw new Error('skip is only valid with a template seed');
+          if (input.intent && (input.template || input.template_id || input.seed_from_run_id) && !input.satisfies)
+            throw new Error('intent with a template or seed requires a satisfies map');
           if (input.template?.type === 'bug_fix' && !input.template.write_scope?.length)
             throw new Error('bug_fix requires write_scope');
           if (input.template?.type === 'read_only_scan' &&
@@ -204,18 +233,36 @@ export default Plugin.define({
                input.template?.type === 'bug_fix' || input.template_id || input.write_scope?.length ||
                (input.operation && input.operation.op !== 'request_human')))
             throw new Error('This session is read-only; cy_plan cannot create or revise a writing node');
-          const result = run_id
-            ? await bridge('plan_op', project, { run_id, operation: input.operation }, context.signal)
-            : await bridge('plan', project, { node: input.node, nodes: input.nodes,
+          const supersede = Boolean(run_id && input.new_run);
+          const result = supersede
+            ? await bridge('plan', project, { node: input.node, nodes: input.nodes,
                 template: input.template, template_id: input.template_id,
                 objective: input.objective, write_scope: input.write_scope,
                 test_scope: input.test_scope, skip: input.skip,
                 request_class: input.request_class,
+                intent: input.intent, satisfies: input.satisfies,
+                parent_run_id: run_id, supersedes_run_id: run_id,
+                seed_from_run_id: input.seed_from_run_id,
+                change_reason: input.change_reason,
                 access_mode, session_title: session?.title || input.objective || '',
                 slug: input.slug || '', host_session_id: context.sessionID,
-                host: 'opencode' }, context.signal);
-          if (!run_id) {
+                host: 'opencode' }, context.signal)
+            : run_id
+              ? await bridge('plan_op', project, { run_id, operation: input.operation }, context.signal)
+              : await bridge('plan', project, { node: input.node, nodes: input.nodes,
+                  template: input.template, template_id: input.template_id,
+                  objective: input.objective, write_scope: input.write_scope,
+                  test_scope: input.test_scope, skip: input.skip,
+                  request_class: input.request_class,
+                  intent: input.intent, satisfies: input.satisfies,
+                  parent_run_id: previous_run_id,
+                  seed_from_run_id: input.seed_from_run_id,
+                  access_mode, session_title: session?.title || input.objective || '',
+                  slug: input.slug || '', host_session_id: context.sessionID,
+                  host: 'opencode' }, context.signal);
+          if (supersede || !run_id) {
             await ctx.storage.set(`run/${context.sessionID}`, result.run_id);
+            await ctx.storage.set(`access/${context.sessionID}`, result.access_mode || access_mode);
             // A planning child gives the parent its run id, so prima can adopt
             // the plan without the human copying the id between agents.
             if (session?.parentID)
@@ -266,7 +313,9 @@ export default Plugin.define({
             ? 'No v6 run in this session; call cy_plan first'
             : 'No v6 run in this session; ask thirteenth for the run_id');
           let state = await bridge('state', project, { run_id }, context.signal);
-          if (input.wait && state.status === 'running') {
+          await ctx.storage.set(`access/${context.sessionID}`, state.access_mode);
+          if (input.wait && (state.status === 'running' ||
+              (state.active_dispatches || []).length > 0)) {
             for (const active of state.active_dispatches || []) {
               if (!active.child_session_id) continue;
               await ctx.session.wait({ sessionID: active.child_session_id });
@@ -301,6 +350,41 @@ export default Plugin.define({
           });
           const result = await bridge('ask', project,
             { run_id, question: input.question, approved: true }, context.signal);
+          const pending = await ctx.storage.get(`grant_request/${context.sessionID}`);
+          if (pending) {
+            const grant = await bridge('grant_approve', project, {
+              run_id, request_id: pending, approver: 'human',
+              via: 'opencode.permission',
+            }, context.signal);
+            await ctx.storage.remove(`grant_request/${context.sessionID}`);
+            return { content: JSON.stringify({ ...result, grant }) };
+          }
+          return { content: JSON.stringify(result) };
+        },
+      });
+      editor.add({
+        name: 'cy_escalate', description: 'Request a capability grant for one node. Does not approve it: after this returns, call cy_ask so the human opens the host approval card. Kinds: read.expand, network.read, write.expand, exec.expand, pkg.install, vcs.write, vcs.push, external.write, deploy, device.',
+        input: { type: 'object', properties: {
+          run_id: { type: 'string' },
+          node_id: { type: 'string' },
+          kind: { type: 'string' },
+          scope: { type: 'object' },
+          constraints: { type: 'object' },
+          reason: { type: 'string' },
+          ttl_seconds: { type: 'integer' },
+          mode: { type: 'string', enum: ['once', 'run', 'standing'] },
+        }, required: ['node_id', 'kind'], additionalProperties: false },
+        execute: async (input, context) => {
+          if (context.agent !== 'prima') throw new Error('Only prima may request a capability grant');
+          const run_id = input.run_id || await ctx.storage.get(`run/${context.sessionID}`);
+          if (!run_id) throw new Error('No v6 run in this session');
+          const result = await bridge('grant_request', project, {
+            run_id, node_id: input.node_id, kind: input.kind,
+            scope: input.scope || {}, constraints: input.constraints || {},
+            reason: input.reason || '', ttl_seconds: input.ttl_seconds,
+            mode: input.mode || 'once',
+          }, context.signal);
+          await ctx.storage.set(`grant_request/${context.sessionID}`, result.request_id);
           return { content: JSON.stringify(result) };
         },
       });
@@ -311,6 +395,16 @@ export default Plugin.define({
           if (!['prima', 'thirteenth'].includes(context.agent))
             throw new Error('Only thirteenth and prima may read templates');
           const result = await bridge('templates', project, {}, context.signal);
+          return { content: JSON.stringify(result) };
+        },
+      });
+      editor.add({
+        name: 'cy_capabilities', description: 'List registered capability -> role mappings. Call this before cy_plan when you are unsure which role can perform an action.',
+        input: { type: 'object', properties: {}, additionalProperties: false },
+        execute: async (_input, context) => {
+          if (!['prima', 'thirteenth'].includes(context.agent))
+            throw new Error('Only prima and thirteenth may read the capability catalog');
+          const result = await bridge('capabilities', project, {}, context.signal);
           return { content: JSON.stringify(result) };
         },
       });
@@ -341,8 +435,12 @@ export default Plugin.define({
           if (!allowed.has(context.agent) ||
               !targets[context.agent].includes(input.target))
             throw new Error(`This role cannot run cy_check target ${input.target}`);
-          const result = await bridge('check', project,
-            { target: input.target, run_id: input.run_id }, context.signal);
+          const binding = await ctx.storage.get(`child/${context.sessionID}`);
+          const result = await bridge('check', project, {
+            target: input.target,
+            run_id: input.run_id || binding?.run_id,
+            call_id: binding?.call_id,
+          }, context.signal);
           return { content: JSON.stringify(result) };
         },
       });
@@ -369,6 +467,44 @@ export default Plugin.define({
       });
     });
     await ctx.tool.hook('execute.before', async event => {
+      const boundRun = await ctx.storage.get(`run/${event.sessionID}`);
+      const boundAccess = await ctx.storage.get(`access/${event.sessionID}`);
+      if (boundRun && ['bash', 'shell', 'write', 'edit'].includes(event.tool)) {
+        const childBinding = await ctx.storage.get(`child/${event.sessionID}`);
+        const dispatch = childBinding?.call_id
+          ? await ctx.storage.get(`dispatch/${childBinding.call_id}`) : null;
+        if (dispatch?.node_id) {
+          const gate = await bridge('gate_tool', project, {
+            run_id: boundRun, node_id: dispatch.node_id,
+            tool: event.tool, input: event.input,
+          }, event.signal);
+          if (gate.action === 'needs_grant')
+            throw new Error(`Cybertron: grant required (${gate.kinds.join(', ')}) for node ${gate.node_id}; call cy_escalate, then cy_ask`);
+        }
+      }
+      if (boundRun && boundAccess === 'danger-full-access' &&
+          ['bash', 'shell', 'write', 'edit'].includes(event.tool)) {
+        const verdict = await bridge('intercept', project, {
+          run_id: boundRun, tool: event.tool, input: event.input,
+        }, event.signal);
+        if (verdict.action === 'confirm') {
+          await ctx.storage.set(`danger/${event.sessionID}`, {
+            command_sha256: verdict.command_sha256, tool: event.tool,
+            at: Date.now(),
+          });
+          throw new Error(`Cybertron: full-access dangerous action requires confirmation. ${verdict.instruction}`);
+        }
+        if (event.tool === 'bash' || event.tool === 'shell') return;
+      }
+      if (['read', 'glob', 'grep'].includes(event.tool) &&
+          ['micronus-prime', 'liege-maximo'].includes(event.agent)) {
+        const raw = event.input?.filePath ?? event.input?.path ?? event.input?.file
+          ?? event.input?.pattern;
+        const values = Array.isArray(raw) ? raw : [raw];
+        for (const value of values)
+          if (reviewerPathDenied(value))
+            throw new Error(`Cybertron: reviewer cannot read sensitive path: ${value}`);
+      }
       if (event.tool === 'shell' || event.tool === 'bash') {
         const role = event.agent;
         const policy = shellPolicy.roles?.[role];
@@ -418,6 +554,9 @@ export default Plugin.define({
       const result = await bridge('before', project,
         { run_id, node_id: nodeID, role, card, call_id: callID, active_token });
       if (result.rejected) {
+        if (result.needs_grant) {
+          throw new Error(`Cybertron: grant required for ${result.node_id}: ${result.needs_grant.join(', ')}; call cy_escalate, then cy_ask for human approval`);
+        }
         await ctx.storage.set(`token/${run_id}`, result.token);
         const active_call = await ctx.storage.get(`active/${run_id}`);
         if (active_call) {
@@ -463,7 +602,13 @@ export default Plugin.define({
       if (event.tool !== 'subagent') return;
       const call_id = event.callID || event.id || event.toolCallID;
       const started = call_id ? await ctx.storage.get(`dispatch/${call_id}`) : null;
-      if (!started) return; // A rejected before-hook has no dispatch to settle.
+      if (!started) {
+        const target = event.input?.agentID || event.input?.agent || event.input?.agentId;
+        const child = childSession(event.result);
+        if (target === 'thirteenth' && child)
+          await ctx.storage.set(`planner/${child}`, true);
+        return; // A rejected before-hook has no dispatch to settle.
+      }
       const child_session_id = childSession(event.result);
       const tool_status = nativeToolStatus(event);
       const result = await bridge('after', project, {
@@ -574,13 +719,14 @@ export default Plugin.define({
         if (!session.parentID) {
           delete event.tools.cy_ask;
           delete event.tools.cy_ask_decision;
+          delete event.tools.cy_escalate;
           delete event.tools.cy_plan_review;
           delete event.tools.cy_metrics;
           delete event.tools.cy_check;
           delete event.tools.cy_review_reject;
           delete event.tools.subagent;
           event.system.push({ type: 'text', text:
-            'Cybertron planner: you are thirteenth, the only role that authors the plan. Clarify the human intent with `question`, check `cy_templates` before planning, then create or revise the kernel-validated graph with `cy_plan`. The kernel writes and validates plan.json; do not read or edit it directly. Do not dispatch `subagent`, run shell, or edit files: dispatch, approval, and settlement belong to prima. After `cy_plan` returns, give the human and prima the run_id, ready node cards, access_mode, gates, and any risk that needs human confirmation.' });
+            'Cybertron planner: you are thirteenth, the only role that authors the plan. Clarify the human intent with `question`, check `cy_capabilities` if the role/capability mapping is unclear, check `cy_templates` before planning, then turn the clarified intent into a contract (goal, done criteria with ids and evidence, non_goals, forbidden capabilities/paths) and create or revise the kernel-validated graph with `cy_plan`. Every done criterion must be covered by at least one node `satisfies` list. Do not create the run until the human has confirmed the contract; set confirmed=true only after that confirmation. The kernel writes and validates plan.json; do not read or edit it directly. Do not dispatch `subagent`, run shell, or edit files: dispatch, approval, and settlement belong to prima. After `cy_plan` returns, give the human and prima the run_id, ready node cards, access_mode, gates, and any risk that needs human confirmation.' });
           event.system.push({ type: 'text', text:
             'When the user requests a read-only inspection or says not to modify files, create the read_only_scan template with a short objective: onyx-prime / scan.static and write_scope=[]. Do not substitute doc.write or a writing node. If the user asks for approval before execution, ask with the native question tool and do not hand off until the answer approves. Use a short English slug (for example hello-doc) for cy_plan.slug; the on-disk run folder uses only that slug and stores the UUID inside run.json. Access modes are host-native: read-only (no writes), workspace-write (default; project write_scope plus any declared external_scope paths, each gated by a host approval card), and danger-full-access (only when the user explicitly authorizes a blanket Desktop/Downloads/outside scope). Prefer external_scope for a few known outside files: the user approves each write (or chooses always) and the kernel records it. Use danger-full-access only when the user asks for unrestricted outside access. Pass access_mode to cy_plan. In danger-full-access mode role write roots relax, but .git, .opencode, .cybertron/runs, and opencode.jsonc stay forbidden. If an outside-project write is ambiguous, ask with the native question tool before planning; never select danger-full-access without explicit authorization.' });
           return;
@@ -589,7 +735,9 @@ export default Plugin.define({
       if (event.agent !== 'prima') {
         const session = await ctx.session.get({ sessionID: event.sessionID });
         const parentRun = session.parentID && await ctx.storage.get(`run/${session.parentID}`);
-        if (event.agent === 'thirteenth' && !parentRun) {
+        const plannerChild = event.agent === 'thirteenth' &&
+          (!parentRun || await ctx.storage.get(`planner/${event.sessionID}`));
+        if (plannerChild) {
           // Planning child: prima dispatched thirteenth before any run exists.
           // Keep only the planning surface; the run id is handed to prima by
           // cy_plan, so the human never switches agents or copies ids.
@@ -597,12 +745,13 @@ export default Plugin.define({
           delete event.tools.cy_plan_review;
           delete event.tools.cy_ask;
           delete event.tools.cy_ask_decision;
+          delete event.tools.cy_escalate;
           delete event.tools.cy_metrics;
           delete event.tools.cy_check;
           delete event.tools.cy_review_reject;
           delete event.tools.subagent;
           event.system.push({ type: 'text', text:
-            'Cybertron planning child: you are thirteenth, dispatched by prima to clarify the human intent and author the plan. Ask the human with the native `question` tool, check `cy_templates`, then create the kernel-validated graph with `cy_plan`. The kernel writes plan.json; do not edit it. Do not dispatch subagent, run shell, edit files, review plans, or settle nodes. When the plan is ready, return the plan summary, ready cards, access_mode, and gates; prima will review and dispatch.' });
+            'Cybertron planning child: you are thirteenth, dispatched by prima to clarify the human intent and author the plan. Ask the human with the native `question` tool, check `cy_capabilities` when unsure about role/capability, check `cy_templates`, then create the kernel-validated graph with `cy_plan`, including the intent contract and each node `satisfies` coverage. Do not create the run before the human confirms the contract; set confirmed=true only then. The kernel writes plan.json; do not edit it. Do not dispatch subagent, run shell, edit files, review plans, or settle nodes. When the plan is ready, return the plan summary, ready cards, access_mode, and gates; prima will review and dispatch.' });
           return;
         }
         if (parentRun) {
@@ -637,6 +786,7 @@ export default Plugin.define({
           }
         }
         delete event.tools.cy_state;
+        delete event.tools.cy_capabilities;
         delete event.tools.cy_plan;
         delete event.tools.cy_plan_review;
         delete event.tools.cy_ask;

@@ -1,6 +1,7 @@
 # Cybertron 角色能力矩阵与 10 / 13 分工归类
 
 > 日期：2026-11-16
+> 历史说明：本文件保留为 Phase 3 之前的角色能力分析；已实现的权力矩阵、审查者 deny-list 与 Git 归属见 [`docs/stages/M-authority-matrix.md`](../docs/stages/M-authority-matrix.md)。
 > 目的：回答「为什么别人 10 个 agent 够用，Cybertron 13 个反而不行」，并给出完整的角色分类、能力/权限/缺口矩阵、可选的 10-agent 归并方案。
 
 ## 一、为什么 13 个反而不如 10 个

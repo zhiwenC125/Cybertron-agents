@@ -1,3 +1,5 @@
+> 0.8.0 清理说明：本文件记录阶段 4/5 的历史探针；对应的 `opencode_run.py`、`opencode_readonly.py`、`opencode_l2_probe.py` 已移除，当前入口为 OpenCode 插件与 `cybertron v6`。
+
 # 阶段 4：OpenCode V2 单角色执行
 
 状态：已由开发者在本机验收。目标是用真实模型执行一个只读角色，再将结构化结果交给账本。

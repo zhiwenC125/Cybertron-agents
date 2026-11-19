@@ -2,7 +2,7 @@
 
 日期：2026-11-14
 
-状态：规划文件；以下阶段除已注明的现状外均**尚未实现或验收**。
+状态：历史规划文件（0.8.0 已移除 `opencode_run.py` 等旧探针）；以下阶段除已注明的现状外均**尚未实现或验收**。
 
 适用范围：Cybertron 核心运行态、OpenCode V2 接入、安装发布、后续 DeepSeek Harness 接入与硬件交付。
 协作基线：以仓库根目录 [`AGENTS.md`](../../AGENTS.md) 为准；七阶段既有验收状态以 [`DEVELOPMENT_PLAN.md`](../../DEVELOPMENT_PLAN.md) 和 [`docs/stages/`](../stages/) 为准。

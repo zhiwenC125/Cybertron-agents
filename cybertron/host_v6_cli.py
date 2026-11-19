@@ -17,17 +17,50 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("operation", choices=("plan", "plan_op", "state", "review_plan", "ask",
                                              "before", "after", "bind", "permission",
                                              "review_reject", "finish",
-                                             "check", "templates", "metrics"))
+                                             "check", "templates", "metrics",
+                                             "grant_request", "grant_approve", "grant_deny",
+                                             "grant_revoke", "grants", "intercept",
+                                             "gate_tool", "capabilities"))
     parser.add_argument("--project", type=Path, required=True)
     args = parser.parse_args(argv)
     data = json.load(sys.stdin)
     bridge = V6HostBridge(args.project) if args.operation != "check" else None
     try:
         if args.operation == "check":
-            result = (V6HostBridge(args.project).check(data["run_id"], data["target"])
+            result = (V6HostBridge(args.project).check(
+                data["run_id"], data["target"], data.get("call_id"),
+                data.get("node_id"))
                       if data.get("run_id") else run_check(args.project, data["target"]))
         elif args.operation == "templates":
             result = V6HostBridge(args.project).templates()
+        elif args.operation == "grant_request":
+            result = bridge.grant_request(
+                data["run_id"], data["node_id"], data["kind"],
+                data.get("scope"), data.get("constraints"),
+                data.get("reason", ""), data.get("ttl_seconds"),
+                data.get("mode", "once"))
+        elif args.operation == "grant_approve":
+            result = bridge.grant_approve(
+                data["run_id"], data["request_id"],
+                approver=data.get("approver", "human"),
+                via=data.get("via", "host"), mode=data.get("mode", "once"),
+                ttl_seconds=data.get("ttl_seconds"))
+        elif args.operation == "grant_deny":
+            result = bridge.grant_deny(data["run_id"], data["request_id"],
+                                       data.get("reason", ""))
+        elif args.operation == "grant_revoke":
+            result = bridge.grant_revoke(data["run_id"], data["grant_id"],
+                                         data.get("reason", ""))
+        elif args.operation == "grants":
+            result = bridge.grants(data["run_id"])
+        elif args.operation == "intercept":
+            result = bridge.intercept(data["run_id"], data["tool"],
+                                      data.get("input"))
+        elif args.operation == "gate_tool":
+            result = bridge.gate_tool(data["run_id"], data["node_id"],
+                                      data["tool"], data.get("input"))
+        elif args.operation == "capabilities":
+            result = bridge.capabilities()
         elif args.operation == "metrics":
             result = V6HostBridge(args.project).metrics(data.get("run_id"))
         elif args.operation == "plan":
@@ -41,8 +74,16 @@ def main(argv: list[str] | None = None) -> int:
                                      skip=data.get("skip"),
                                      access_mode=data.get("access_mode"),
                                      session_title=data.get("session_title", ""),
-                                     slug=data.get("slug", ""))
+                                     slug=data.get("slug", ""),
+                                     intent=data.get("intent"),
+                                     satisfies_map=data.get("satisfies"),
+                                     parent_run_id=data.get("parent_run_id"),
+                                     supersedes_run_id=data.get("supersedes_run_id"),
+                                     change_reason=data.get("change_reason", ""),
+                                     seed_from_run_id=data.get("seed_from_run_id"))
             elif "template" in data:
+                if data.get("intent") is not None:
+                    raise ValueError("intent requires explicit node or nodes; templates cannot carry intent")
                 template = data["template"]
                 if template.get("type") == "bug_fix":
                     graph = bug_fix_template(template["objective"], tuple(template["write_scope"]))
@@ -61,7 +102,13 @@ def main(argv: list[str] | None = None) -> int:
                                      access_mode=data.get("access_mode"),
                                      session_title=data.get("session_title", ""),
                                      slug=data.get("slug", ""),
-                                     host=data.get("host", "opencode"))
+                                     host=data.get("host", "opencode"),
+                                     intent=data.get("intent"),
+                                     satisfies_map=data.get("satisfies"),
+                                     parent_run_id=data.get("parent_run_id"),
+                                     supersedes_run_id=data.get("supersedes_run_id"),
+                                     change_reason=data.get("change_reason", ""),
+                                     seed_from_run_id=data.get("seed_from_run_id"))
             else:
                 nodes = data.get("nodes", data.get("node"))
                 result = bridge.plan(nodes, data["host_session_id"],
@@ -70,7 +117,13 @@ def main(argv: list[str] | None = None) -> int:
                                      access_mode=data.get("access_mode"),
                                      session_title=data.get("session_title", ""),
                                      slug=data.get("slug", ""),
-                                     host=data.get("host", "opencode"))
+                                     host=data.get("host", "opencode"),
+                                     intent=data.get("intent"),
+                                     satisfies_map=data.get("satisfies"),
+                                     parent_run_id=data.get("parent_run_id"),
+                                     supersedes_run_id=data.get("supersedes_run_id"),
+                                     change_reason=data.get("change_reason", ""),
+                                     seed_from_run_id=data.get("seed_from_run_id"))
         elif args.operation == "plan_op":
             result = bridge.plan_op(data["run_id"], data["operation"])
         elif args.operation == "state":

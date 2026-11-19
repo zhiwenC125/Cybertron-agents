@@ -4,7 +4,7 @@
 
 ![Cybertron Agents — Multi-Agent Framework for Intelligent Tasks](assets/cybertron-banner.jpg)
 
-[![Release](https://img.shields.io/badge/release-v0.7.3-8b8cff?style=for-the-badge)](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.7.3)
+[![Release](https://img.shields.io/badge/release-v0.8.0-8b8cff?style=for-the-badge)](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.8.0)
 [![CI](https://img.shields.io/github/actions/workflow/status/zhiwenC125/Cybertron-agents/verify.yml?branch=main&style=for-the-badge&label=verify)](https://github.com/zhiwenC125/Cybertron-agents/actions/workflows/verify.yml)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-73f8ff?style=for-the-badge)](pyproject.toml)
 [![License](https://img.shields.io/badge/license-MIT-f67adf?style=for-the-badge)](LICENSE)
@@ -26,16 +26,16 @@
 ### npm · 不需要全局 `cybertron` 命令
 
 ```bash
-npx -y cybertron-agents@0.7.3 init --dry-run
-npx -y cybertron-agents@0.7.3 init --apply
-npx -y cybertron-agents@0.7.3 models setup
-npx -y cybertron-agents@0.7.3 doctor --global
+npx -y cybertron-agents@0.8.0 init --dry-run
+npx -y cybertron-agents@0.8.0 init --apply
+npx -y cybertron-agents@0.8.0 models setup
+npx -y cybertron-agents@0.8.0 doctor --global
 ```
 
 npx 只运行一次，不会留下全局 `cybertron` 命令；后续命令继续带 npx 即可。若希望直接使用 `cybertron`：
 
 ```bash
-npm install -g cybertron-agents@0.7.3
+npm install -g cybertron-agents@0.8.0
 cybertron --version
 ```
 
@@ -44,7 +44,7 @@ cybertron --version
 ### pipx · Python 隔离安装
 
 ```bash
-pipx install cybertron-agents==0.7.3
+pipx install cybertron-agents==0.8.0
 pipx ensurepath
 exec zsh
 cybertron init --apply
@@ -57,7 +57,7 @@ cybertron doctor --global
 ### GitHub Release · 可先审阅安装脚本
 
 ```bash
-curl -fsSL https://github.com/zhiwenC125/Cybertron-agents/releases/download/v0.7.3/install.sh -o install.sh
+curl -fsSL https://github.com/zhiwenC125/Cybertron-agents/releases/download/v0.8.0/install.sh -o install.sh
 bash install.sh --dry-run
 bash install.sh --apply
 ```
@@ -82,7 +82,7 @@ opencode2 debug agents
 
 > 修复登录接口的超时问题，补充回归测试，并说明改动影响。
 
-首次使用时按安装渠道运行模型配置命令：npm 用 `npx -y cybertron-agents@0.7.3 models setup`，pipx 用 `cybertron models setup`，Shell 安装用 `"${XDG_CONFIG_HOME:-$HOME/.config}/opencode/bin/cybertron" models setup`。随后通过 OpenCode 的认证流程提供模型密钥。Cybertron 的模型配置只保存模型 ID，不保存 API Key。[模型配置说明 →](docs/stages/H-model-configuration.md)
+首次使用时按安装渠道运行模型配置命令：npm 用 `npx -y cybertron-agents@0.8.0 models setup`，pipx 用 `cybertron models setup`，Shell 安装用 `"${XDG_CONFIG_HOME:-$HOME/.config}/opencode/bin/cybertron" models setup`。随后通过 OpenCode 的认证流程提供模型密钥。Cybertron 的模型配置只保存模型 ID，不保存 API Key。[模型配置说明 →](docs/stages/H-model-configuration.md)
 
 ---
 
@@ -115,7 +115,7 @@ v6 的 M0–M5 已完成验收；真实 OpenCode 宿主中的模板复用案例�
 ## 🪐 两个宿主
 
 - **OpenCode V2**：主集成路径。十三角色由 [`cybertron/registry.py`](cybertron/registry.py) 定义，配置由导出器生成；原生子代理卡片、权限、运行账本和工具回执共同构成执行证据。
-- **DeepSeek Harness**：随包分发的实验性 `Cybertron` preset。可用安装入口的 `dsh path` 找到 bundle（npm：`npx -y cybertron-agents@0.7.3 dsh path`；pipx：`cybertron dsh path`；Shell：`"${XDG_CONFIG_HOME:-$HOME/.config}/opencode/bin/cybertron" dsh path`）；preset 名称为 `Cybertron`；目前是单一 `prima` persona 与 `cy_*` 工具，尚未提供与 OpenCode 相同的十三角色子会话写范围绑定。[查看限制 →](cybertron/dsh_adapter/docs/DETAIL.md)
+- **DeepSeek Harness**：随包分发的实验性 `Cybertron` preset。可用安装入口的 `dsh path` 找到 bundle（npm：`npx -y cybertron-agents@0.8.0 dsh path`；pipx：`cybertron dsh path`；Shell：`"${XDG_CONFIG_HOME:-$HOME/.config}/opencode/bin/cybertron" dsh path`）；preset 名称为 `Cybertron`；目前是单一 `prima` persona 与 `cy_*` 工具，尚未提供与 OpenCode 相同的十三角色子会话写范围绑定。[查看限制 →](cybertron/dsh_adapter/docs/DETAIL.md)
 
 ## 🛡️ 安全边界
 
@@ -133,7 +133,7 @@ python3 -m cybertron.stage5_verify
 python3 cybertron_primes_engine.py
 ```
 
-阶段 5 隔离验证依赖 macOS `sandbox-exec`。当前 0.7.3 的发布说明见 [v0.7.3 发布说明](docs/releases/v0.7.3.md)；0.4.0 的 DSH/访问模式变更见 [v0.4.0 发布说明](docs/releases/v0.4.0.md)。
+阶段 5 隔离验证依赖 macOS `sandbox-exec`。当前 0.8.0 的发布说明见 [v0.8.0 发布说明](docs/releases/v0.8.0.md)；0.4.0 的 DSH/访问模式变更见 [v0.4.0 发布说明](docs/releases/v0.4.0.md)。
 
 ## 📚 继续探索
 
@@ -141,7 +141,7 @@ python3 cybertron_primes_engine.py
 | --- | --- |
 | 安装路径与升级 | [安装与发布方案](docs/packaging-and-installation.md) |
 | v6 设计与门禁 | [动态任务图开发计划](design/DEVELOPMENT_PLAN.md) · [里程碑证据](docs/stages/v6-progress.md) |
-| 0.7.3 具体变更 | [发布说明](docs/releases/v0.7.3.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.7.3) |
+| 0.8.0 具体变更 | [发布说明](docs/releases/v0.8.0.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.8.0) |
 | 0.6.0 具体变更 | [发布说明](docs/releases/v0.6.0.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.6.0) |
 | 0.5.1 具体变更 | [发布说明](docs/releases/v0.5.1.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.5.1) |
 | 0.5.0 具体变更 | [发布说明](docs/releases/v0.5.0.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.5.0) |
@@ -154,6 +154,6 @@ python3 cybertron_primes_engine.py
 
 **Plan with intent. Execute with boundaries. Verify with evidence.**
 
-MIT License · [Cybertron v0.7.3](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.7.3)
+MIT License · [Cybertron v0.8.0](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.8.0)
 
 </div>

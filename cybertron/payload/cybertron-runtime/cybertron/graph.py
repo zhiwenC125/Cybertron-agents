@@ -24,6 +24,8 @@ GRAPH_OPERATIONS = ("add_node", "add_edge", "reassign_role", "split_node", "retr
 from .access import (DEFAULT_ACCESS_MODE, hard_denied, is_external_scope,
                      normalize_access_mode)
 from .registry import PRIME_ROLES, assert_catalog
+from .intent import Intent
+from .grants import GRANT_KINDS
 
 CAPABILITY_CATALOG: Mapping[str, Mapping[str, Tuple[str, ...]]] = MappingProxyType({
     capability: MappingProxyType({role.agent_id: role.write_roots})
@@ -75,6 +77,8 @@ class PlanNode:
     verifiers: Tuple[str, ...] = ()
     budget: Dict[str, int] = field(default_factory=lambda: {"max_attempts": 2})
     status: str = "pending"
+    satisfies: Tuple[str, ...] = ()
+    requires: Tuple[str, ...] = ()
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -85,6 +89,7 @@ class PlanNode:
             "external_scope": list(self.external_scope),
             "acceptance": list(self.acceptance), "verifiers": list(self.verifiers),
             "budget": dict(self.budget), "status": self.status,
+            "satisfies": list(self.satisfies), "requires": list(self.requires),
         }
 
     @classmethod
@@ -102,6 +107,8 @@ class PlanNode:
                 verifiers=tuple(data.get("verifiers", ())),
                 budget=dict(data.get("budget", {"max_attempts": 2})),
                 status=data.get("status", "pending"),
+                satisfies=tuple(data.get("satisfies", ())),
+                requires=tuple(data.get("requires", ())),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise GraphRejected("invalid node payload") from exc
@@ -114,7 +121,8 @@ class PlanGraph:
                  events: Iterable[Mapping[str, Any]] = (), applied_ops: Mapping[str, Mapping[str, Any]] = None,
                  gates: Iterable[str] = (), human_requests: Iterable[str] = (),
                  attempts: Mapping[str, int] = None, complete: bool = False,
-                 access_mode: str = DEFAULT_ACCESS_MODE):
+                 access_mode: str = DEFAULT_ACCESS_MODE,
+                 intent: Intent | None = None):
         assert_catalog()
         self.access_mode = normalize_access_mode(access_mode)
         items = list(nodes)
@@ -128,6 +136,9 @@ class PlanGraph:
         self.human_requests = list(human_requests)
         self.attempts = dict(attempts or {})
         self.complete = complete
+        if intent is not None and not isinstance(intent, Intent):
+            raise GraphRejected("intent must be an Intent")
+        self.intent = intent
         self.validate()
 
     def validate(self) -> None:
@@ -167,6 +178,21 @@ class PlanGraph:
                 raise GraphRejected("invalid max_attempts")
             if self.attempts.get(node.node_id, 0) > attempts:
                 raise GraphRejected("attempt counter exceeds max_attempts")
+            if any(not isinstance(value, str) or not value for value in node.satisfies):
+                raise GraphRejected("satisfies must contain nonempty strings")
+            if len(set(node.satisfies)) != len(node.satisfies):
+                raise GraphRejected("duplicate satisfies id")
+            if any(kind not in GRANT_KINDS for kind in node.requires):
+                raise GraphRejected("unknown grant requirement")
+            if len(set(node.requires)) != len(node.requires):
+                raise GraphRejected("duplicate grant requirement")
+        if self.intent is not None:
+            done_ids = self.intent.done_ids
+            for node in self.nodes.values():
+                if not set(node.satisfies) <= done_ids:
+                    raise GraphRejected(f"node {node.node_id!r} satisfies unknown done id")
+        elif any(node.satisfies for node in self.nodes.values()):
+            raise GraphRejected("satisfies requires an intent contract")
         visiting, visited = set(), set()
 
         def visit(node_id: str) -> None:
@@ -220,12 +246,15 @@ class PlanGraph:
                 and all(self.nodes[dep].status == "completed" for dep in node.depends_on)]
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"schema_version": 2, "plan_revision": self.revision,
-                "nodes": [node.to_dict() for node in self.nodes.values()],
-                "events": copy.deepcopy(self.events), "applied_ops": copy.deepcopy(self.applied_ops),
-                "gates": list(self.gates), "human_requests": list(self.human_requests),
-                "attempts": dict(self.attempts), "complete": self.complete,
-                "access_mode": self.access_mode}
+        payload = {"schema_version": 2, "plan_revision": self.revision,
+                   "nodes": [node.to_dict() for node in self.nodes.values()],
+                   "events": copy.deepcopy(self.events), "applied_ops": copy.deepcopy(self.applied_ops),
+                   "gates": list(self.gates), "human_requests": list(self.human_requests),
+                   "attempts": dict(self.attempts), "complete": self.complete,
+                   "access_mode": self.access_mode}
+        if self.intent is not None:
+            payload["intent"] = self.intent.to_dict()
+        return payload
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "PlanGraph":
@@ -237,7 +266,9 @@ class PlanGraph:
                        applied_ops=data.get("applied_ops", {}), gates=data.get("gates", ()),
                        human_requests=data.get("human_requests", ()),
                        attempts=data.get("attempts", {}), complete=data.get("complete", False),
-                       access_mode=data.get("access_mode", DEFAULT_ACCESS_MODE))
+                       access_mode=data.get("access_mode", DEFAULT_ACCESS_MODE),
+                       intent=(Intent.from_dict(data["intent"])
+                               if data.get("intent") is not None else None))
         except (KeyError, TypeError, ValueError) as exc:
             raise GraphRejected("invalid graph payload") from exc
 
@@ -344,7 +375,8 @@ class PlanGraph:
                     f"unknown graph operation {kind!r}; expected one of {', '.join(GRAPH_OPERATIONS)}")
             PlanGraph(candidate.values(), revision=self.revision + 1,
                       gates=gates, human_requests=human_requests, attempts=attempts,
-                      complete=complete, access_mode=self.access_mode)
+                      complete=complete, access_mode=self.access_mode,
+                      intent=self.intent)
         except (GraphRejected, KeyError, TypeError, ValueError, AttributeError) as exc:
             reason = str(exc) if isinstance(exc, GraphRejected) else "invalid operation payload"
             self.events.append({"type": "plan.op.rejected", "op_id": op_id, "reason": reason})

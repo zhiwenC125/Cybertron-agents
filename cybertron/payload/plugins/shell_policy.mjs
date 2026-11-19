@@ -38,7 +38,12 @@ export default {
         "git branch --list*",
         "git ls-files*"
       ],
-      "ask": [],
+      "ask": [
+        "git add *",
+        "git commit *",
+        "git tag *",
+        "git push *"
+      ],
       "deny": [
         "*--output*",
         "* --ext-diff*",
