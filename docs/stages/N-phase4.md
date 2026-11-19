@@ -74,7 +74,7 @@ python3 -m unittest discover -s tests
 node --test tests/v6_plugin_runtime.test.mjs tests/v6_plugin_hook.test.mjs tests/dsh_adapter_bridge.test.mjs
 ```
 
-当前环境全绿：Python `317 tests OK (skipped=1)`，Node `15/15`。
+当前环境全绿：Python `319 tests OK (skipped=1)`，Node `15/15`。
 
 ## OpenCode 硬化（Phase 5）
 

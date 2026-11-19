@@ -141,7 +141,7 @@ node --test tests/v6_plugin_runtime.test.mjs tests/v6_plugin_hook.test.mjs tests
 python3 cybertron_primes_engine.py
 ```
 
-当前会话为 `danger-full-access`，隔离运行器可正常启动：`317 tests OK (skipped=1)`，Node `15/15` 通过。此前嵌套沙箱下的 `sandbox-exec` 失败已不再复现。
+当前会话为 `danger-full-access`，隔离运行器可正常启动：`319 tests OK (skipped=1)`，Node `15/15` 通过。此前嵌套沙箱下的 `sandbox-exec` 失败已不再复现。
 
 ## Phase 1.5a 追加
 

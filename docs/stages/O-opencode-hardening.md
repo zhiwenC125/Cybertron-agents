@@ -99,7 +99,7 @@ cybertron v6 lineage <run-id>
 ## 验证
 
 ```bash
-python3 -m unittest discover -s tests        # 317 tests OK (skipped=1)
+python3 -m unittest discover -s tests        # 319 tests OK (skipped=1)
 node --test ...                              # 15/15 pass
 python3 cybertron_primes_engine.py           # PASS
 python3 -m cybertron.stage5_verify           # PASS
