@@ -614,7 +614,8 @@ export default Plugin.define({
       await ctx.storage.set(`token/${run_id}`, result.token);
     });
     await ctx.tool.hook('execute.after', async event => {
-      if (event.status === 'error' || event.error)
+      if ((event.status === 'error' || event.error) &&
+          ['bash', 'shell', 'write', 'edit'].includes(event.tool))
         await ctx.storage.set(`tool_error/${event.sessionID}`, true);
       if (event.tool === 'question') {
         // The native OpenCode question card is the only user-facing ask UI.
