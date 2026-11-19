@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { nativeDispatch, childSession, nativeToolStatus, childPermissionRules, pathCovered, externalGate, grantCovers, runIsTerminal } from '../cybertron/v6_plugin/hook_logic.mjs';
+import { nativeDispatch, childSession, nativeToolStatus, childPermissionRules, pathCovered, externalGate, grantCovers, runIsTerminal, reviewerPathDenied } from '../cybertron/v6_plugin/hook_logic.mjs';
 
 test('native card binds node, capability, scope, role, and call', () => {
   assert.deepEqual(nativeDispatch({ input: { description: '[n1] doc.write | notes.md', agentID: 'alpha-trion' },
@@ -83,5 +83,10 @@ test('only a completed run frees the session for a new plan', () => {
   assert.equal(runIsTerminal({ status: 'ready' }), false);
   assert.equal(runIsTerminal({ status: 'running' }), false);
   assert.equal(runIsTerminal({ status: 'blocked' }), false);
+  assert.equal(runIsTerminal({ status: 'superseded' }), true);
   assert.equal(runIsTerminal(null), false);
+  assert.equal(reviewerPathDenied('.env'), true);
+  assert.equal(reviewerPathDenied('.ssh/id_rsa'), true);
+  assert.equal(reviewerPathDenied('.git/config'), true);
+  assert.equal(reviewerPathDenied('services/auth/a.py'), false);
 });

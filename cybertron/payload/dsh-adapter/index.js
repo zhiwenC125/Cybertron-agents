@@ -34,7 +34,7 @@ export function apply(ctx, config = {}) {
     description: 'Create or revise a validated Cybertron plan graph. Provide a JSON payload: '
       + 'one of {"node": {...}}, {"nodes": [...]}, {"template_id": ..., "objective": ...}, '
       + 'or {"operation": {...}} with "run_id". Optional fields: write_scope, test_scope, '
-      + 'skip (read-only capabilities), request_class, access_mode '
+      + 'skip (read-only capabilities), request_class, intent (goal, done criteria, constraints), satisfies (template node -> done ids), parent_run_id, supersedes_run_id, seed_from_run_id, change_reason, access_mode '
       + '(read-only | workspace-write | danger-full-access), slug (English folder name), '
       + 'session_title. Returns the run state as JSON.',
     parameters: {
@@ -59,6 +59,11 @@ export function apply(ctx, config = {}) {
           template_id: payload.template_id, objective: payload.objective,
           write_scope: payload.write_scope, test_scope: payload.test_scope,
           skip: payload.skip, request_class: payload.request_class,
+          intent: payload.intent, satisfies: payload.satisfies,
+          parent_run_id: payload.parent_run_id,
+          supersedes_run_id: payload.supersedes_run_id,
+          seed_from_run_id: payload.seed_from_run_id,
+          change_reason: payload.change_reason || "",
           access_mode: payload.access_mode, slug: payload.slug,
           session_title: payload.session_title,
           host_session_id: hostIdOf(exec),
@@ -91,6 +96,46 @@ export function apply(ctx, config = {}) {
     async execute(args, exec) {
       return jsonResult(await callBridge('ask', await projectOf(exec),
         { run_id: args.run_id, question: args.question }, exec.signal, config))
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'cy_escalate',
+    description: 'Request a capability grant for one node. DSH has no approval card in this bundle; the host must approve the request before dispatch.',
+    parameters: {
+      run_id: { type: 'string', required: true, description: 'Cybertron run id.' },
+      node_id: { type: 'string', required: true, description: 'Node that needs the grant, or * for a dangerous confirmation.' },
+      kind: { type: 'string', required: true, description: 'Grant kind, e.g. device, deploy, vcs.push, external.write, dangerous.confirm.' },
+      scope: { type: 'object', description: 'Grant scope.' },
+      constraints: { type: 'object', description: 'Grant constraints.' },
+      reason: { type: 'string' },
+      ttl_seconds: { type: 'number' },
+      mode: { type: 'string', description: 'once, run, or standing.' },
+    },
+    output: jsonOutput,
+    async execute(args, exec) {
+      return jsonResult(await callBridge('grant_request', await projectOf(exec), {
+        run_id: args.run_id, node_id: args.node_id, kind: args.kind,
+        scope: args.scope || {}, constraints: args.constraints || {},
+        reason: args.reason || '', ttl_seconds: args.ttl_seconds,
+        mode: args.mode || 'once',
+      }, exec.signal, config))
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'cy_check',
+    description: 'Run a fixed lint, build, test, or Renode simulation target in an isolated project copy. Pass the node_id you are currently working on; the kernel verifies it is ready or active.',
+    parameters: {
+      run_id: { type: 'string', required: true, description: 'Cybertron run id.' },
+      target: { type: 'string', required: true, enum: ['lint', 'build', 'test', 'sim'] },
+      node_id: { type: 'string', required: true, description: 'Node that this check belongs to.' },
+    },
+    output: jsonOutput,
+    async execute(args, exec) {
+      return jsonResult(await callBridge('check', await projectOf(exec),
+        { run_id: args.run_id, target: args.target, node_id: args.node_id },
+        exec.signal, config))
     },
   }))
 

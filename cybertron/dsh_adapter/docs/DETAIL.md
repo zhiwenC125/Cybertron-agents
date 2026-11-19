@@ -12,6 +12,8 @@ available to other presets or sessions.
 | `cy_plan` | Create a validated plan graph, seed one from a learned template, or apply one revisioned graph operation. |
 | `cy_state` | Read the run ledger projection: node status, ready nodes, gates, repair feedback. |
 | `cy_ask` | Record a human question on the run; refused during an active dispatch. |
+| `cy_escalate` | Request a capability grant for a node; DSH has no approval card in this bundle, so the host must approve it. |
+| `cy_check` | Run an isolated lint/build/test/sim target for one node; the kernel verifies the node is ready or active. |
 | `cy_templates` | List templates distilled from fully completed runs. |
 | `cy_metrics` | Read the project metrics panel or one run projection. |
 
@@ -35,9 +37,15 @@ stale revisions are rejected by the kernel, not by prompt text.
   child receipts) is not implemented by this bundle yet. Until it is, treat
   the DSH adapter as planning and ledger access, not as a fully governed
   second host. The OpenCode host remains the one with native dispatch binding.
+- Grant approval is not wired into this bundle: `cy_escalate` creates the
+  request, but DSH has no approval card here. The host must approve it through
+  the bridge or an external flow before dispatch.
 - The DSH preset is a single `prima` persona, so it keeps `cy_plan` for
   compatibility. The OpenCode 13-role composition splits plan authorship to
   `thirteenth` and dispatch to `prima`; DSH does not yet expose that split.
+- `cy_check` under DSH requires an explicit `node_id`; the kernel verifies the
+  node is ready or active, but without child-session binding this is a weaker
+  provenance than OpenCode's `call_id`-derived node binding.
 
 ## Install
 

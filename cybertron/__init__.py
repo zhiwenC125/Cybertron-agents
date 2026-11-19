@@ -1,5 +1,6 @@
 """Cybertron multi-agent configuration and orchestration primitives."""
 from .schema import Message, ToolCallRequest, function_to_json_schema
+from .intent import DoneCriterion, Intent, IntentRejected
 from .compaction import AlphaTrionHeadTailCompaction, CompactionStrategy
 from .policy import MegatronusCircuitBreaker, PermissionEffect, PermissionRule
 from .feishu import FeishuWikiGovernanceConfig, FeishuWikiKnowledgeClient

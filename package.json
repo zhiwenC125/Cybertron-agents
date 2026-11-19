@@ -1,6 +1,6 @@
 {
   "name": "cybertron-agents",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "description": "Install the 13 Cybertron Primes agents and the /cybertron command into OpenCode",
   "type": "module",
   "bin": {

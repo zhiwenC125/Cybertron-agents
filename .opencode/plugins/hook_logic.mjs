@@ -106,5 +106,24 @@ export function grantCovers({ resources, grants }) {
 
 /** A run that can no longer accept nodes; a new request may start a fresh run. */
 export function runIsTerminal(state) {
-  return Boolean(state) && state.status === 'completed'
+  return Boolean(state) && (state.status === 'completed' || state.status === 'superseded')
+}
+const REVIEWER_DENY = [
+  '.env', '.env.*', '*.pem', '*.key', '*.p12', '*.pfx', '*.keystore',
+  '*.jks', 'id_rsa*', 'id_ed25519*', '.ssh/**', '.aws/**',
+  '.config/gcloud/**', '.npmrc', '.pypirc', '.netrc', '.docker/config.json',
+  'kubeconfig*', 'secrets/**', '**/secrets/**', 'credentials*', '.git/**',
+];
+const globToRegExp = pattern => '^' + pattern
+  .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+  .replace(/\*\*/g, '.*')
+  .replace(/\*/g, '[^/]*')
+  .replace(/\?/g, '.') + '$';
+
+export function reviewerPathDenied(value) {
+  if (typeof value !== 'string' || !value) return false;
+  let normalized = value.replace(/\\/g, '/');
+  if (normalized.startsWith('./')) normalized = normalized.slice(2);
+  if (normalized.split('/').includes('.git')) return true;
+  return REVIEWER_DENY.some(pattern => new RegExp(globToRegExp(pattern)).test(normalized));
 }

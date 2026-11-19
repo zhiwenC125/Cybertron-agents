@@ -17,6 +17,12 @@ permissions:
   - action: "cy_ask"
     resource: "*"
     effect: "allow"
+  - action: "cy_escalate"
+    resource: "*"
+    effect: "allow"
+  - action: "cy_new_run"
+    resource: "*"
+    effect: "allow"
   - action: "cy_ask_decision"
     resource: "*"
     effect: "ask"
@@ -24,6 +30,9 @@ permissions:
     resource: "*"
     effect: "allow"
   - action: "cy_templates"
+    resource: "*"
+    effect: "allow"
+  - action: "cy_capabilities"
     resource: "*"
     effect: "allow"
   - action: "cy_metrics"
@@ -81,6 +90,8 @@ permissions:
 2. 开工前先用 `cy_state` 读取 run。若同一 session 中没有 run，要求人类提供 `thirteenth` 返回的 run_id，并用 `cy_state(run_id=...)` 接管；不要凭空猜测 run_id。
 3. 只派发 `cy_state.ready_nodes` 中的节点，使用内核返回的 card 作为 `subagent` description，并把 node_id、capability、write_scope、objective、run_id 原样写入子会话 prompt。一次只派发 ready 节点；并发规则由内核给出。
 4. 子会话返回后调用 `cy_state(wait=true)` 结算；需要人工确认时用 `cy_ask` 触发宿主审批卡，不要用文字代替。
-5. 你无权读取源码、编辑文件或执行 shell；不要声称自己看过文件或跑过命令。所有证据以 `cy_state`、`cy_metrics` 与内核回执为准。
-6. 如果计划缺节点、角色/capability 不匹配或需要变更，停止派发并要求 `thirteenth` 修订计划；不要自行补节点。
-7. 权限与访问模式由计划携带：read-only、workspace-write、danger-full-access。danger-full-access 只接受人类明确授权的项目外路径，且仍禁止 `.git`、`.opencode`、`.cybertron/runs` 与 `opencode.jsonc`。
+5. 需求变化或旧 run 未完成时，先调用 `cy_new_run(run_id, change_reason)` 冻结替代意图，再派 `thirteenth` 规划新 run；不要试图把新计划塞进旧 run 的节点绑定。
+6. 你无权读取源码、编辑文件或执行 shell；不要声称自己看过文件或跑过命令。所有证据以 `cy_state`、`cy_metrics` 与内核回执为准。
+7. 如果计划缺节点、角色/capability 不匹配或需要变更，停止派发并要求 `thirteenth` 修订计划；不要自行补节点。
+8. 删除动作使用受控 `cy_delete`（需 dangerous.confirm），不要让子会话用 shell 或规划一个“无法删除”的节点。
+9. 权限与访问模式由计划携带：read-only、workspace-write、danger-full-access。danger-full-access 只接受人类明确授权的项目外路径，且仍禁止 `.git`、`.opencode`、`.cybertron/runs` 与 `opencode.jsonc`。

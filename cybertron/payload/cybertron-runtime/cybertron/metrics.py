@@ -116,6 +116,13 @@ def run_metrics(run_dir: Path) -> dict[str, Any]:
     gate_checks = sum(event.get("type") == "gate.check" for event in events)
     gate_failures = sum(event.get("type") == "gate.check" and event.get("status") != "pass"
                         for event in events)
+    grants_requested = sum(event.get("type") == "grant.requested" for event in events)
+    grants_granted = sum(event.get("type") == "grant.granted" for event in events)
+    grants_denied = sum(event.get("type") == "grant.denied" for event in events)
+    grants_used = sum(event.get("type") == "grant.used" for event in events)
+    interceptor_allowed = sum(event.get("type") == "interceptor.allowed" for event in events)
+    confirm_required = sum(event.get("type") == "interceptor.confirm_required" for event in events)
+    confirm_granted = sum(event.get("type") == "interceptor.confirmed" for event in events)
     return {
         "run_id": run_dir.name,
         "request_class": created.get("request_class"),
@@ -126,6 +133,13 @@ def run_metrics(run_dir: Path) -> dict[str, Any]:
         "human_interventions": interventions,
         "gate_checks": gate_checks,
         "gate_failures": gate_failures,
+        "grants_requested": grants_requested,
+        "grants_granted": grants_granted,
+        "grants_denied": grants_denied,
+        "grants_used": grants_used,
+        "interceptor_allowed": interceptor_allowed,
+        "confirm_required": confirm_required,
+        "confirm_granted": confirm_granted,
         "first_pass": retries == 0 and gate_failures == 0 and status == "completed",
         "duration_s": round(_duration(events), 3),
         "started_utc": events[0].get("utc") if events else None,
@@ -160,6 +174,10 @@ def summarize(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     reusable = [run for run in runs if run.get("template_id")]
     gate_checks = sum(run["gate_checks"] for run in runs)
     gate_failures = sum(run["gate_failures"] for run in runs)
+    grants_requested = sum(run["grants_requested"] for run in runs)
+    grants_granted = sum(run["grants_granted"] for run in runs)
+    grants_used = sum(run["grants_used"] for run in runs)
+    confirm_required = sum(run["confirm_required"] for run in runs)
 
     def average(field: str) -> float:
         return round(sum(run[field] for run in runs) / len(runs), 3) if runs else 0.0
@@ -175,6 +193,10 @@ def summarize(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "gate_checks": gate_checks,
         "gate_failures": gate_failures,
         "gate_failure_ratio": round(gate_failures / gate_checks, 3) if gate_checks else 0.0,
+        "grants_requested": grants_requested,
+        "grants_granted": grants_granted,
+        "grants_used": grants_used,
+        "confirm_required": confirm_required,
         "template_runs": len(reusable),
     }
 
@@ -207,13 +229,14 @@ def render_panel(runs: Sequence[Mapping[str, Any]], summary: Mapping[str, Any],
                  templates: Mapping[str, Any] | None = None) -> str:
     lines = ["# Cybertron v6 metrics", ""]
     lines.append("| run | class | template | nodes | dispatches | retries | human | gates (fail/check) "
-                 "| duration | status |")
-    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+                 "| grants (used/req) | confirms | duration | status |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for run in runs:
         row = {**run, "request_class": run.get("request_class") or "-",
                "template_id": run.get("template_id") or "-"}
         lines.append("| {run_id} | {request_class} | {template_id} | {node_count} | {dispatch_count} "
                      "| {retry_count} | {human_interventions} | {gate_failures}/{gate_checks} "
+                     "| {grants_used}/{grants_requested} | {confirm_required} "
                      "| {duration_s}s | {status} |".format(**row))
     lines.extend([
         "", "## aggregate", "",
@@ -223,6 +246,8 @@ def render_panel(runs: Sequence[Mapping[str, Any]], summary: Mapping[str, Any],
         f"human interventions: {summary['avg_human_interventions']}",
         f"- gate failures: {summary['gate_failures']}/{summary['gate_checks']} "
         f"({summary['gate_failure_ratio']:.1%})",
+        f"- grants: {summary['grants_granted']}/{summary['grants_requested']} granted, "
+        f"{summary['grants_used']} used; full-access confirmations: {summary['confirm_required']}",
         f"- template-seeded runs: {summary['template_runs']}",
     ])
     if templates is not None:

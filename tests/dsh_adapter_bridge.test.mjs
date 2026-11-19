@@ -60,7 +60,7 @@ test('transport helpers are deterministic', () => {
 })
 
 
-test('registers the five cy tools without importing DSH internals', async () => {
+test('registers the seven cy tools without importing DSH internals', async () => {
   const { apply } = await import('../cybertron/dsh_adapter/index.js');
   const tools = new Map();
   const ctx = {
@@ -68,7 +68,7 @@ test('registers the five cy tools without importing DSH internals', async () => 
     workingDirectory: { ensure: async () => process.cwd() },
   };
   apply(ctx, { python: process.execPath });
-  assert.deepEqual([...tools.keys()], ['cy_plan', 'cy_state', 'cy_ask', 'cy_templates', 'cy_metrics']);
+  assert.deepEqual([...tools.keys()], ['cy_plan', 'cy_state', 'cy_ask', 'cy_escalate', 'cy_check', 'cy_templates', 'cy_metrics']);
   for (const tool of tools.values()) {
     assert.equal(typeof tool.execute, 'function');
     assert.equal(typeof tool.description, 'string');

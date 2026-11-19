@@ -18,7 +18,7 @@ import urllib.request
 from pathlib import Path
 
 REPO = "zhiwenC125/Cybertron-agents"
-DEFAULT_REF = "v0.7.3"
+DEFAULT_REF = "v0.8.0"
 KNOWN_AGENT_COUNT = 13
 MINIMAL_CONFIG = (
     '{\n'
@@ -43,7 +43,7 @@ def _version() -> str:
 
         return version("cybertron-agents")
     except Exception:
-        return "0.7.3"
+        return "0.8.0"
 
 
 def default_base(global_install: bool, project: str) -> Path:
@@ -449,14 +449,17 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser.add_argument("--ref", default="")
     doctor_parser.add_argument("--sha256", default="")
 
-    run_parser = sub.add_parser("run", help="离线任务账本：create/show/verify/resume")
+    run_parser = sub.add_parser("run", help="离线任务账本（v5 legacy）")
     run_parser.add_argument("run_args", nargs=argparse.REMAINDER)
 
-    session_parser = sub.add_parser("session", help="会话名称与多个 run 的管理")
+    session_parser = sub.add_parser("session", help="会话管理（v5 legacy）")
     session_parser.add_argument("session_args", nargs=argparse.REMAINDER)
 
-    workflow_parser = sub.add_parser("workflow", help="可恢复的宿主外层接力")
+    workflow_parser = sub.add_parser("workflow", help="可恢复的宿主外层接力（legacy）")
     workflow_parser.add_argument("workflow_args", nargs=argparse.REMAINDER)
+
+    v6_parser = sub.add_parser("v6", help="查看 v6 run、Intent 覆盖与 Grant", add_help=False)
+    v6_parser.add_argument("v6_args", nargs=argparse.REMAINDER)
 
     models_parser = sub.add_parser("models", help="配置和检查十三角色模型编队")
     models_parser.add_argument("models_args", nargs=argparse.REMAINDER)
@@ -472,6 +475,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+    if argv and argv[0] == "v6":
+        from .v6_cli import main as v6_main
+        return v6_main(argv[1:])
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command in {"init", "doctor"}:
@@ -483,6 +491,9 @@ def main(argv=None) -> int:
         return run_init(args)
     if args.command == "doctor":
         return run_doctor(args)
+    if args.command in {"run", "session", "workflow"}:
+        print("警告: run/session/workflow 是 v5 legacy；v6 请使用 cybertron v6 runs/show/grants/lineage。",
+              file=sys.stderr)
     if args.command == "run":
         from .run_cli import main as run_main
         return run_main(args.run_args)
@@ -492,6 +503,9 @@ def main(argv=None) -> int:
     if args.command == "workflow":
         from .workflow_cli import main as workflow_main
         return workflow_main(args.workflow_args)
+    if args.command == "v6":
+        from .v6_cli import main as v6_main
+        return v6_main(args.v6_args)
     if args.command == "models":
         from .model_cli import main as models_main
         return models_main(args.models_args)

@@ -29,6 +29,16 @@
           "effect": "allow"
         },
         {
+          "action": "cy_escalate",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "cy_new_run",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
           "action": "cy_ask_decision",
           "resource": "*",
           "effect": "ask"
@@ -40,6 +50,11 @@
         },
         {
           "action": "cy_templates",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "cy_capabilities",
           "resource": "*",
           "effect": "allow"
         },
@@ -339,6 +354,26 @@
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git add *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git commit *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git tag *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push *",
+          "effect": "ask"
         }
       ]
     },
@@ -592,6 +627,11 @@
           "action": "cy_check",
           "resource": "*",
           "effect": "allow"
+        },
+        {
+          "action": "cy_delete",
+          "resource": "*",
+          "effect": "allow"
         }
       ]
     },
@@ -780,6 +820,116 @@
           "action": "cy_check",
           "resource": "*",
           "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": ".env",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".env.*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.pem",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.key",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.p12",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.pfx",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.keystore",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.jks",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "id_rsa*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "id_ed25519*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".ssh/**",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".aws/**",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".config/gcloud/**",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".npmrc",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".pypirc",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".netrc",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".docker/config.json",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "kubeconfig*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "secrets/**",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "**/secrets/**",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "credentials*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".git/**",
+          "effect": "deny"
         }
       ]
     },
@@ -948,6 +1098,121 @@
         {
           "action": "subagent",
           "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": ".env",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".env.*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.pem",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.key",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.p12",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.pfx",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.keystore",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.jks",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "id_rsa*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "id_ed25519*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".ssh/**",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".aws/**",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".config/gcloud/**",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".npmrc",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".pypirc",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".netrc",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".docker/config.json",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "kubeconfig*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "secrets/**",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "**/secrets/**",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "credentials*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": ".git/**",
           "effect": "deny"
         }
       ]
@@ -1197,6 +1462,11 @@
           "action": "cy_check",
           "resource": "*",
           "effect": "allow"
+        },
+        {
+          "action": "cy_delete",
+          "resource": "*",
+          "effect": "allow"
         }
       ]
     },
@@ -1311,6 +1581,11 @@
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
+        },
+        {
+          "action": "cy_delete",
+          "resource": "*",
+          "effect": "allow"
         }
       ]
     },
@@ -1372,9 +1647,19 @@
           "effect": "allow"
         },
         {
+          "action": "cy_capabilities",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*",
+          "effect": "allow"
         }
       ]
     }

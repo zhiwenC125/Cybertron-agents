@@ -74,6 +74,18 @@ permissions:
   - action: "subagent"
     resource: "*"
     effect: "deny"
+  - action: "shell"
+    resource: "git add *"
+    effect: "ask"
+  - action: "shell"
+    resource: "git commit *"
+    effect: "ask"
+  - action: "shell"
+    resource: "git tag *"
+    effect: "ask"
+  - action: "shell"
+    resource: "git push *"
+    effect: "ask"
 ---
 
 # 维克多 (Vector Prime) — 神器：Blades of Time (时空之剑)
