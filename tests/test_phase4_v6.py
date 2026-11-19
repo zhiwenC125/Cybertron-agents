@@ -90,6 +90,18 @@ class ToolGateTests(unittest.TestCase):
             self.assertEqual(again["action"], "needs_grant")
 
 
+class WriteRoleTests(unittest.TestCase):
+    def test_write_scope_requires_a_role_with_write_permission(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bridge = V6HostBridge(Path(directory))
+            bad = PlanNode("n1", "task", "device.op", "megatronus",
+                           "create a temp file", write_scope=("tmp",),
+                           acceptance=("file",), verifiers=("scope_guard",))
+            with self.assertRaisesRegex(HostBridgeError, "no write/edit permission"):
+                bridge.plan(bad.to_dict(), "session", objective="write",
+                            access_mode="danger-full-access")
+
+
 class SeedFromTests(unittest.TestCase):
     def test_seed_copies_plan_shape_without_evidence(self):
         with tempfile.TemporaryDirectory() as directory:

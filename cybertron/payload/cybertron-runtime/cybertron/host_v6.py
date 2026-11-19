@@ -478,6 +478,22 @@ class V6HostBridge:
                 "instruction": ("call cy_escalate with kind=dangerous.confirm, "
                                 "node_id='*', scope.command_sha256, then cy_ask")}
 
+    @staticmethod
+    def _assert_write_roles(nodes: list[PlanNode]) -> None:
+        from .registry import THIRTEEN_PRIMES_REGISTRY
+        profiles = {prime.agent_id: prime for prime in THIRTEEN_PRIMES_REGISTRY}
+        for node in nodes:
+            if not node.write_scope:
+                continue
+            profile = profiles.get(node.role)
+            if profile is None:
+                raise HostBridgeError(f"unknown role {node.role!r}")
+            if not any(rule.action in {"write", "edit"}
+                       and rule.effect.value == "allow"
+                       for rule in profile.permissions):
+                raise HostBridgeError(
+                    f"role {node.role!r} has no write/edit permission for a write_scope node {node.node_id!r}")
+
     def plan(self, node_data: dict | list[dict] | None, host_session_id: str, *,
              request_class: str | None = None, template_id: str | None = None,
              objective: str = "", write_scope: list[str] | None = None,
@@ -565,6 +581,7 @@ class V6HostBridge:
                 graph_seed = PlanGraph(node_objects, access_mode=mode, intent=intent_obj)
             except (GraphRejected, TypeError) as exc:
                 raise HostBridgeError(str(exc)) from exc
+        self._assert_write_roles(node_objects)
         require_isolated_workspace(self.project, mode)
         if not node_objects or any(node.status != "pending" or node.kind not in {"task", "review"} or node.role == "prima" for node in node_objects):
             raise HostBridgeError("plan requires pending subagent task or review nodes")
