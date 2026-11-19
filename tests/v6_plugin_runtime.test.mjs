@@ -30,7 +30,8 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
   let approved = false;
   const ctx = {
     location: { project: { canonical: project } },
-    storage: { get: async key => storage.get(key), set: async (key, value) => storage.set(key, value) },
+    storage: { get: async key => storage.get(key), set: async (key, value) => storage.set(key, value),
+      remove: async key => storage.delete(key) },
     permission: { assert: async request => {
       approvals.push(request);
       if (!approved) throw new Error('human denied');
@@ -86,7 +87,7 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     input: { command: 'openocd -f board.cfg' } });
   await assert.rejects(shell({ tool: 'shell', agent: 'prima', sessionID: 'parent',
     input: { command: 'git status' } }), /no shell allow-list/);
-  assert.deepEqual([...tools.keys()], ['cy_plan', 'cy_plan_review', 'cy_state', 'cy_ask', 'cy_escalate',
+  assert.deepEqual([...tools.keys()], ['cy_plan', 'cy_plan_review', 'cy_state', 'cy_ask', 'cy_new_run', 'cy_escalate',
     'cy_templates', 'cy_capabilities', 'cy_metrics', 'cy_check', 'cy_review_reject']);
   assert.deepEqual(tools.get('cy_plan').input.properties.nodes.items.properties.kind.enum,
     ['task', 'review']);

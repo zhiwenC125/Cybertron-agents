@@ -365,7 +365,7 @@ class V6HostBridge:
         if grant is None:
             raise HostBridgeError("grant is not active")
         self._append(run_id, "grant.used", grant_id=grant_id, node_id=node_id,
-                     call_id=call_id, used_utc=_utc())
+                     grant_kind=grant["kind"], call_id=call_id, used_utc=_utc())
         return {**grant, "uses": grant["uses"] + 1}
 
     def check(self, run_id: str, target: str, call_id: str | None = None,
@@ -443,7 +443,8 @@ class V6HostBridge:
                 self.consume_grant(run_id, grant["grant_id"], node_id, None)
         return {"action": "allow", "kinds": kinds}
 
-    def intercept(self, run_id: str, tool: str, payload: dict | None = None) -> dict:
+    def intercept(self, run_id: str, tool: str, payload: dict | None = None,
+                  node_id: str | None = None) -> dict:
         """Apply the full-access execution interceptor before a tool runs."""
         state = self.state(run_id)
         if state["access_mode"] != "danger-full-access":
@@ -457,6 +458,10 @@ class V6HostBridge:
                     "command_sha256": verdict["command_sha256"]}
         scope = {"command_sha256": verdict["command_sha256"]}
         grant = self.check_grant(run_id, "*", "dangerous.confirm", scope)
+        if grant is None and node_id is not None:
+            # A node-level dangerous.confirm approval covers this node's
+            # dangerous action; the command hash is still recorded below.
+            grant = self.check_grant(run_id, node_id, "dangerous.confirm", {})
         if grant is not None:
             self.consume_grant(run_id, grant["grant_id"], "*", None)
             self._append(run_id, "interceptor.confirmed", tool=tool,
@@ -1238,7 +1243,7 @@ class V6HostBridge:
         return artifacts
 
     def finish(self, run_id: str, token: str, child_session_id: str | None,
-               *, call_id: str | None = None) -> dict:
+               *, call_id: str | None = None, child_error: bool = False) -> dict:
         state = self.state(run_id)
         if call_id is None:
             matches = [entry for entry in state["active_dispatches"]
@@ -1332,18 +1337,30 @@ class V6HostBridge:
             artifacts.update(external_artifacts)
         rejection = next((event for event in reversed(all_events)
                           if event["type"] == "review.rejected" and event.get("call_id") == call_id), None)
+        dangerous_used = any(
+            event["type"] == "grant.used" and event.get("node_id") == node.node_id
+            and event.get("grant_kind") == "dangerous.confirm"
+            for event in all_events)
+        removed_paths: list[str] = []
+        if (not artifacts and node.write_scope and dangerous_used):
+            declared = [resolve_scope(scope, self.project) for scope in node.write_scope]
+            if declared and all(not path.exists() for path in declared):
+                removed_paths = [str(path) for path in declared]
         if returned["tool_status"] == "cancelled":
             status = "cancelled"
+        elif child_error:
+            status = "failed"
         elif (unapproved_external or rejection or report.rejected_paths
               or returned["tool_status"] == "error"):
             status = "failed"
-        elif not artifacts and (node.write_scope or node.external_scope):
+        elif not artifacts and (node.write_scope or node.external_scope) and not removed_paths:
             status = "blocked"
         elif not node.write_scope and report.changed_paths:
             status = "failed"
         else:
             status = "completed"
         diagnostic = (rejection["diagnostic"] if rejection else
+                      "child tool error" if child_error else
                       "external write without host approval: " + ", ".join(unapproved_external) if unapproved_external else
                       "write_scope violation: " + ", ".join(report.rejected_paths) if report.rejected_paths else
                       "native subagent error" if returned["tool_status"] == "error" else
@@ -1352,9 +1369,10 @@ class V6HostBridge:
                                         "paths": report.rejected_paths}, sort_keys=True).encode())
         self._append(run_id, "node." + status, node_id=node.node_id, call_id=call_id,
                      artifacts=artifacts, rejected_paths=list(report.rejected_paths),
+                     removed_paths=removed_paths,
                      diagnostic=diagnostic, failure_fingerprint=fingerprint if status in {"failed", "blocked"} else None,
                      evidence={"source": "host", "command": "native.subagent",
-                               "exit": 0 if returned["tool_status"] == "completed" else 1,
+                               "exit": 0 if returned["tool_status"] == "completed" and not child_error else 1,
                                "utc": _utc(), "sha256": returned["output_sha256"],
                                "session_id": child_session_id})
         if status == "completed" and artifacts and graph.access_mode != "danger-full-access":

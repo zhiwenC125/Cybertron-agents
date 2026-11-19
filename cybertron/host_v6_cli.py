@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
             result = bridge.grants(data["run_id"])
         elif args.operation == "intercept":
             result = bridge.intercept(data["run_id"], data["tool"],
-                                      data.get("input"))
+                                      data.get("input"), data.get("node_id"))
         elif args.operation == "gate_tool":
             result = bridge.gate_tool(data["run_id"], data["node_id"],
                                       data["tool"], data.get("input"))
@@ -154,7 +154,8 @@ def main(argv: list[str] | None = None) -> int:
                                           data["diagnostic"])
         else:
             result = bridge.finish(data["run_id"], data["token"], data["child_session_id"],
-                                   call_id=data.get("call_id"))
+                                   call_id=data.get("call_id"),
+                                   child_error=bool(data.get("child_error")))
     except (HostBridgeError, CheckRejected, KeyError, ValueError) as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False))
         return 2

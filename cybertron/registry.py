@@ -64,9 +64,10 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "2. 开工前先用 `cy_state` 读取 run。若同一 session 中没有 run，要求人类提供 `thirteenth` 返回的 run_id，并用 `cy_state(run_id=...)` 接管；不要凭空猜测 run_id。\n"
             "3. 只派发 `cy_state.ready_nodes` 中的节点，使用内核返回的 card 作为 `subagent` description，并把 node_id、capability、write_scope、objective、run_id 原样写入子会话 prompt。一次只派发 ready 节点；并发规则由内核给出。\n"
             "4. 子会话返回后调用 `cy_state(wait=true)` 结算；需要人工确认时用 `cy_ask` 触发宿主审批卡，不要用文字代替。\n"
-            "5. 你无权读取源码、编辑文件或执行 shell；不要声称自己看过文件或跑过命令。所有证据以 `cy_state`、`cy_metrics` 与内核回执为准。\n"
-            "6. 如果计划缺节点、角色/capability 不匹配或需要变更，停止派发并要求 `thirteenth` 修订计划；不要自行补节点。\n"
-            "7. 权限与访问模式由计划携带：read-only、workspace-write、danger-full-access。danger-full-access 只接受人类明确授权的项目外路径，且仍禁止 `.git`、`.opencode`、`.cybertron/runs` 与 `opencode.jsonc`。"
+            "5. 需求变化或旧 run 未完成时，先调用 `cy_new_run(run_id, change_reason)` 冻结替代意图，再派 `thirteenth` 规划新 run；不要试图把新计划塞进旧 run 的节点绑定。\n"
+            "6. 你无权读取源码、编辑文件或执行 shell；不要声称自己看过文件或跑过命令。所有证据以 `cy_state`、`cy_metrics` 与内核回执为准。\n"
+            "7. 如果计划缺节点、角色/capability 不匹配或需要变更，停止派发并要求 `thirteenth` 修订计划；不要自行补节点。\n"
+            "8. 权限与访问模式由计划携带：read-only、workspace-write、danger-full-access。danger-full-access 只接受人类明确授权的项目外路径，且仍禁止 `.git`、`.opencode`、`.cybertron/runs` 与 `opencode.jsonc`。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
@@ -733,7 +734,7 @@ PRIME_ROLES: Mapping[str, PrimeRole] = MappingProxyType({
                          if r.action == "read" and r.effect is PermissionEffect.ALLOW),
         write_roots=_ROLE_WRITE_ROOTS.get(spec.agent_id, ()),
         tool_mode="allow-list",
-        tool_classes=("task", "cy_state", "cy_plan_review", "cy_ask", "cy_escalate",
+        tool_classes=("task", "cy_state", "cy_plan_review", "cy_ask", "cy_escalate", "cy_new_run",
                       "question", "cy_templates", "cy_capabilities", "cy_metrics")
                      if spec.agent_id == "prima" else
                      tuple(sorted({rule.action for rule in spec.permissions if rule.effect is PermissionEffect.ALLOW and rule.action != "*"})),
@@ -758,7 +759,7 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
     if set(roles) != set(_ROLE_CAPABILITIES) or len(specs) != len(roles):
         raise ValueError("role catalogue must contain exactly thirteen unique agents")
     known_actions = {"*", "read", "glob", "grep", "edit", "shell", "subagent",
-                     "cy_state", "cy_plan", "cy_plan_review", "cy_ask", "cy_escalate", "cy_capabilities",
+                     "cy_state", "cy_plan", "cy_plan_review", "cy_ask", "cy_escalate", "cy_new_run", "cy_capabilities",
                      "cy_ask_decision", "question", "cy_templates", "cy_metrics",
                      "cy_check", "cy_review_reject", "feishu_mcp_healthcheck*",
                      "feishu_wiki_delete*", "feishu_wiki_docx_v1_document_rawContent",

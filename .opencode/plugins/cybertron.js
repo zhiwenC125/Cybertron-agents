@@ -195,6 +195,8 @@ export default Plugin.define({
           let run_id = await ctx.storage.get(`run/${context.sessionID}`);
           const session = await ctx.session.get({ sessionID: context.sessionID });
           let previous_run_id = null;
+          const pendingSupersede = !run_id && session?.parentID
+            ? await ctx.storage.get(`supersede/${session.parentID}`) : null;
           if (run_id) {
             const current = await bridge('state', project, { run_id }, context.signal);
             if (input.new_run &&
@@ -255,12 +257,16 @@ export default Plugin.define({
                   test_scope: input.test_scope, skip: input.skip,
                   request_class: input.request_class,
                   intent: input.intent, satisfies: input.satisfies,
-                  parent_run_id: previous_run_id,
+                  parent_run_id: pendingSupersede?.run_id || previous_run_id,
+                  supersedes_run_id: pendingSupersede?.run_id,
+                  change_reason: pendingSupersede?.change_reason || '',
                   seed_from_run_id: input.seed_from_run_id,
                   access_mode, session_title: session?.title || input.objective || '',
                   slug: input.slug || '', host_session_id: context.sessionID,
                   host: 'opencode' }, context.signal);
           if (supersede || !run_id) {
+            if (pendingSupersede && session?.parentID)
+              await ctx.storage.remove(`supersede/${session.parentID}`);
             await ctx.storage.set(`run/${context.sessionID}`, result.run_id);
             await ctx.storage.set(`access/${context.sessionID}`, result.access_mode || access_mode);
             // A planning child gives the parent its run id, so prima can adopt
@@ -321,9 +327,12 @@ export default Plugin.define({
               await ctx.session.wait({ sessionID: active.child_session_id });
               const dispatch = await ctx.storage.get(`dispatch/${active.call_id}`);
               if (!dispatch) throw new Error('Missing bound native dispatch receipt');
+              const child_error = Boolean(await ctx.storage.get(
+                `tool_error/${active.child_session_id}`));
               state = await bridge('finish', project,
                 { run_id, token: dispatch.token, call_id: active.call_id,
-                  child_session_id: active.child_session_id }, context.signal);
+                  child_session_id: active.child_session_id, child_error }, context.signal);
+              await ctx.storage.remove(`tool_error/${active.child_session_id}`);
             }
           }
           return { content: JSON.stringify(state) };
@@ -363,7 +372,28 @@ export default Plugin.define({
         },
       });
       editor.add({
-        name: 'cy_escalate', description: 'Request a capability grant for one node. Does not approve it: after this returns, call cy_ask so the human opens the host approval card. Kinds: read.expand, network.read, write.expand, exec.expand, pkg.install, vcs.write, vcs.push, external.write, deploy, device.',
+        name: 'cy_new_run', description: 'Freeze planning on the current run and prepare a replacement run. Call this before dispatching thirteenth when the user changes requirements while the current run is not terminal; then dispatch thirteenth, which must pass supersedes_run_id via cy_plan.',
+        input: { type: 'object', properties: {
+          run_id: { type: 'string' },
+          change_reason: { type: 'string' },
+        }, required: ['change_reason'], additionalProperties: false },
+        execute: async (input, context) => {
+          if (context.agent !== 'prima') throw new Error('Only prima may start a replacement run');
+          const run_id = input.run_id || await ctx.storage.get(`run/${context.sessionID}`);
+          if (!run_id) throw new Error('No v6 run in this session');
+          if (typeof input.change_reason !== 'string' || !input.change_reason.trim())
+            throw new Error('change_reason is required');
+          const state = await bridge('state', project, { run_id }, context.signal);
+          if (state.status === 'running' || (state.active_dispatches || []).length)
+            throw new Error('Cannot replace a run during an active dispatch');
+          await ctx.storage.set(`supersede/${context.sessionID}`,
+            { run_id, change_reason: input.change_reason.trim() });
+          return { content: JSON.stringify({ old_run_id: run_id,
+            status: 'ready_for_replacement_plan' }) };
+        },
+      });
+      editor.add({
+        name: 'cy_escalate', description: 'Request a capability grant for one node. Does not approve it: after this returns, call cy_ask so the human opens the host approval card. Kinds: read.expand, network.read, write.expand, exec.expand, pkg.install, vcs.write, vcs.push, external.write, deploy, device, dangerous.confirm. A gate named dangerous.confirm requires kind dangerous.confirm.',
         input: { type: 'object', properties: {
           run_id: { type: 'string' },
           node_id: { type: 'string' },
@@ -468,9 +498,10 @@ export default Plugin.define({
     });
     await ctx.tool.hook('execute.before', async event => {
       const boundRun = await ctx.storage.get(`run/${event.sessionID}`);
-      const boundAccess = await ctx.storage.get(`access/${event.sessionID}`);
+      const childBinding = boundRun ? await ctx.storage.get(`child/${event.sessionID}`) : null;
+      const boundAccess = await ctx.storage.get(`access/${event.sessionID}`)
+        || childBinding?.access_mode;
       if (boundRun && ['bash', 'shell', 'write', 'edit'].includes(event.tool)) {
-        const childBinding = await ctx.storage.get(`child/${event.sessionID}`);
         const dispatch = childBinding?.call_id
           ? await ctx.storage.get(`dispatch/${childBinding.call_id}`) : null;
         if (dispatch?.node_id) {
@@ -486,6 +517,7 @@ export default Plugin.define({
           ['bash', 'shell', 'write', 'edit'].includes(event.tool)) {
         const verdict = await bridge('intercept', project, {
           run_id: boundRun, tool: event.tool, input: event.input,
+          node_id: childBinding?.node_id,
         }, event.signal);
         if (verdict.action === 'confirm') {
           await ctx.storage.set(`danger/${event.sessionID}`, {
@@ -517,13 +549,19 @@ export default Plugin.define({
           ? event.input : (event.input?.command ?? event.input?.cmd);
         if (typeof command !== 'string' || !command.trim())
           throw new Error('Cybertron: shell command must be a non-empty string');
-        if (/[\n\r;|&<>`]|\$\(/.test(command))
+        if (/[\n\r;|&<>`]|\$\(/.test(command)) {
+          await ctx.storage.set(`tool_error/${event.sessionID}`, true);
           throw new Error('Cybertron: shell chaining, redirection, or substitution is denied');
+        }
         const verdict = shellVerdict(policy, command);
-        if (verdict === 'deny')
+        if (verdict === 'deny') {
+          await ctx.storage.set(`tool_error/${event.sessionID}`, true);
           throw new Error(`Cybertron: shell command denied by policy: ${command}`);
-        if (verdict === 'unlisted')
+        }
+        if (verdict === 'unlisted') {
+          await ctx.storage.set(`tool_error/${event.sessionID}`, true);
           throw new Error(`Cybertron: shell command is not allow-listed for ${role}: ${command}`);
+        }
         return;
       }
       if (event.tool !== 'subagent') return;
@@ -540,6 +578,8 @@ export default Plugin.define({
         }
       }
       const target = event.input?.agentID || event.input?.agent || event.input?.agentId;
+      if (run_id && target === 'thirteenth' &&
+          await ctx.storage.get(`supersede/${event.sessionID}`)) return;
       if (!run_id) {
         // Pre-plan phase: prima may dispatch thirteenth to clarify intent and
         // author the plan before any Cybertron node exists.
@@ -574,6 +614,8 @@ export default Plugin.define({
       await ctx.storage.set(`token/${run_id}`, result.token);
     });
     await ctx.tool.hook('execute.after', async event => {
+      if (event.status === 'error' || event.error)
+        await ctx.storage.set(`tool_error/${event.sessionID}`, true);
       if (event.tool === 'question') {
         // The native OpenCode question card is the only user-facing ask UI.
         // Persist its question and the structured answer in the run ledger so
@@ -624,6 +666,8 @@ export default Plugin.define({
           access_mode: started.access_mode || 'workspace-write',
           parent_session_id: started.parent_session_id,
         });
+        await ctx.storage.set(`access/${child_session_id}`,
+          started.access_mode || 'workspace-write');
       }
     });
     if (ctx.permission && typeof ctx.permission.hook === 'function') {
