@@ -1358,9 +1358,11 @@ class V6HostBridge:
             event["type"] == "grant.used" and event.get("node_id") == node.node_id
             and event.get("grant_kind") == "dangerous.confirm"
             for event in all_events)
+        declared = [resolve_scope(scope, self.project) for scope in node.write_scope]
+        destructive = "dangerous.confirm" in node.requires
+        destructive_exists = destructive and any(path.exists() for path in declared)
         removed_paths: list[str] = []
         if (not artifacts and node.write_scope and dangerous_used):
-            declared = [resolve_scope(scope, self.project) for scope in node.write_scope]
             if declared and all(not path.exists() for path in declared):
                 removed_paths = [str(path) for path in declared]
         if returned["tool_status"] == "cancelled":
@@ -1370,6 +1372,8 @@ class V6HostBridge:
         elif (unapproved_external or rejection or report.rejected_paths
               or returned["tool_status"] == "error"):
             status = "failed"
+        elif destructive_exists:
+            status = "blocked"
         elif not artifacts and (node.write_scope or node.external_scope) and not removed_paths:
             status = "blocked"
         elif not node.write_scope and report.changed_paths:
@@ -1381,6 +1385,7 @@ class V6HostBridge:
                       "external write without host approval: " + ", ".join(unapproved_external) if unapproved_external else
                       "write_scope violation: " + ", ".join(report.rejected_paths) if report.rejected_paths else
                       "native subagent error" if returned["tool_status"] == "error" else
+                      "dangerous target still exists" if destructive_exists else
                       "no accepted artifact" if status == "blocked" else None)
         fingerprint = _hash(json.dumps({"status": status, "diagnostic": diagnostic,
                                         "paths": report.rejected_paths}, sort_keys=True).encode())
