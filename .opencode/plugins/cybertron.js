@@ -149,7 +149,7 @@ export default Plugin.define({
     });
     await ctx.tool.transform(editor => {
       editor.add({
-        name: 'cy_plan', description: 'Create a validated v6 task graph. For a read-only inspection use template {type:"read_only_scan",objective:"..."} (write_scope=[]). For fixes use bug_fix or explicit nodes. Pass an intent contract (goal + done criteria) and mark which nodes satisfy each done id. Pass access_mode read-only/workspace-write/danger-full-access. Under workspace-write, list intended outside paths in the node external_scope; each write then needs a host approval (once/always/reject). Use danger-full-access only for explicit blanket authorization of Desktop/Downloads/outside paths. Pass an English slug for the on-disk run folder. Returns ready native subagent cards.',
+        name: 'cy_plan', description: 'Create a validated v6 task graph. For a read-only inspection use template {type:"read_only_scan",objective:"..."} (write_scope=[]). For fixes use bug_fix or explicit nodes. Pass an intent contract (goal + done criteria) and mark which nodes satisfy each done id. Pass access_mode read-only/workspace-write/danger-full-access. Under workspace-write, list intended outside paths in the node external_scope; each write then needs a host approval (once/always/reject). Use danger-full-access only for explicit blanket authorization of Desktop/Downloads/outside paths. A controlled `cy_delete` tool exists for deletion; plan delete nodes with requires=["dangerous.confirm"] and do not use shell rm or a separate blocked-delete node. Pass an English slug for the on-disk run folder. Returns ready native subagent cards.',
         input: { type: 'object', properties: {
           node: nodeInput, nodes: { type: 'array', items: nodeInput, minItems: 1 },
           template: { type: 'object', properties: {
@@ -787,7 +787,6 @@ export default Plugin.define({
           delete event.tools.cy_metrics;
           delete event.tools.cy_check;
           delete event.tools.cy_review_reject;
-          delete event.tools.cy_delete;
           delete event.tools.subagent;
           event.system.push({ type: 'text', text:
             'Cybertron planner: you are thirteenth, the only role that authors the plan. Clarify the human intent with `question`, check `cy_capabilities` if the role/capability mapping is unclear, check `cy_templates` before planning, then turn the clarified intent into a contract (goal, done criteria with ids and evidence, non_goals, forbidden capabilities/paths) and create or revise the kernel-validated graph with `cy_plan`. Every done criterion must be covered by at least one node `satisfies` list. Do not create the run until the human has confirmed the contract; set confirmed=true only after that confirmation. The kernel writes and validates plan.json; do not read or edit it directly. Do not dispatch `subagent`, run shell, or edit files: dispatch, approval, and settlement belong to prima. After `cy_plan` returns, give the human and prima the run_id, ready node cards, access_mode, gates, and any risk that needs human confirmation.' });
@@ -813,10 +812,9 @@ export default Plugin.define({
           delete event.tools.cy_metrics;
           delete event.tools.cy_check;
           delete event.tools.cy_review_reject;
-          delete event.tools.cy_delete;
           delete event.tools.subagent;
           event.system.push({ type: 'text', text:
-            'Cybertron planning child: you are thirteenth, dispatched by prima to clarify the human intent and author the plan. Ask the human with the native `question` tool, check `cy_capabilities` when unsure about role/capability, check `cy_templates`, then create the kernel-validated graph with `cy_plan`, including the intent contract and each node `satisfies` coverage. Do not create the run before the human confirms the contract; set confirmed=true only then. The kernel writes plan.json; do not edit it. Do not dispatch subagent, run shell, edit files, review plans, or settle nodes. When the plan is ready, return the plan summary, ready cards, access_mode, and gates; prima will review and dispatch.' });
+            'Cybertron planning child: you are thirteenth, dispatched by prima to clarify the human intent and author the plan. Ask the human with the native `question` tool, check `cy_capabilities` when unsure about role/capability, check `cy_templates`, then create the kernel-validated graph with `cy_plan`, including the intent contract and each node `satisfies` coverage. Do not create the run before the human confirms the contract; set confirmed=true only then. The kernel writes plan.json; do not edit it. Do not dispatch subagent, run shell, edit files, review plans, or settle nodes. For deletion, plan `cy_delete` on a role that has it; do not plan a node whose only purpose is to report that deletion is impossible. When the plan is ready, return the plan summary, ready cards, access_mode, and gates; prima will review and dispatch.' });
           return;
         }
         if (parentRun) {

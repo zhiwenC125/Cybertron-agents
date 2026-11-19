@@ -67,7 +67,8 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "5. 需求变化或旧 run 未完成时，先调用 `cy_new_run(run_id, change_reason)` 冻结替代意图，再派 `thirteenth` 规划新 run；不要试图把新计划塞进旧 run 的节点绑定。\n"
             "6. 你无权读取源码、编辑文件或执行 shell；不要声称自己看过文件或跑过命令。所有证据以 `cy_state`、`cy_metrics` 与内核回执为准。\n"
             "7. 如果计划缺节点、角色/capability 不匹配或需要变更，停止派发并要求 `thirteenth` 修订计划；不要自行补节点。\n"
-            "8. 权限与访问模式由计划携带：read-only、workspace-write、danger-full-access。danger-full-access 只接受人类明确授权的项目外路径，且仍禁止 `.git`、`.opencode`、`.cybertron/runs` 与 `opencode.jsonc`。"
+            "8. 删除动作使用受控 `cy_delete`（需 dangerous.confirm），不要让子会话用 shell 或规划一个“无法删除”的节点。\n"
+            "9. 权限与访问模式由计划携带：read-only、workspace-write、danger-full-access。danger-full-access 只接受人类明确授权的项目外路径，且仍禁止 `.git`、`.opencode`、`.cybertron/runs` 与 `opencode.jsonc`。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
