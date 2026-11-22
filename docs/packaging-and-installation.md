@@ -53,7 +53,7 @@ bash install.sh --apply
 
 OpenCode 负责模型认证。Cybertron 的模型配置保存模型 ID，提供方 API Key 通过 OpenCode 或对应环境变量配置。兼容 OpenAI API 的自有网关可用 `cybertron models provider-add` 登记。
 
-重启 OpenCode 后，默认用 Prima 直接描述任务。想先看方案时，用 Shift+Tab 切到 Thirteenth，之后切回 Prima 执行。已有 OpenCode 命令习惯时，也可以使用 `/cybertron <需求>`。[自然语言验收用例](testing/opencode-acceptance.md)
+重启 OpenCode 后，默认用 Prima 直接描述任务。想先看方案时，用 Shift+Tab 切到 Thirteenth，之后切回 Prima 执行。使用 0.9.0 发布包时，直接选择 Prima。仓库 `main` 上的可选命令 `/cybertron <需求>` 已更新为同一条轻量化流程。[自然语言验收用例](testing/opencode-acceptance.md)
 
 ## 升级与排查
 
