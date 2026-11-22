@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,14 +7,6 @@ const payload = path.join(root, 'payload');
 const pluginSource = path.join(root, 'cybertron', 'v6_plugin', 'cybertron.js');
 const hookSource = path.join(root, 'cybertron', 'v6_plugin', 'hook_logic.mjs');
 const shellPolicySource = path.join(root, 'cybertron', 'v6_plugin', 'shell_policy.mjs');
-const checkoutPlugin = path.join(root, '.opencode', 'plugins', 'cybertron.js');
-
-mkdirSync(path.dirname(checkoutPlugin), { recursive: true });
-cpSync(pluginSource, checkoutPlugin);
-cpSync(hookSource, path.join(root, '.opencode', 'plugins', 'hook_logic.mjs'));
-cpSync(shellPolicySource, path.join(root, '.opencode', 'plugins', 'shell_policy.mjs'));
-
-rmSync(payload, { recursive: true, force: true });
 for (const kind of ['agents', 'commands']) {
   const src = path.join(root, '.opencode', kind);
   const dest = path.join(payload, kind);

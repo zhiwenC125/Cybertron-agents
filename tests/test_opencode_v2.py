@@ -13,10 +13,10 @@ class OpenCodeV2BundleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             generated = Path(directory)
             compile_opencode_v2_assets(generated)
-            expected = [Path("opencode.jsonc"), Path(".opencode/plugins/shell_policy.mjs"),
+            expected = [Path("opencode.jsonc"),
                     *sorted(path.relative_to(repository)
                         for path in (repository / ".opencode/agents").glob("*.md"))]
-            self.assertEqual(len(expected), 15)
+            self.assertEqual(len(expected), 14)
             for relative in expected:
                 with self.subTest(file=str(relative)):
                     self.assertEqual((repository / relative).read_bytes(),

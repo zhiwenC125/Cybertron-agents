@@ -119,7 +119,7 @@ class GraphM1Tests(unittest.TestCase):
             ("code", "task", "code.write", "solus-prime", ("design",), ("firmware/dma.c",)),
             ("test", "task", "test.write", "alchemist", ("design",), ("tests/dma_test.py",)),
             ("review", "review", "review.l2", "liege-maximo", ("code", "test"), ()),
-            ("device", "device_op", "device.op", "megatronus", ("review",), ()),
+            ("device", "device_op", "device.op", "nexus-prime", ("review",), ()),
             ("doc", "task", "doc.write", "alpha-trion", ("device",), ("docs/dma.md",)),
         ]
         hardware = PlanGraph(PlanNode(identifier, kind, capability, role,

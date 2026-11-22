@@ -111,7 +111,7 @@ def run_metrics(run_dir: Path) -> dict[str, Any]:
     created = _first(events, "plan.created") or {}
     dispatches = sum(event.get("type") == "dispatch.started" for event in events)
     retries = sum(event.get("type") == "node.retry" for event in events)
-    interventions = sum(event.get("type") in {"human.requested", "approval.granted"}
+    interventions = sum(event.get("type") in {"human.requested", "approval.granted", "external.write.requested"}
                         for event in events)
     gate_checks = sum(event.get("type") == "gate.check" for event in events)
     gate_failures = sum(event.get("type") == "gate.check" and event.get("status") != "pass"

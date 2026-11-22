@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from cybertron.host_v6 import HostBridgeError, V6HostBridge
 
@@ -32,6 +33,21 @@ class V6M2HostGateTests(unittest.TestCase):
                 bridge.plan_op(run_id, {"op_id": "lower", "op": "mark_not_applicable",
                                         "plan_revision": 0, "gate": "test"})
 
+    def test_check_keeps_explicit_completed_node_binding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bridge, run_id, _ = self._code_run(Path(directory))
+            receipt = {"source": "sandbox", "command": "test", "exit": 0,
+                       "utc": "2026-11-20T00:00:00+00:00", "sha256": "tool-output"}
+            with patch("cybertron.host_v6.run_check", return_value={
+                    "profile": "python", "target": "test", "status": "pass",
+                    "receipts": [receipt]}):
+                result = bridge.check(run_id, "test", node_id="code")
+            self.assertEqual(result["status"], "pass")
+            checks = [event for event in bridge.events(run_id)
+                      if event["type"] == "gate.check"]
+            self.assertEqual(checks[-1]["node_id"], "code")
+            self.assertIn("test", result["state"]["passed_gates"])
+
     @unittest.skipIf(os.environ.get("CYBERTRON_SANDBOX") == "1",
                      "nested sandbox-exec is unsupported; run host checks outside stage5 sandbox")
     def test_real_lint_receipt_binds_to_workspace_and_goes_stale_on_change(self):
@@ -45,6 +61,9 @@ class V6M2HostGateTests(unittest.TestCase):
             self.assertEqual(check["status"], "pass", check["receipts"][-1]["output"])
             self.assertIn("lint", check["state"]["passed_gates"])
             self.assertIn("test", check["state"]["pending_gates"])
+            (root / "build").mkdir()
+            (root / "build" / "unrelated.bin").write_bytes(b"generated output")
+            self.assertIn("lint", bridge.state(run_id)["passed_gates"])
             (root / "src" / "main.c").write_text('int main(void){return 1;}\n')
             self.assertNotIn("lint", bridge.state(run_id)["passed_gates"])
 

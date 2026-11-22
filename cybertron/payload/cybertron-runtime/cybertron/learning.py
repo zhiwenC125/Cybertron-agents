@@ -27,7 +27,8 @@ _TOP_KEYS = frozenset({"schema_version", "template_id", "request_class", "signat
                        "created_utc", "source_run_id", "source_plan_sha256",
                        "nodes", "learned", "metrics"})
 _NODE_KEYS = frozenset({"node_id", "kind", "capability", "role", "objective_template",
-                        "depends_on", "read_scope", "write_scope", "scope_slot", "acceptance", "verifiers"})
+                        "depends_on", "read_scope", "write_scope", "scope_slot", "acceptance",
+                        "verifiers", "check_target"})
 _LEARNED_KEYS = frozenset({"dispatch_count", "human_interventions", "retry_fingerprints",
                            "human_questions", "gate_failures"})
 _METRIC_KEYS = frozenset({"node_count", "dispatch_count", "human_interventions", "duration_s"})
@@ -157,6 +158,10 @@ def validate_template(data: Mapping[str, Any]) -> dict[str, Any]:
         objective = node["objective_template"]
         if not isinstance(objective, str) or not objective.strip():
             raise TemplateRejected("invalid objective_template")
+        if "check_target" in raw:
+            if raw["check_target"] not in ("lint", "build", "test", "sim"):
+                raise TemplateRejected("invalid check_target")
+            node["check_target"] = raw["check_target"]
         nodes.append(node)
     learned = data.get("learned", {})
     if not isinstance(learned, Mapping) or set(learned) - _LEARNED_KEYS:
@@ -231,7 +236,7 @@ def _validate_graph_shape(template: Mapping[str, Any]) -> None:
                             write_scope=(tuple(node["write_scope"])
                                          if node["scope_slot"] == "literal" else ()),
                             acceptance=tuple(node["acceptance"]),
-                            verifiers=tuple(node["verifiers"]))
+                            verifiers=tuple(node["verifiers"]), check_target=node.get("check_target"))
                   for node in nodes])
     except GraphRejected as exc:
         raise TemplateRejected(str(exc)) from exc
@@ -277,9 +282,10 @@ def distill_template(graph: PlanGraph, events: Sequence[Mapping[str, Any]], *,
             "depends_on": list(node.depends_on), "read_scope": list(node.read_scope),
             "write_scope": list(node.write_scope), "scope_slot": scope_slot,
             "acceptance": list(node.acceptance), "verifiers": list(node.verifiers),
+            **({"check_target": node.check_target} if node.check_target else {}),
         })
     dispatches = sum(event.get("type") == "dispatch.started" for event in events)
-    interventions = sum(event.get("type") in {"human.requested", "approval.granted"}
+    interventions = sum(event.get("type") in {"human.requested", "approval.granted", "external.write.requested"}
                         for event in events)
     questions = [event.get("question") for event in events
                  if event.get("type") == "human.requested" and isinstance(event.get("question"), str)]
@@ -391,7 +397,7 @@ def instantiate(template: Mapping[str, Any], *, objective: str,
     if set(skipped) - known:
         raise TemplateRejected("skip names an absent capability")
     if any(raw["kind"] != "task" or raw["write_scope"] or raw["scope_slot"] != "literal"
-           for raw in dropped):
+           or raw.get("check_target") for raw in dropped):
         raise TemplateRejected("only read-only task nodes can be skipped")
     remaining = [raw for raw in template["nodes"] if raw not in dropped]
     if not remaining:
@@ -425,7 +431,7 @@ def instantiate(template: Mapping[str, Any], *, objective: str,
             role=raw["role"], objective=raw["objective_template"].replace("{objective}", objective.strip()),
             depends_on=tuple(sorted(deps)), read_scope=tuple(raw["read_scope"]),
             write_scope=write_scope, acceptance=tuple(raw["acceptance"]),
-            verifiers=tuple(raw["verifiers"])))
+            verifiers=tuple(raw["verifiers"]), check_target=raw.get("check_target")))
     try:
         return PlanGraph(nodes)
     except GraphRejected as exc:

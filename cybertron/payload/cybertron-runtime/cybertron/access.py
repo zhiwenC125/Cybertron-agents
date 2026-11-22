@@ -17,6 +17,7 @@ from pathlib import Path
 
 ACCESS_MODES = ("read-only", "workspace-write", "danger-full-access")
 DEFAULT_ACCESS_MODE = "workspace-write"
+HOST_STATE_DIRECTORIES = ("runs", "templates")
 
 _HARD_PARTS = {".git", ".cybertron/runs", ".opencode", "opencode.jsonc"}
 _SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$")
@@ -39,7 +40,9 @@ def hard_denied(scope: str) -> bool:
     parts = [part for part in scope.replace("\\", "/").split("/") if part]
     if any(part in {".git", ".opencode", "opencode.jsonc"} for part in parts):
         return True
-    return any(parts[index] == ".cybertron" and parts[index + 1] == "runs"
+    if parts[-2:] == ["cybertron", "registry.py"]:
+        return True
+    return any(parts[index] == ".cybertron" and parts[index + 1] in HOST_STATE_DIRECTORIES
                for index in range(len(parts) - 1))
 
 

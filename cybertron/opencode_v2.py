@@ -25,8 +25,8 @@ def validate_bundle(root: Path) -> list[str]:
     registry = {prime.agent_id: prime for prime in THIRTEEN_PRIMES_REGISTRY}
     if set(agents) != expected:
         errors.append(f"Agent IDs differ from registry: {sorted(set(agents) ^ expected)}")
-    if "default_agent" in config:
-        errors.append("Cybertron must not override OpenCode's default agent")
+    if config.get("default_agent") != "prima":
+        errors.append("Cybertron project bundles must default to prima")
     for agent_id in expected:
         entry = agents.get(agent_id)
         if not isinstance(entry, dict):

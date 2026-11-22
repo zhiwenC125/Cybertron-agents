@@ -48,7 +48,7 @@ class DeviceNodeKernel:
     def _plan(self, plan: FlashPlan) -> PlanGraph:
         node = PlanNode(
             node_id=self.node_id, kind="device_op", capability="device.op",
-            role="megatronus",
+            role="nexus-prime",
             objective=("Flash the approved STM32 image, verify the SRAM heartbeat, "
                        "and restore the verified rollback image."),
             acceptance=(

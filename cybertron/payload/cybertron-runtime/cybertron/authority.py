@@ -14,7 +14,7 @@ from .grants import GRANT_KINDS
 
 ROLE_AUTHORITY: dict[str, dict[str, Any]] = {
     "prima": {
-        "atoms": ("task", "cy_state", "cy_plan_review", "cy_ask", "cy_escalate",
+        "atoms": ("task", "cy_state", "cy_ask", "cy_escalate",
                   "question", "cy_templates", "cy_metrics"),
         "escalatable": (),
         "never": ("read", "write", "edit", "bash", "cy_plan"),
@@ -37,27 +37,24 @@ ROLE_AUTHORITY: dict[str, dict[str, Any]] = {
         "never": ("write", "edit", "bash", "device", "deploy"),
     },
     "vector-prime": {
-        "atoms": ("read", "glob", "grep", "write", "edit", "bash:read",
-                  "bash:git-read"),
-        "escalatable": ("read.expand", "network.read", "vcs.write", "vcs.push"),
-        "never": ("device", "deploy"),
+        "atoms": ("bash:git-read",),
+        "escalatable": ("vcs.write", "vcs.push"),
+        "never": ("write", "edit", "device", "deploy"),
     },
     "quintus-prime": {
-        "atoms": ("read", "glob", "grep", "write", "edit"),
+        "atoms": ("read", "glob", "grep", "write", "edit", "cy_check"),
         "escalatable": ("exec.expand", "pkg.install"),
         "never": ("bash:git-write", "bash:git-push", "device", "deploy"),
     },
     "solus-prime": {
-        "atoms": ("read", "glob", "grep", "bash:lint", "bash:git-read",
-                  "cy_check"),
+        "atoms": ("read", "edit", "bash:lint"),
         "escalatable": ("exec.expand", "pkg.install"),
         "never": ("bash:git-write", "bash:git-push", "device", "deploy"),
     },
     "amalgamous": {
-        "atoms": ("read", "glob", "grep", "bash:lint", "bash:git-read",
-                  "cy_check"),
-        "escalatable": ("exec.expand", "pkg.install"),
-        "never": ("bash:git-write", "bash:git-push", "device", "deploy"),
+        "atoms": ("read",),
+        "escalatable": (),
+        "never": ("write", "edit", "bash", "task", "device", "deploy"),
     },
     "micronus-prime": {
         "atoms": ("read", "glob", "grep", "bash:lint", "bash:git-read",
@@ -78,15 +75,14 @@ ROLE_AUTHORITY: dict[str, dict[str, Any]] = {
     },
     "nexus-prime": {
         "atoms": ("read", "glob", "grep", "write", "edit", "bash:build",
-                  "bash:pkg", "bash:git-read", "cy_check", "deploy"),
-        "escalatable": ("exec.expand", "pkg.install", "deploy"),
-        "never": ("bash:git-write", "bash:git-push", "device"),
+                  "bash:pkg", "cy_check", "device", "deploy"),
+        "escalatable": ("exec.expand", "pkg.install", "device", "deploy"),
+        "never": ("bash:git-write", "bash:git-push"),
     },
     "megatronus": {
-        "atoms": ("read", "glob", "grep", "write", "edit", "bash:read",
-                  "bash:git-read", "device", "deploy"),
-        "escalatable": ("device", "deploy"),
-        "never": ("bash:git-write", "bash:git-push"),
+        "atoms": ("read", "cy_verify"),
+        "escalatable": (),
+        "never": ("write", "edit", "bash", "device", "deploy"),
     },
 }
 

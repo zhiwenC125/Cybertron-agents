@@ -18,7 +18,7 @@ import urllib.request
 from pathlib import Path
 
 REPO = "zhiwenC125/Cybertron-agents"
-DEFAULT_REF = "v0.8.0"
+DEFAULT_REF = "v0.9.0"
 KNOWN_AGENT_COUNT = 13
 MINIMAL_CONFIG = (
     '{\n'
@@ -43,7 +43,7 @@ def _version() -> str:
 
         return version("cybertron-agents")
     except Exception:
-        return "0.8.0"
+        return "0.9.0"
 
 
 def default_base(global_install: bool, project: str) -> Path:

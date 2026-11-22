@@ -17,34 +17,30 @@ class V6PlanReviewTests(unittest.TestCase):
                      "write_scope": ["notes.md"], "acceptance": ["notes.md exists"],
                      "verifiers": ["scope_guard"]}
 
-    def test_review_is_required_and_handoff_names_prima(self):
-        plan = self.bridge.plan(self.node, "thirteenth")
-        state = self.bridge.state(plan["run_id"])
-        self.assertFalse(state["review_current"])
-        self.assertTrue(state["review_required"])
+    def test_submission_validates_and_handoff_names_prima(self):
+        state = self.bridge.plan(self.node, "thirteenth", planned_verification=True)
+        self.assertTrue(state["review_current"])
+        self.assertFalse(state["review_required"])
+        self.assertEqual(state["review"]["reviewer"], "kernel")
         self.assertEqual(state["handoff"]["next_agent"], "prima")
         self.assertEqual(state["handoff"]["ready_nodes"], ["n1"])
-        self.assertEqual(state["handoff"]["ready_cards"], [plan["card"]])
-        review = self.bridge.review_plan(plan["run_id"])
-        self.assertTrue(review["approved"])
-        state = self.bridge.state(plan["run_id"])
-        self.assertTrue(state["review_current"])
-        self.assertEqual(state["review"]["reviewer"], "prima")
-        self.assertEqual(state["handoff"]["review_current"], True)
+        self.assertEqual(state["handoff"]["ready_cards"], [state["card"]])
 
-    def test_plan_revision_invalidates_the_previous_review(self):
-        plan = self.bridge.plan(self.node, "thirteenth")
-        review = self.bridge.review_plan(plan["run_id"])
-        self.assertTrue(review["approved"])
-        self.assertTrue(self.bridge.state(plan["run_id"])["review_current"])
-        self.bridge.plan_op(plan["run_id"], {
-            "op": "insert_gate", "op_id": "gate-1", "plan_revision": 0,
-            "gate": "extra_review",
+    def test_plan_revision_validates_its_own_digest(self):
+        plan = self.bridge.plan(self.node, "thirteenth", planned_verification=True)
+        with self.assertRaisesRegex(RuntimeError, "required verification"):
+            self.bridge.plan_op(plan["run_id"], {
+                "op": "insert_gate", "op_id": "gate-1", "plan_revision": 0,
+                "gate": "extra_review",
+            })
+        state = self.bridge.plan_op(plan["run_id"], {
+            "op": "revise", "op_id": "revise-1", "plan_revision": 0,
+            "reason": "clarify the method", "nodes": [dict(self.node, objective="Write the requested note")],
         })
-        state = self.bridge.state(plan["run_id"])
         self.assertEqual(state["plan_revision"], 1)
-        self.assertFalse(state["review_current"])
-        self.assertIsNone(state["review"])
+        self.assertTrue(state["review_current"])
+        self.assertEqual(state["review"]["reviewer"], "kernel")
+        self.assertNotEqual(state["plan_sha256"], plan["plan_sha256"])
 
     def test_plan_json_is_a_projection_not_runtime_truth(self):
         plan = self.bridge.plan(self.node, "thirteenth")

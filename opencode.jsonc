@@ -1,8 +1,9 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "default_agent": "prima",
   "agents": {
     "prima": {
-      "description": "[先觉天] 塞伯坦运行时派发官：唯一拥有 subagent 派发权，读取 thirteenth 已确认的计划图并逐节点调度其余天尊；不再自行规划。",
+      "description": "[先觉天] 默认运行编排入口，接续同一 run，按内核就绪节点派发并结算。",
       "mode": "primary",
       "model": "deepseek/deepseek-v4-pro",
       "steps": 28,
@@ -15,11 +16,6 @@
         },
         {
           "action": "cy_state",
-          "resource": "*",
-          "effect": "allow"
-        },
-        {
-          "action": "cy_plan_review",
           "resource": "*",
           "effect": "allow"
         },
@@ -39,7 +35,22 @@
           "effect": "allow"
         },
         {
+          "action": "cy_runs",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "cy_resume",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
           "action": "cy_ask_decision",
+          "resource": "*",
+          "effect": "ask"
+        },
+        {
+          "action": "cy_full_access_decision",
           "resource": "*",
           "effect": "ask"
         },
@@ -126,7 +137,7 @@
       ]
     },
     "alpha-trion": {
-      "description": "[钛师傅] 专职技术文档撰写官与飞书知识库总管：负责项目全部文档编写及飞书Wiki双向同步，并执行长上下文原子压缩。",
+      "description": "[钛师傅] 负责工程文档、知识整理与扩展，以及授权空间内的飞书 Wiki 同步。",
       "mode": "subagent",
       "model": "deepseek/deepseek-flash",
       "steps": 15,
@@ -234,7 +245,7 @@
       ]
     },
     "vector-prime": {
-      "description": "[维克多] Git版本演进与固件基线考古官：使用固定形式的只读 Git 命令，专注回归溯源。",
+      "description": "[维克多] Git 专职角色，汇报提交、差异和版本基线，执行获准的 Git 操作。",
       "mode": "subagent",
       "model": "deepseek/deepseek-flash",
       "steps": 10,
@@ -378,7 +389,7 @@
       ]
     },
     "quintus-prime": {
-      "description": "[昆图斯] 软硬件系统架构师与脚手架孵化器：负责创建工程目录、依赖配置以及软件接口与硬件HAL头文件空骨架。",
+      "description": "[昆图斯] Debug 专家，使用实际故障反馈定位根因，为接口、HAL 和脚手架提供设计支持。",
       "mode": "subagent",
       "model": "deepseek/deepseek-flash",
       "steps": 12,
@@ -466,11 +477,6 @@
         },
         {
           "action": "edit",
-          "resource": "package.json",
-          "effect": "allow"
-        },
-        {
-          "action": "edit",
           "resource": "Cargo.toml",
           "effect": "allow"
         },
@@ -491,22 +497,12 @@
         },
         {
           "action": "edit",
-          "resource": "src/**/__init__.py",
-          "effect": "allow"
-        },
-        {
-          "action": "edit",
           "resource": "include/**/hal_*.h",
           "effect": "allow"
         },
         {
           "action": "edit",
           "resource": "firmware/**/hal_*.h",
-          "effect": "allow"
-        },
-        {
-          "action": "shell",
-          "resource": "mkdir -p *",
           "effect": "allow"
         },
         {
@@ -518,129 +514,20 @@
           "action": "edit",
           "resource": ".cybertron/plans/**",
           "effect": "allow"
-        }
-      ]
-    },
-    "solus-prime": {
-      "description": "[赛天骄] 核心软件与嵌入式固件锻造师：唯一负责编写新增业务逻辑、MCU/边缘设备外设驱动与修复功能Bug的主力编码天尊。",
-      "mode": "subagent",
-      "model": "deepseek/deepseek-v4-pro",
-      "steps": 18,
-      "color": "#ea580c",
-      "permissions": [
-        {
-          "action": "*",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "read",
-          "resource": "*",
-          "effect": "allow"
-        },
-        {
-          "action": "edit",
-          "resource": "src/**",
-          "effect": "allow"
-        },
-        {
-          "action": "edit",
-          "resource": "app/**",
-          "effect": "allow"
-        },
-        {
-          "action": "edit",
-          "resource": "firmware/**",
-          "effect": "allow"
-        },
-        {
-          "action": "edit",
-          "resource": "drivers/**",
-          "effect": "allow"
-        },
-        {
-          "action": "edit",
-          "resource": "bsp/**",
-          "effect": "allow"
-        },
-        {
-          "action": "edit",
-          "resource": "src/**/interfaces.py",
-          "effect": "deny"
-        },
-        {
-          "action": "edit",
-          "resource": "include/**/hal_*.h",
-          "effect": "deny"
-        },
-        {
-          "action": "edit",
-          "resource": "firmware/**/hal_*.h",
-          "effect": "deny"
-        },
-        {
-          "action": "edit",
-          "resource": "tests/**",
-          "effect": "deny"
-        },
-        {
-          "action": "shell",
-          "resource": "ruff format *",
-          "effect": "allow"
-        },
-        {
-          "action": "shell",
-          "resource": "ruff check *",
-          "effect": "allow"
-        },
-        {
-          "action": "shell",
-          "resource": "clang-format *",
-          "effect": "allow"
-        },
-        {
-          "action": "shell",
-          "resource": "cargo fmt *",
-          "effect": "allow"
-        },
-        {
-          "action": "shell",
-          "resource": "cmake --build *",
-          "effect": "allow"
-        },
-        {
-          "action": "shell",
-          "resource": "make *",
-          "effect": "allow"
-        },
-        {
-          "action": "shell",
-          "resource": "*--output*",
-          "effect": "deny"
-        },
-        {
-          "action": "subagent",
-          "resource": "*",
-          "effect": "deny"
         },
         {
           "action": "cy_check",
           "resource": "*",
           "effect": "allow"
-        },
-        {
-          "action": "cy_delete",
-          "resource": "*",
-          "effect": "allow"
         }
       ]
     },
-    "amalgamous": {
-      "description": "[幻化天] 代码重构与跨硬件平台移植专家：在不改变外部功能语义的前提下执行代码解耦、嵌入式内存优化与跨芯片架构移植。",
+    "solus-prime": {
+      "description": "[赛天骄] 唯一常规业务代码修改角色，负责实现、修复、重构、优化及移植。",
       "mode": "subagent",
       "model": "deepseek/deepseek-v4-pro",
-      "steps": 15,
-      "color": "#0891b2",
+      "steps": 18,
+      "color": "#ea580c",
       "permissions": [
         {
           "action": "*",
@@ -664,6 +551,11 @@
         },
         {
           "action": "edit",
+          "resource": "app/**",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
           "resource": "firmware/**",
           "effect": "allow"
         },
@@ -671,6 +563,26 @@
           "action": "edit",
           "resource": "drivers/**",
           "effect": "allow"
+        },
+        {
+          "action": "edit",
+          "resource": "bsp/**",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
+          "resource": "src/**/interfaces.py",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "include/**/hal_*.h",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "firmware/**/hal_*.h",
+          "effect": "deny"
         },
         {
           "action": "edit",
@@ -718,19 +630,33 @@
           "effect": "deny"
         },
         {
-          "action": "edit",
-          "resource": "app/**",
-          "effect": "allow"
-        },
-        {
-          "action": "edit",
-          "resource": "bsp/**",
-          "effect": "allow"
-        },
-        {
-          "action": "cy_check",
+          "action": "cy_delete",
           "resource": "*",
           "effect": "allow"
+        }
+      ]
+    },
+    "amalgamous": {
+      "description": "[幻化天] 按需设计临时专才任务，并约束在已注册能力和原有权限之内。",
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-pro",
+      "steps": 15,
+      "color": "#0891b2",
+      "permissions": [
+        {
+          "action": "*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
         }
       ]
     },
@@ -1317,7 +1243,7 @@
       ]
     },
     "nexus-prime": {
-      "description": "[合体天] 软硬件交叉编译、容器打包与硬件部署准备官：负责CMake/设备树/Docker配置、运行交叉编译生成固件并探测目标硬件端口。",
+      "description": "[合体天] 负责构建、打包、部署执行和结果处理，实体和远程动作使用专项授权。",
       "mode": "subagent",
       "model": "deepseek/deepseek-flash",
       "steps": 14,
@@ -1431,22 +1357,32 @@
         {
           "action": "shell",
           "resource": "pio run -t upload*",
-          "effect": "deny"
+          "effect": "ask"
         },
         {
           "action": "shell",
           "resource": "openocd *",
-          "effect": "deny"
+          "effect": "ask"
         },
         {
           "action": "shell",
           "resource": "esptool*",
-          "effect": "deny"
+          "effect": "ask"
         },
         {
           "action": "shell",
           "resource": "st-flash*",
-          "effect": "deny"
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "ssh *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "scp *",
+          "effect": "ask"
         },
         {
           "action": "feishu_mcp_healthcheck*",
@@ -1471,7 +1407,7 @@
       ]
     },
     "megatronus": {
-      "description": "[震天尊] 物理硬件烧录安全闸门与高危熔断执法官：全系统唯一可执行真机烧录(openocd/esptool)、边缘设备重启与固件回滚的天尊，强制触发人工审批。",
+      "description": "[震天尊] 独立核验成果与真实证据，逐项报告验收条件的满足情况。",
       "mode": "subagent",
       "model": "deepseek/deepseek-v4-pro",
       "steps": 10,
@@ -1488,109 +1424,19 @@
           "effect": "allow"
         },
         {
-          "action": "shell",
-          "resource": "git status --short",
-          "effect": "allow"
-        },
-        {
-          "action": "shell",
-          "resource": "lsusb*",
-          "effect": "allow"
-        },
-        {
-          "action": "shell",
-          "resource": "ls /dev/tty*",
-          "effect": "allow"
-        },
-        {
-          "action": "shell",
-          "resource": "cat /dev/tty*",
-          "effect": "allow"
-        },
-        {
-          "action": "shell",
-          "resource": "pio device monitor*",
-          "effect": "allow"
-        },
-        {
-          "action": "shell",
-          "resource": "openocd --version",
-          "effect": "allow"
-        },
-        {
-          "action": "shell",
-          "resource": "screen *",
-          "effect": "ask"
-        },
-        {
-          "action": "shell",
-          "resource": "python3 -m serial.tools.miniterm *",
-          "effect": "ask"
-        },
-        {
-          "action": "shell",
-          "resource": "cp *",
-          "effect": "ask"
-        },
-        {
-          "action": "shell",
-          "resource": "mv *",
-          "effect": "ask"
-        },
-        {
-          "action": "shell",
-          "resource": "git checkout *",
-          "effect": "ask"
-        },
-        {
-          "action": "shell",
-          "resource": "ssh *",
-          "effect": "ask"
-        },
-        {
-          "action": "shell",
-          "resource": "scp *",
-          "effect": "ask"
-        },
-        {
-          "action": "shell",
-          "resource": "openocd *",
-          "effect": "ask"
-        },
-        {
-          "action": "shell",
-          "resource": "esptool*",
-          "effect": "ask"
-        },
-        {
-          "action": "shell",
-          "resource": "pio run -t upload*",
-          "effect": "ask"
-        },
-        {
-          "action": "shell",
-          "resource": "st-flash*",
-          "effect": "ask"
-        },
-        {
-          "action": "feishu_wiki_delete*",
+          "action": "cy_verify",
           "resource": "*",
-          "effect": "ask"
+          "effect": "allow"
         },
         {
           "action": "subagent",
           "resource": "*",
           "effect": "deny"
-        },
-        {
-          "action": "cy_delete",
-          "resource": "*",
-          "effect": "allow"
         }
       ]
     },
     "thirteenth": {
-      "description": "[第十三天尊] 人类意图与计划图所有者：通过 question 澄清需求，用 cy_plan 创建/修订内核校验的计划；把 run_id 与 ready 节点交给 prima 派发。",
+      "description": "[第十三天尊] 负责意图与架构规划，通过 cy_plan 提交或修订计划，交先觉天执行。",
       "mode": "all",
       "model": "deepseek/deepseek-flash",
       "steps": 12,
@@ -1635,6 +1481,11 @@
           "action": "cy_plan",
           "resource": "*",
           "effect": "allow"
+        },
+        {
+          "action": "cy_full_access_decision",
+          "resource": "*",
+          "effect": "ask"
         },
         {
           "action": "cy_state",

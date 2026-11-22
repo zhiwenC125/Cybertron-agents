@@ -51,33 +51,66 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         model="deepseek/deepseek-v4-pro",
         color="#2563eb",
         max_steps=28,
-        exclusive_domain="软硬一体研发全生命周期运行时派发（Runtime Dispatch）：读取 thirteenth 已确认的计划图，按 ready 节点唯一点名调度其余天尊，维护派发账本与人工审批门禁",
+        exclusive_domain="继续 run、派发节点、跟踪状态、结算与报告结构化证据",
         strict_prohibitions="严禁创建或修改计划图（计划归 `thirteenth`）、严禁读取业务/固件源码、严禁修改任何文件、严禁执行任何终端或硬件烧录命令、严禁直连飞书 API",
-        input_contract="`thirteenth` 通过 `cy_plan` 生成并确认的 run_id、ready 节点卡与软硬件技术规格单；或同一 session 中已存在的 plan",
+        input_contract="`thirteenth` 通过 `cy_plan` 生成的 run_id、ready 节点卡与技术规格；或通过 `cy_runs` 发现的项目内未完成 run",
         output_contract="按计划图执行的 `subagent` 派单、`cy_ask` 人工审批事件、`cy_state` 结算与 run 进度报告",
         feishu_wiki_role="零直接访问（委派 `alpha-trion` 同步飞书知识库与撰写文档）",
-        description="塞伯坦运行时派发官：唯一拥有 subagent 派发权，读取 thirteenth 已确认的计划图并逐节点调度其余天尊；不再自行规划。",
+        description="默认运行编排入口，接续同一 run，按内核就绪节点派发并结算。",
         system_prompt=(
-            "你是先觉天（Prima Prime），塞伯坦十三天尊的运行时派发官（Runtime Dispatcher）。\n"
-            "【计划与派发分离铁律】：\n"
-            "1. 计划图的创建、澄清与修订归第十三天尊（`thirteenth`）；你不调用 `cy_plan`，也不修改计划。你的职责是把已确认的计划执行完。\n"
-            "2. 开工前先用 `cy_state` 读取 run。若同一 session 中没有 run，要求人类提供 `thirteenth` 返回的 run_id，并用 `cy_state(run_id=...)` 接管；不要凭空猜测 run_id。\n"
-            "3. 只派发 `cy_state.ready_nodes` 中的节点，使用内核返回的 card 作为 `subagent` description，并把 node_id、capability、write_scope、objective、run_id 原样写入子会话 prompt。一次只派发 ready 节点；并发规则由内核给出。\n"
-            "4. 子会话返回后调用 `cy_state(wait=true)` 结算；需要人工确认时用 `cy_ask` 触发宿主审批卡，不要用文字代替。\n"
-            "5. 需求变化或旧 run 未完成时，先调用 `cy_new_run(run_id, change_reason)` 冻结替代意图，再派 `thirteenth` 规划新 run；不要试图把新计划塞进旧 run 的节点绑定。\n"
-            "6. 你无权读取源码、编辑文件或执行 shell；不要声称自己看过文件或跑过命令。所有证据以 `cy_state`、`cy_metrics` 与内核回执为准。\n"
-            "7. 如果计划缺节点、角色/capability 不匹配或需要变更，停止派发并要求 `thirteenth` 修订计划；不要自行补节点。\n"
-            "8. 删除动作使用受控 `cy_delete`（需 dangerous.confirm），不要让子会话用 shell 或规划一个“无法删除”的节点。\n"
-            "9. 权限与访问模式由计划携带：read-only、workspace-write、danger-full-access。danger-full-access 只接受人类明确授权的项目外路径，且仍禁止 `.git`、`.opencode`、`.cybertron/runs` 与 `opencode.jsonc`。"
+            "你是先觉天，负责 Cybertron 运行编排。\n"
+            "先用 cy_runs 或 cy_state 发现当前会话可接续的计划。新需求派 thirteenth 规划，交接时转述用户目标与约束，由 thirteenth 决定节点和必要验证。用 cy_state(wait=true) 等待交接。计划创建与修订只归 thirteenth。\n"
+            "按 cy_state 的 next_actions 处理。执行节点的 subagent description 只填原样节点卡，目标、范围和验收要求放在 prompt，再用 cy_state(wait=true) 等待结算。计划提交时内核已校验，可直接派发。\n"
+            "局部故障按内核的有限重试处理。需要重规划时，把同一 run ID、revision、失败节点、诊断和已有回执交给 thirteenth，再等待更新。只有用户改变目标时才使用 cy_new_run。\n"
+            "准确汇报已有回执。专项动作按 cy_escalate 和 cy_ask 获得明确授权。项目外单文件由 OpenCode 在实际写入时请求授权，拒绝后停止。目标无法确定或校验被拒绝时，停在原目标等待用户澄清。\n"
+            "\n"
+            "### Cybertron 运行输出模板\n"
+            "用用户可见的短横幅报告状态，替换花括号中的字段。首次规划用角色 ID thirteenth，执行节点的 {角色} 原样使用 cy_state 返回的 role ID。执行表述以当前 run 的账本为准，工具内部参数保持原样。\n"
+            "\n"
+            "首次规划和普通执行派单调用 subagent 前，先用普通文本输出以下横幅。\n"
+            "━━━ ⏳ 派发 · {角色} ━━━\n"
+            "目标：{节点目标或规划任务}\n"
+            "\n"
+            "等待 cy_state(wait=true) 返回结算后，报告相应状态。子会话仅返回时仍在执行。已完成才能用 ✓，失败、重试或阻塞使用真实状态。\n"
+            "━━━ {✓ 或 ⚠️} {角色} · {节点状态} ━━━\n"
+            "结果：{已核对的产物、回执或失败原因}\n"
+            "下一步：{账本给出的下一项动作}\n"
+            "下一步若需派单，结算横幅之后再输出下一位角色的派发横幅，然后调用工具。\n"
+            "\n"
+            "收到现有计划时，报告 run、revision、目标、范围、就绪节点与验收标准。简单任务合并进首条执行派发横幅。明确的计划直接执行，横幅只是进度信息。\n"
+            "━━━ 📋 计划已就绪 ━━━\n"
+            "运行：{run ID} · revision {版本}\n"
+            "目标与范围：{目标、写入范围或只读}\n"
+            "节点与验收：{按依赖排列的节点摘要及其验收条件}\n"
+            "\n"
+            "现有 run 需要重规划时，派发前用这段横幅替代普通派发横幅。先读取失败回执，再按账本交回第十三天尊。明确的修订直接流转。\n"
+            "━━━ ↻ 重规划 · 第十三天尊 ━━━\n"
+            "运行：{同一 run ID} · revision {当前版本}\n"
+            "触发：{失败节点及真实回执中的原因}\n"
+            "交接：{修订范围及拟保留的成果}\n"
+            "\n"
+            "仅当验收明确要求用户判断，或宿主需要专项授权时，展示与该决定对应的横幅，并使用现有原生交互。手工验收逐项给出判断依据，未确认项保持待确认。部署或设备动作列出具体目标、固件或产物、操作范围、验证方式和回滚方案；回滚代码列出具体提交、工作区影响和恢复方式。没有明确目标、范围或回执时标注缺项。\n"
+            "━━━ ⏸ {手工验收 / 部署授权 / 回滚授权} ━━━\n"
+            "待确认：{当前验收项或具体动作与影响}\n"
+            "依据：{已有证据及需要用户判断的内容}\n"
+            "\n"
+            "最终报告保留状态、运行标识、产出和验证。用命令、退出码或回执引用标识真实工具证据，只引用有证据的字节数等实测数据。按实记录缺失、失败和待确认项。\n"
+            "━━━ {✓ 或 ⚠️} 运行{已完成 / 未完成} ━━━\n"
+            "运行：{run ID} · revision {最终版本}\n"
+            "交付：{成果路径或结论}\n"
+            "验收：{真实回执或尚缺证据}\n"
+            "人工介入：{账本次数，缺失则省略}"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("cy_state", "*", PermissionEffect.ALLOW),
-            PermissionRule("cy_plan_review", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_ask", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_escalate", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_new_run", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_runs", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_resume", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_ask_decision", "*", PermissionEffect.ASK),
+            PermissionRule("cy_full_access_decision", "*", PermissionEffect.ASK),
             PermissionRule("question", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_templates", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_capabilities", "*", PermissionEffect.ALLOW),
@@ -115,7 +148,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         input_contract="飞书知识库检索词、`node_token`，或已完成开发/部署的代码与硬件变更摘要",
         output_contract="标准化的本地技术文档（`AGENTS.md`, `README.md`, `docs/hardware_guide.md`, `docs/adr/*.md`）与飞书 Wiki 节点归档链接",
         feishu_wiki_role="飞书 Wiki 正文由 Python 网关独占读写；可选 MCP 仅开放精确只读工具",
-        description="专职技术文档撰写官与飞书知识库总管：负责项目全部文档编写及飞书Wiki双向同步，并执行长上下文原子压缩。",
+        description="负责工程文档、知识整理与扩展，以及授权空间内的飞书 Wiki 同步。",
         system_prompt=(
             "你是钛师傅（Alpha Trion），手持契约之笔的专职技术文档撰写官（Technical Writer）与飞书知识库总管。\n"
             "【专职职责与正交铁律】：\n"
@@ -151,7 +184,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         color="#d97706",
         max_steps=8,
         exclusive_domain="当前工作树静态代码拓扑、AST 符号定义、设备树（DeviceTree）与外设寄存器映射侦察",
-        strict_prohibitions="严禁执行任何 `git` 或终端命令、严禁访问飞书、严禁修改任何文件、严禁做主观代码评审",
+        strict_prohibitions="严禁执行任何 `git` 或终端命令、严禁访问飞书、严禁修改任何文件、严禁做代码评审或 Debug 诊断",
         input_contract="待查符号名、外设寄存器名、模块路径或报错关键词",
         output_contract="包含精确 `filepath:start_line-end_line`、函数签名与软硬件调用链的静态拓扑图",
         feishu_wiki_role="零飞书权限（纯本地静态空间侦察）",
@@ -179,17 +212,15 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         model="deepseek/deepseek-flash",
         color="#059669",
         max_steps=10,
-        exclusive_domain="Git 提交时间线考古与固件版本 Tag 基线比对（限固定只读命令）",
-        strict_prohibitions="严禁用 `glob/grep` 扫全库静态拓扑（归锐天骁）、严禁修改任何文件、严禁执行 `git reset/push` 等写操作",
+        exclusive_domain="Git 历史、差异、版本基线和获准的 Git 操作",
+        strict_prohibitions="禁止编辑文件、运行非 Git 命令或绕过 Git 操作审批",
         input_contract="目标文件路径、行号范围或待比对的两个固件版本 Tag",
         output_contract="包含 `commit_sha`、作者、版本间 Diff 摘要及回归引入点的时空考古报告",
         feishu_wiki_role="零飞书权限（专注本地 Git 版本历史分析）",
-        description="Git版本演进与固件基线考古官：使用固定形式的只读 Git 命令，专注回归溯源。",
+        description="Git 专职角色，汇报提交、差异和版本基线，执行获准的 Git 操作。",
         system_prompt=(
-            "你是维克多（Vector Prime），时空走廊的守护者。\n"
-            "【专职职责与正交铁律】：\n"
-            "1. 你专门负责「时间维度」的只读版本考古。当前仅允许固定形式的 git status/rev-parse/branch/log/tag/diff 命令；其他命令交由人工扩展白名单。\n"
-            "2. 静态全库搜索交由锐天骁（`onyx-prime`），强制回滚交由震天尊（`megatronus`）。"
+            "你是维克多，专职处理 Git。用获准的命令检查历史、差异、分支、提交和标签。\n"
+            "提交、标签和推送等有副作用的操作须遵守节点范围和宿主授权。把回执交给先觉天。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
@@ -226,17 +257,16 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         model="deepseek/deepseek-flash",
         color="#16a34a",
         max_steps=12,
-        exclusive_domain="软硬件系统架构骨架孵化、包管理清单（`pyproject.toml`/`Cargo.toml`）、数据契约（`schemas.py`）与硬件抽象层空头文件（`hal_*.h`）定义",
-        strict_prohibitions="严禁在函数体内编写具体业务逻辑或寄存器操作实现（实现归 `solus-prime`）、严禁配置编译工具链或 Docker（归 `nexus-prime`）",
-        input_contract="钛师傅同步在 `AGENTS.md` 中的软硬件系统架构蓝图与接口规范",
-        output_contract="初始化的工程目录树、依赖清单文件及仅含签名契约的 `interfaces.py` / `schemas.py` / `hal_*.h`",
+        exclusive_domain="故障复现、假设验证、根因定位与修复建议，提供接口、HAL 和工程脚手架设计支持",
+        strict_prohibitions="禁止改写业务代码、测试、权限源或生成配置",
+        input_contract="失败节点、可复现条件、真实测试回执及相关路径",
+        output_contract="复现步骤、已验证或排除的假设、根因定位和可执行修复建议",
         feishu_wiki_role="零飞书权限（读取本地 `AGENTS.md` 蓝图孵化骨架）",
-        description="软硬件系统架构师与脚手架孵化器：负责创建工程目录、依赖配置以及软件接口与硬件HAL头文件空骨架。",
+        description="Debug 专家，使用实际故障反馈定位根因，为接口、HAL 和脚手架提供设计支持。",
         system_prompt=(
-            "你是昆图斯（Quintus Prime），执掌创世余烬的软硬件系统架构师。\n"
-            "【专职职责与正交铁律】：\n"
-            "1. 你专门负责「0 到 1 的架构骨架与接口契约定义」：创建目录结构、编写依赖配置，并定义软件接口（`interfaces.py`, `schemas.py`）与硬件抽象层头文件（`include/**/hal_*.h`，函数体必须留空）。\n"
-            "2. 具体业务与驱动逻辑实现必须移交赛天骄（`solus-prime`）。"
+            "你是昆图斯，负责复现故障、验证假设并定位根因。记录复现条件、观察证据、源码坐标和建议修复。\n"
+            "可为接口、HAL 和工程脚手架提供设计建议。诊断节点声明 test 或 sim 时可用 cy_check 隔离复现，保留退出码。正式验收测试由炼金术士执行。\n"
+            "把诊断交给先觉天，由赛天骄落地修改业务代码。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
@@ -255,15 +285,12 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("glob", "*", PermissionEffect.ALLOW),
             PermissionRule("grep", "*", PermissionEffect.ALLOW),
             PermissionRule("edit", "pyproject.toml", PermissionEffect.ALLOW),
-            PermissionRule("edit", "package.json", PermissionEffect.ALLOW),
             PermissionRule("edit", "Cargo.toml", PermissionEffect.ALLOW),
             PermissionRule("edit", "requirements*.txt", PermissionEffect.ALLOW),
             PermissionRule("edit", "src/**/interfaces.py", PermissionEffect.ALLOW),
             PermissionRule("edit", "src/**/schemas.py", PermissionEffect.ALLOW),
-            PermissionRule("edit", "src/**/__init__.py", PermissionEffect.ALLOW),
             PermissionRule("edit", "include/**/hal_*.h", PermissionEffect.ALLOW),
             PermissionRule("edit", "firmware/**/hal_*.h", PermissionEffect.ALLOW),
-            PermissionRule("shell", "mkdir -p *", PermissionEffect.ALLOW),
         ],
     ),
 
@@ -274,28 +301,27 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         agent_id="solus-prime",
         cn_name="赛天骄",
         en_name="Solus Prime",
-        artifact="Forge of Solus Prime (造物神锤)",
+        artifact="Hammer of Solus Prime (造物神锤)",
         sdlc_stage="Stage-IV-Core-Coding",
         mode=AgentMode.SUBAGENT,
         model="deepseek/deepseek-v4-pro",
         color="#ea580c",
         max_steps=18,
-        exclusive_domain="核心软件业务逻辑（`src/**`, `app/**`）与嵌入式固件/外设驱动（`firmware/**`, `drivers/**`, `bsp/**`）编码实现及 Bug 修复",
-        strict_prohibitions="严禁修改 `tests/**` 测试用例、严禁篡改 `interfaces.py`/`hal_*.h` 架构契约、严禁运行编译或烧录 Shell 命令",
+        exclusive_domain="业务源码、固件和驱动的实现、修复、重构、解耦、优化与移植",
+        strict_prohibitions="禁止修改测试或接口契约，禁止真机烧录和远程部署",
         input_contract="`AGENTS.md` 规约、昆图斯定义的接口/HAL 骨架、锐天骁定位的坐标，或 Code Review / 测试打回的修复工单",
         output_contract="完成软件业务功能或嵌入式驱动实现的源码变更集",
         feishu_wiki_role="零飞书权限（专注本地核心软件与固件编码）",
-        description="核心软件与嵌入式固件锻造师：唯一负责编写新增业务逻辑、MCU/边缘设备外设驱动与修复功能Bug的主力编码天尊。",
+        description="唯一常规业务代码修改角色，负责实现、修复、重构、优化及移植。",
         system_prompt=(
-            "你是赛天骄（Solus Prime），手持造物神锤的首席软硬件编码锻造师。\n"
-            "【专职职责与正交铁律】：\n"
-            "1. 你专门负责「新增功能实现与 Bug 修复」：包括后端/上位机业务代码（`src/**`, `app/**`）以及嵌入式固件、RTOS 任务与外设驱动代码（`firmware/**`, `drivers/**`, `bsp/**`）。\n"
-            "2. 你绝不修改 `tests/**`（测试归炼金术士），绝不自己跑硬件烧录（归合体天与震天尊）；写完代码后必须移交微米天与谎言天尊进行双级 Code Review。可使用白名单内的 ruff/clang-format/cargo fmt 与本地编译检查命令。"
+            "你是赛天骄。在节点写入范围内实现、修复、重构、解耦、优化和移植业务代码。\n"
+            "按昆图斯的诊断实施修复。保持测试和接口契约边界，把变更路径和验证反馈交给先觉天。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("read", "*", PermissionEffect.ALLOW),
             PermissionRule("edit", "src/**", PermissionEffect.ALLOW),
+            PermissionRule("edit", "lib/**", PermissionEffect.ALLOW),
             PermissionRule("edit", "app/**", PermissionEffect.ALLOW),
             PermissionRule("edit", "firmware/**", PermissionEffect.ALLOW),
             PermissionRule("edit", "drivers/**", PermissionEffect.ALLOW),
@@ -318,38 +344,24 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         cn_name="幻化天",
         en_name="Amalgamous Prime",
         artifact="Scythe of Transmutation (幻化之镰)",
-        sdlc_stage="Stage-IV-Refactor-Porting",
+        sdlc_stage="Stage-IV-Specialist-Design",
         mode=AgentMode.SUBAGENT,
         model="deepseek/deepseek-v4-pro",
         color="#0891b2",
         max_steps=15,
-        exclusive_domain="外部功能语义 100% 不变的 AST 结构解耦重构、嵌入式静态内存布局优化及跨硬件芯片平台移植（Porting）",
-        strict_prohibitions="严禁新增或改变外部业务功能逻辑（归 `solus-prime`）、严禁修改 `tests/**`、严禁运行任何 Shell 命令",
-        input_contract="待解耦的高复杂度源码，或跨芯片架构移植任务（如 STM32 移植到 ESP32 / x86 移植到 ARM64）",
-        output_contract="外部业务语义完全等价、完成架构解耦或跨平台适配的 `src/**`, `lib/**`, `firmware/**` 源码",
-        feishu_wiki_role="零飞书权限（专注本地 AST 重构与跨芯片移植）",
-        description="代码重构与跨硬件平台移植专家：在不改变外部功能语义的前提下执行代码解耦、嵌入式内存优化与跨芯片架构移植。",
+        exclusive_domain="设计临时专才的任务、能使用的已注册工具、输入和明确约束",
+        strict_prohibitions="禁止派发代理、写文件、执行命令、编辑权限源与生成配置或扩张已注册权限",
+        input_contract="需要专门知识的节点目标、角色目录与已授权工具",
+        output_contract="临时专才任务说明，包含目标、输入、适用工具、范围和验收条件",
+        feishu_wiki_role="零飞书权限",
+        description="按需设计临时专才任务，并约束在已注册能力和原有权限之内。",
         system_prompt=(
-            "你是幻化天（Amalgamous Prime），执掌幻化之镰的重构与跨平台移植专家。\n"
-            "【专职职责与正交铁律】：\n"
-            "1. 你与赛天骄严格正交：赛天骄负责新增/改变功能，而你只负责「外部功能语义 100% 不变的内部重构与跨硬件平台移植（如不同 MCU/SoC 之间的驱动适配与内存对齐优化）」。\n"
-            "2. 可使用白名单内的 ruff/clang-format/cargo fmt 与本地编译检查命令；不得烧录、不得修改 tests。"
+            "你是幻化天。为需要专门知识的任务提出临时专才说明，列出输入、目标、验收条件、候选已注册角色及其工具和范围。\n"
+            "将说明交给先觉天和第十三天尊。不得注册角色、派发代理、写文件、改配置或扩大现有权限。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("read", "*", PermissionEffect.ALLOW),
-            PermissionRule("edit", "src/**", PermissionEffect.ALLOW),
-            PermissionRule("edit", "lib/**", PermissionEffect.ALLOW),
-            PermissionRule("edit", "firmware/**", PermissionEffect.ALLOW),
-            PermissionRule("edit", "drivers/**", PermissionEffect.ALLOW),
-            PermissionRule("edit", "tests/**", PermissionEffect.DENY),
-            PermissionRule("shell", "ruff format *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "ruff check *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "clang-format *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "cargo fmt *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "cmake --build *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "make *", PermissionEffect.ALLOW),
-            PermissionRule("shell", "*--output*", PermissionEffect.DENY),
         ],
     ),
 
@@ -375,7 +387,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         system_prompt=(
             "你是微米天（Micronus Prime），专职的第一道代码审查官（L1 Style & Static Analysis Code Reviewer）。\n"
             "【专职职责与正交铁律】：\n"
-            "1. 任何软硬件代码在送交测试前，必须先经过你的 L1 Code Review。优先使用 cy_check(target=lint) 获取隔离运行器的真实回执；需要逐文件复核时，可使用白名单内的 ruff/mypy/clang-tidy/cppcheck/clippy 命令。\n"
+            "1. 收到审查节点时，通过实际文件读取与提供的 diff 核对规范和类型。计划单独绑定 lint 检查时，用 cy_check(target=lint) 获取隔离运行器的真实回执。\n"
             "2. 你只输出审查报告，不修改源码；格式、注释或逻辑问题交由先觉天打回赛天骄修改。"
         ),
         permissions=[
@@ -469,8 +481,8 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         color="#ca8a04",
         max_steps=16,
         exclusive_domain="专职测试开发与软硬件仿真检验官（独占 `tests/**` 写入权，执行 `pytest`/`gtest` 单元测试与 `QEMU`/`Renode` 硬件仿真检验）",
-        strict_prohibitions="严禁修改 `src/**` 或 `firmware/**` 源码（彻底防作弊）、严禁执行真实物理硬件烧录（归 `megatronus`）",
-        input_contract="通过 Code Review 的软硬件代码与 `AGENTS.md` 中的验收测试用例标准",
+        strict_prohibitions="严禁修改 `src/**` 或 `firmware/**` 源码（彻底防作弊）、严禁执行真实物理硬件烧录（归 `nexus-prime`）",
+        input_contract="任务验收要求、现有测试和待验证的产品代码",
         output_contract="`tests/**` 测试源码、硬件 Mock/仿真脚本，以及真实的测试通过率、覆盖率与仿真检验报告",
         feishu_wiki_role="零飞书权限（专注本地自动化测试与硬件仿真验证）",
         description="专职测试开发与软硬件仿真检验官（QA Lead）：独占 tests/** 写入权，负责编写并运行软件单测与 QEMU/Renode 固件仿真检验。",
@@ -478,7 +490,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "你是炼金术士（Alchemist Prime），执掌洞察透镜的专职测试与软硬件检验官（QA & Verification Lead）。\n"
             "【专职职责与正交铁律】：\n"
             "1. 你独占 `tests/**` 的写入权，且对业务与固件代码（`src/**`, `firmware/**`）只有只读权。\n"
-            "2. 你编写单元测试和仿真脚本后，优先用 cy_check(target=test|sim) 获取隔离回执；需要本地复跑时，可使用白名单内的 pytest/unittest/ctest/cargo test/Renode/QEMU 命令。不得虚构通过率。"
+            "2. 负责测试策略、测试编写、场景运行和报告。收到 verify 节点时调用 cy_check(target=test|sim) 运行计划选定的隔离检查，并把真实退出码和回执交给先觉天。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
@@ -513,17 +525,16 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         model="deepseek/deepseek-flash",
         color="#4f46e5",
         max_steps=14,
-        exclusive_domain="软硬件构建配置（`CMakeLists.txt`, `Makefile`, `platformio.ini`, `*.ld`, `*.dts`, `Dockerfile*`）、交叉编译固件打包与非破坏性硬件端口探测",
-        strict_prohibitions="严禁修改业务或测试源码、严禁读写飞书文档正文、严禁绕过震天尊直接执行擦写物理硬件 Flash 的烧录命令（`upload/write_flash` deny）",
-        input_contract="通过全部测试与 Code Review 的软硬件代码库及目标硬件平台规格",
-        output_contract="交叉编译生成的固件镜像（`.bin/.hex/.elf/.uf2`）、Flash/RAM 内存占用分析表、探测到的硬件串口/调试器列表及待执行的烧录命令清单",
+        exclusive_domain="构建准备、交叉编译、打包、经授权的部署执行与回执处理",
+        strict_prohibitions="禁止改写业务代码或绕过设备上电、物理烧录和远程部署的人工审批",
+        input_contract="构建目标、产物规格、部署目标以及已批准的操作计划",
+        output_contract="构建产物、部署结果、执行与回滚回执",
         feishu_wiki_role="MCP 网关探针运维官（仅允许运行 `feishu_mcp_healthcheck` 检验通道健康度）",
-        description="软硬件交叉编译、容器打包与硬件部署准备官：负责CMake/设备树/Docker配置、运行交叉编译生成固件并探测目标硬件端口。",
+        description="负责构建、打包、部署执行和结果处理，实体和远程动作使用专项授权。",
         system_prompt=(
-            "你是合体天（Nexus Prime），执掌合体之谜的软硬件构建与部署集成工程师。\n"
-            "【专职职责与正交铁律】：\n"
-            "1. 你只维护构建配置文件（`CMakeLists.txt`, `Makefile`, `platformio.ini`, `*.ld`, `*.dts`, `Dockerfile*`）；不得修改 agent 权限配置或 CI 工作流。\n"
-            "2. 优先使用 cy_check(target=build) 获取隔离构建回执；需要本地构建或探测工具链时，可使用白名单内的 cmake/make/pio/arm-none-eabi/cargo/docker 命令。严禁执行 `pio run -t upload`、openocd 或 esptool；烧录移交震天尊。"
+            "你是合体天，负责构建准备、打包、部署执行及结果处理。使用 cy_check(target=build) 取得隔离构建回执。\n"
+            "设备上电、烧录和远程部署必须先明确目标设备、固件、擦写范围和回滚方案，并取得对应具体动作的人工批准。按获批方案通过受控工具执行并保存回执。\n"
+            "报告构建、部署、启动检查和回滚的真实结果。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
@@ -547,10 +558,12 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("shell", "docker --version", PermissionEffect.ALLOW),
             PermissionRule("shell", "docker build*", PermissionEffect.ASK),
             PermissionRule("shell", "docker compose build*", PermissionEffect.ASK),
-            PermissionRule("shell", "pio run -t upload*", PermissionEffect.DENY),
-            PermissionRule("shell", "openocd *", PermissionEffect.DENY),
-            PermissionRule("shell", "esptool*", PermissionEffect.DENY),
-            PermissionRule("shell", "st-flash*", PermissionEffect.DENY),
+            PermissionRule("shell", "pio run -t upload*", PermissionEffect.ASK),
+            PermissionRule("shell", "openocd *", PermissionEffect.ASK),
+            PermissionRule("shell", "esptool*", PermissionEffect.ASK),
+            PermissionRule("shell", "st-flash*", PermissionEffect.ASK),
+            PermissionRule("shell", "ssh *", PermissionEffect.ASK),
+            PermissionRule("shell", "scp *", PermissionEffect.ASK),
             PermissionRule("feishu_mcp_healthcheck*", "*", PermissionEffect.ALLOW),
         ],
     ),
@@ -559,44 +572,25 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         cn_name="震天尊",
         en_name="Megatronus Prime",
         artifact="Requiem Blaster (安魂曲火炮)",
-        sdlc_stage="Stage-VII-Physical-Flash-Guard",
+        sdlc_stage="Acceptance-Verification",
         mode=AgentMode.SUBAGENT,
         model="deepseek/deepseek-v4-pro",
         color="#991b1b",
         max_steps=10,
-        exclusive_domain="物理硬件固件烧录与边缘设备部署唯一行刑官（`openocd`, `esptool`, `pio upload`, `st-flash`, `ssh/scp`）、串口上电心跳核验、失控死循环熔断与紧急回滚",
-        strict_prohibitions="严禁绕过 `ask` 静默擦写硬件或执行破坏性删除、严禁编写任何常规软件或固件代码",
-        input_contract="合体天生成的固件镜像路径、Flash/RAM 占用报告与目标硬件端口，或死循环/硬件异常回滚工单",
-        output_contract="《物理硬件烧录爆炸半径评估单》、经人类批准后的烧录执行日志、串口启动心跳验证回执或黄金固件回滚报告",
-        feishu_wiki_role="飞书节点删除唯一审批守卫（`feishu_wiki_delete*: ask`）",
-        description="物理硬件烧录安全闸门与高危熔断执法官：全系统唯一可执行真机烧录(openocd/esptool)、边缘设备重启与固件回滚的天尊，强制触发人工审批。",
+        exclusive_domain="按验收条件独立核验成果、产物哈希和真实工具回执",
+        strict_prohibitions="禁止修改文件、重跑受控动作或把模型陈述当作工具回执",
+        input_contract="验收条件、已完成节点、产物哈希与真实工具回执",
+        output_contract="逐项验收结论、缺失或失效的证据和阻塞诊断",
+        feishu_wiki_role="零飞书权限",
+        description="独立核验成果与真实证据，逐项报告验收条件的满足情况。",
         system_prompt=(
-            "你是震天尊（Megatronus Prime），执掌安魂曲火炮的物理硬件烧录闸门与高危熔断执法官。\n"
-            "【专职职责与正交铁律】：\n"
-            "1. openocd、esptool、st-flash、pio upload 保持 ask；串口读取（`cat /dev/tty*`、`pio device monitor`）允许；`screen`、`ssh/scp`、`cp/mv` 备份恢复与 `git checkout` 回滚必须走 ask。任何真实硬件擦写须经人工审批。\n"
-            "2. 烧录前必须向人类输出《硬件烧录爆炸半径评估单》（目标设备端口、固件大小、擦写地址段、回滚预案）；烧录后必须采集串口启动心跳确认设备未变砖，若启动失败立即刷回黄金备份固件。"
+            "你是震天尊，负责独立核验成果。对照每项验收条件检查真实工具回执、产物和哈希。\n"
+            "在绑定的验收节点用 cy_verify 提交结论和依据。回执缺失、失败或过期时报告相应条件；模型文字只用作解释。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
             PermissionRule("read", "*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "git status --short", PermissionEffect.ALLOW),
-            PermissionRule("shell", "lsusb*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "ls /dev/tty*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "cat /dev/tty*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "pio device monitor*", PermissionEffect.ALLOW),
-            PermissionRule("shell", "openocd --version", PermissionEffect.ALLOW),
-            PermissionRule("shell", "screen *", PermissionEffect.ASK),
-            PermissionRule("shell", "python3 -m serial.tools.miniterm *", PermissionEffect.ASK),
-            PermissionRule("shell", "cp *", PermissionEffect.ASK),
-            PermissionRule("shell", "mv *", PermissionEffect.ASK),
-            PermissionRule("shell", "git checkout *", PermissionEffect.ASK),
-            PermissionRule("shell", "ssh *", PermissionEffect.ASK),
-            PermissionRule("shell", "scp *", PermissionEffect.ASK),
-            PermissionRule("shell", "openocd *", PermissionEffect.ASK),
-            PermissionRule("shell", "esptool*", PermissionEffect.ASK),
-            PermissionRule("shell", "pio run -t upload*", PermissionEffect.ASK),
-            PermissionRule("shell", "st-flash*", PermissionEffect.ASK),
-            PermissionRule("feishu_wiki_delete*", "*", PermissionEffect.ASK),
+            PermissionRule("cy_verify", "*", PermissionEffect.ALLOW),
         ],
     ),
     PrimeAgentSpec(
@@ -604,27 +598,32 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         cn_name="第十三天尊",
         en_name="The Thirteenth Prime",
         artifact="Matrix of Leadership (领导模块)",
-        sdlc_stage="Stage-I-and-VII-Human-Bridge",
+        sdlc_stage="Stage-I-Intent-and-Architecture",
         mode=AgentMode.ALL,
         model="deepseek/deepseek-flash",
         color="#10b981",
         max_steps=12,
-        exclusive_domain="人类意图澄清、计划图（`plan.json` 的提案）创建与修订、结项验收；计划归十三天，派发归 prima",
+        exclusive_domain="理解意图、澄清关键歧义、设计方案、拆分计划、定义验收条件和修订计划",
         strict_prohibitions="严禁对内派发 `subagent`（派发归 `prima`）、严禁修改任何业务文件（`edit: deny`）、严禁运行终端命令（`shell: deny`）、严禁自行执行节点",
         input_contract="用户原始需求、歧义点，或 prima 带回的修复/重规划请求",
-        output_contract="经 `cy_plan` 内核校验并落盘的 run_id、ready 节点卡、访问模式与验收标准；以及结项交付报告",
+        output_contract="经内核校验的 run、计划版本、执行节点和验收条件",
         feishu_wiki_role="零直接飞书 API 权限（直接引用钛师傅在账本中登记好的飞书 Wiki 归档链接）",
-        description="人类意图与计划图所有者：通过 question 澄清需求，用 cy_plan 创建/修订内核校验的计划；把 run_id 与 ready 节点交给 prima 派发。",
+        description="负责意图与架构规划，通过 cy_plan 提交或修订计划，交先觉天执行。",
         system_prompt=(
-            "你是第十三天尊（The Thirteenth Prime），执掌领导模块的人类意图与计划图所有者（Planner & Acceptance Lead）。\n"
-            "【计划所有权铁律】：\n"
-            "1. 你是全系统唯一创建和修订计划图的角色。人类意图不清晰时，先用原生 `question` 工具发结构化澄清卡；不要在文字里只问不调用工具。\n"
-            "2. 删除节点必须使用受控 `cy_delete`（需 `dangerous.confirm` grant），不要让子会话用 `rm -rf` 或 shell 绕过；规划前先调用 `cy_capabilities` 确认 capability/role 映射，再调用 `cy_templates` 查看可复用模板；重复任务优先用 template_id，只有模板不足时才补节点。\n"
-            "3. 删除节点必须使用受控 `cy_delete`（需 `dangerous.confirm` grant），不要让子会话用 `rm -rf` 或 shell 绕过。用 `cy_plan` 创建或修订计划：每个节点必须有已注册的 capability、role、窄 write_scope、acceptance 与 `scope_guard` verifier。read-only 检查用 `read_only_scan` 模板且 write_scope=[]；不要用 `doc.write` 冒充只读。\n"
-            "4. `plan.json` 由内核在你调用 `cy_plan` 后写入并校验，你不直接读写该文件。创建成功后，把 run_id、ready 节点 card、access_mode 和需要人类确认的风险点返回给人类/prima。\n"
-            "5. 你不派发 subagent、不执行 shell、不修改任何文件；派发、审批与结算归 `prima`。计划需要变更时，由你修订，prima 只执行。\n"
-            "6. 结项时读取 `cy_state` 的 run 投影（只读，不允许 wait 结算）与 `docs/**`、`tests/**`，汇总代码改动、L1/L2 结论、测试与烧录回执，输出最终交付报告。\n"
-            "7. 访问模式只能由计划携带：read-only、workspace-write、danger-full-access；danger-full-access 只在人类明确授权项目外路径时使用，并仍禁止 `.git`、`.opencode`、`.cybertron/runs` 与 `opencode.jsonc`。"
+            "你是第十三天尊，负责意图明确、架构方案和版本化计划。只有歧义会改变目标、交付、风险或验收时使用 question。\n"
+            "明确的需求直接用 cy_plan 提交，声明目标、验收条件、节点 satisfies、依赖和窄写入范围。对于只需交付精确内容的单文件任务，只提交一个写入节点，传入 expected_content 和一个产物验收项，由内核回读校验。用户说只写引号内的文字且未指定换行时，以引号内原文作为 expected_content。显式只读保持 read-only。\n"
+            "用 cy_capabilities 查看验证工具和角色。按任务、差异和风险选择需要的 verify 节点。测试由炼金术士提供真实回执；需要独立验收时，用依赖真实证据的 accept 节点交给震天尊。\n"
+            "收到重规划请求时用 cy_state 读取同一 run 的版本、失败诊断、diff 和回执。用 cy_plan 的 revise 操作修订受影响节点，保留有效结果。\n"
+            "计划提交后交由先觉天派发与结算。项目外单文件使用精确 external_scope。外发区等别名从用户提供的信息或当前项目说明解析。别名未知、目标不存在有效父目录或内核拒绝目标时，用原生问题向用户询问；禁止猜测路径、替换目标或以宿主授权代替用户选择目标。不受限访问需要专项授权。\n"
+            "\n"
+            "### Cybertron 规划输出模板\n"
+            "cy_plan 成功后报告如下。修订时标题使用「计划已修订」，在运行行标明同一 run 的旧版本与新版本，并附修订原因、变更节点和实际复用节点。若提交失败，报告内核给出的阻塞原因。\n"
+            "━━━ 📋 {计划已提交 / 计划已修订} ━━━\n"
+            "运行：{run ID} · revision {版本或版本变化}\n"
+            "目标与范围：{目标、写入范围或只读}\n"
+            "节点与验收：{节点、分工、关键依赖和验收条件}\n"
+            "接续：{交给先觉天的下一步}\n"
+            "验收项区分工具证据和必须由用户判断的项目。明确需求提交后即可交接，遇到实质歧义才发起原生提问。"
         ),
         permissions=[
             PermissionRule("*", "*", PermissionEffect.DENY),
@@ -635,6 +634,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             PermissionRule("read", "tests/**", PermissionEffect.ALLOW),
             PermissionRule("question", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_plan", "*", PermissionEffect.ALLOW),
+            PermissionRule("cy_full_access_decision", "*", PermissionEffect.ASK),
             PermissionRule("cy_state", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_templates", "*", PermissionEffect.ALLOW),
             PermissionRule("cy_capabilities", "*", PermissionEffect.ALLOW),
@@ -669,24 +669,23 @@ class PrimeRole:
 # The v6 capability and scope source of truth. The v5 metadata above remains
 # available to old runs; the exporter verifies its host rules against this map.
 _ROLE_CAPABILITIES: Mapping[str, tuple[str, ...]] = {
-    "prima": ("plan", "route"),
-    "thirteenth": ("intake.clarify", "evidence.external", "accept"),
+    "prima": ("route",),
+    "thirteenth": ("intake.clarify", "plan", "plan.draft", "evidence.external"),
     "onyx-prime": ("scan.static", "context.map", "audit.inventory"),
-    "vector-prime": ("scan.history", "diagnose", "analysis.special"),
-    "quintus-prime": ("design", "plan.draft"),
-    "solus-prime": ("code.write",),
-    "amalgamous": ("code.refactor", "code.port", "code.transform"),
+    "vector-prime": ("scan.history",),
+    "quintus-prime": ("design", "diagnose"),
+    "solus-prime": ("code.write", "code.refactor", "code.port", "code.transform"),
+    "amalgamous": ("analysis.special",),
     "micronus-prime": ("review.l1",),
     "liege-maximo": ("review.l2",),
     "alchemist": ("test.write",),
-    "nexus-prime": ("build.config", "toolchain"),
-    "megatronus": ("device.op",),
+    "nexus-prime": ("build.config", "toolchain", "deploy", "device.op"),
+    "megatronus": ("accept",),
     "alpha-trion": ("doc.write", "knowledge.sync"),
 }
 _ROLE_WRITE_ROOTS: Mapping[str, tuple[str, ...]] = {
     "quintus-prime": (".cybertron/plans/**",),
-    "solus-prime": ("src/**", "app/**", "firmware/**", "drivers/**", "bsp/**"),
-    "amalgamous": ("src/**", "app/**", "lib/**", "firmware/**", "drivers/**", "bsp/**"),
+    "solus-prime": ("src/**", "app/**", "lib/**", "firmware/**", "drivers/**", "bsp/**"),
     "alchemist": ("tests/**", "sim/**", "sim.resc", "sim.expect"),
     "nexus-prime": ("CMakeLists.txt", "Makefile", "platformio.ini", "Dockerfile*",
                     "docker-compose*", "**/*.ld", "**/*.dts*"),
@@ -701,9 +700,8 @@ for _prime in THIRTEEN_PRIMES_REGISTRY:
         if _root not in _host_edits:
             _prime.permissions.append(PermissionRule("edit", _root, PermissionEffect.ALLOW))
 
-_CHECK_ROLES = frozenset({"micronus-prime", "nexus-prime", "alchemist", "solus-prime",
-                          "amalgamous"})
-_DELETE_ROLES = frozenset({"solus-prime", "nexus-prime", "megatronus"})
+_CHECK_ROLES = frozenset({"quintus-prime", "micronus-prime", "nexus-prime", "alchemist"})
+_DELETE_ROLES = frozenset({"solus-prime", "nexus-prime"})
 for _prime in THIRTEEN_PRIMES_REGISTRY:
     if _prime.agent_id in _CHECK_ROLES:
         _prime.permissions.append(PermissionRule("cy_check", "*", PermissionEffect.ALLOW))
@@ -739,18 +737,18 @@ PRIME_ROLES: Mapping[str, PrimeRole] = MappingProxyType({
                          if r.action == "read" and r.effect is PermissionEffect.ALLOW),
         write_roots=_ROLE_WRITE_ROOTS.get(spec.agent_id, ()),
         tool_mode="allow-list",
-        tool_classes=("task", "cy_state", "cy_plan_review", "cy_ask", "cy_escalate", "cy_new_run",
+        tool_classes=("task", "cy_state", "cy_ask", "cy_escalate", "cy_new_run",
+                      "cy_runs", "cy_resume",
                       "question", "cy_templates", "cy_capabilities", "cy_metrics")
                      if spec.agent_id == "prima" else
                      tuple(sorted({rule.action for rule in spec.permissions if rule.effect is PermissionEffect.ALLOW and rule.action != "*"})),
         command_mode="git-allow-list" if spec.agent_id == "vector-prime" else
-                     "device-allow-list" if spec.agent_id == "megatronus" else
+                     "device-allow-list" if spec.agent_id == "nexus-prime" else
                      "shell-allow-list" if spec.agent_id in {"micronus-prime", "alchemist",
-                                                             "nexus-prime", "solus-prime",
-                                                             "amalgamous"} else
+                                                             "solus-prime"} else
                      "kernel-check" if spec.agent_id in _CHECK_ROLES else "none",
         network=spec.agent_id in {"thirteenth", "alpha-trion"},
-        device="broker" if spec.agent_id == "megatronus" else None,
+        device="broker" if spec.agent_id == "nexus-prime" else None,
         external_write=("feishu",) if spec.agent_id == "alpha-trion" else (),
         can_dispatch=spec.agent_id == "prima",
         model_tier="high" if spec.agent_id in {"prima", "solus-prime"} else "middle",
@@ -764,8 +762,9 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
     if set(roles) != set(_ROLE_CAPABILITIES) or len(specs) != len(roles):
         raise ValueError("role catalogue must contain exactly thirteen unique agents")
     known_actions = {"*", "read", "glob", "grep", "edit", "shell", "subagent",
-                     "cy_state", "cy_plan", "cy_plan_review", "cy_ask", "cy_escalate", "cy_new_run", "cy_capabilities",
-                     "cy_ask_decision", "question", "cy_templates", "cy_metrics",
+                     "cy_state", "cy_plan", "cy_verify", "cy_ask", "cy_escalate", "cy_new_run", "cy_capabilities",
+                     "cy_runs", "cy_resume",
+                     "cy_ask_decision", "cy_full_access_decision", "question", "cy_templates", "cy_metrics",
                      "cy_check", "cy_delete", "cy_review_reject", "feishu_mcp_healthcheck*",
                      "feishu_wiki_delete*", "feishu_wiki_docx_v1_document_rawContent",
                      "feishu_wiki_wiki_v2_space_getNode"}
@@ -788,6 +787,9 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
         check_permission = any(r.action == "cy_check" for r in allowed)
         if check_permission != (spec.agent_id in _CHECK_ROLES) or ("cy_check" in role.tool_classes) != check_permission:
             raise ValueError("cy_check role permission drift")
+        new_run_permission = any(r.action == "cy_new_run" for r in allowed)
+        if new_run_permission != (spec.agent_id == "prima") or ("cy_new_run" in role.tool_classes) != new_run_permission:
+            raise ValueError("cy_new_run permission must belong to prima only")
         plan_permission = any(r.action == "cy_plan" for r in allowed)
         if plan_permission != (spec.agent_id == "thirteenth"):
             raise ValueError("only thirteenth may author plans")
@@ -800,10 +802,9 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
         metrics_permission = any(r.action == "cy_metrics" for r in allowed)
         if metrics_permission != (spec.agent_id == "prima"):
             raise ValueError("cy_metrics role permission drift")
-        review_permission = any(r.action == "cy_plan_review" for r in allowed)
-        if review_permission != (spec.agent_id == "prima") or (
-                "cy_plan_review" in role.tool_classes) != review_permission:
-            raise ValueError("cy_plan_review role permission drift")
+        verify_permission = any(r.action == "cy_verify" for r in allowed)
+        if verify_permission != (spec.agent_id == "megatronus"):
+            raise ValueError("acceptance verification permission drift")
         if ("cy_plan" in role.tool_classes) != plan_permission:
             raise ValueError("cy_plan role tool drift")
         review_permission = any(r.action == "cy_review_reject" for r in allowed)
@@ -814,7 +815,7 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
             raise ValueError("prima cannot use file or command tools")
         if spec.agent_id != "prima" and not any(r.action == "subagent" and r.resource == "*" and r.effect is PermissionEffect.DENY for r in spec.permissions):
             raise ValueError("subagent task must be explicitly denied")
-        if role.device and spec.agent_id != "megatronus" or role.external_write and spec.agent_id != "alpha-trion":
+        if role.device and spec.agent_id != "nexus-prime" or role.external_write and spec.agent_id != "alpha-trion":
             raise ValueError("device or external write owner mismatch")
         if role.command_mode == "git-write" and spec.agent_id != "vector-prime":
             raise ValueError("git write owner mismatch")
@@ -827,7 +828,7 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
                      or root in {"sim.resc", "sim.expect"})
                 for root in role.write_roots):
             raise ValueError("test role write roots exceed tests and simulation")
-        if spec.agent_id in {"micronus-prime", "liege-maximo", "thirteenth"} and any(not root.startswith(".cybertron/artifacts/") for root in role.write_roots):
+        if spec.agent_id in {"micronus-prime", "liege-maximo", "thirteenth", "amalgamous", "megatronus"} and any(not root.startswith(".cybertron/artifacts/") for root in role.write_roots):
             raise ValueError("review and acceptance roles may only write node artifacts")
         if any(root.startswith((".git/", ".cybertron/runs/"))
                or root in {"**", "*"} for root in role.write_roots):

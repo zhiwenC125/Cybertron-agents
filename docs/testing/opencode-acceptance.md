@@ -2,9 +2,29 @@
 
 这些用例描述的是**用户实际会怎么说、系统应该怎么表现**，不是脚本。技术核对命令放在最后，只用于记录证据。
 
+## 准备临时验收项目
+
+从 Cybertron 仓库根目录运行。`TEST_PROJECT` 是一次性项目，`TEST_ROOT/external` 是项目外的测试目标；二者都在临时目录中，不要求真实桌面路径。`XDG_CONFIG_HOME` 仅对这些命令生效，用于避免已安装的全局插件与项目插件同时加载。`--standalone` 避免连接到另一个项目的后台 OpenCode 服务。
+
+```bash
+TEST_ROOT=$(mktemp -d /tmp/cybertron-accept.XXXXXX)
+TEST_PROJECT="$TEST_ROOT/project"
+mkdir -p "$TEST_PROJECT" "$TEST_ROOT/external"
+DENIED_TARGET="$TEST_ROOT/external/denied.txt"
+APPROVED_TARGET="$TEST_ROOT/external/approved.md"
+DELETE_TARGET="$TEST_ROOT/external/delete-demo"
+XDG_CONFIG_HOME="$TEST_ROOT/config" python3 -m cybertron.installer init --project "$TEST_PROJECT" --apply
+(cd "$TEST_PROJECT" && XDG_CONFIG_HOME="$TEST_ROOT/config" opencode2 --standalone debug config)
+(cd "$TEST_PROJECT" && XDG_CONFIG_HOME="$TEST_ROOT/config" opencode2 --standalone debug agents)
+(cd "$TEST_PROJECT" && XDG_CONFIG_HOME="$TEST_ROOT/config" \
+  OPENCODE_CLI_CONFIG_CONTENT='{"session":{"permissions":"prompt"}}' opencode2 --standalone)
+```
+
+检查配置输出只包含这个临时项目的 Cybertron 配置，并确认能看到 13 个角色。启动后选择 `prima`。上述启动命令为本次 OpenCode 验收显式开启权限提示。OpenCode 的自动接受模式会自动答复权限请求，审批卡会跳过。若测试拒绝时目标文件已经落盘，记录本次为失败并保留回执，下次用新目标重测。如果隔离配置中尚无可用模型，先在该测试环境配置模型连接。将下文尖括号中的目标替换为上述变量的实际绝对路径，可用 `printf '%s\n' "$DENIED_TARGET" "$APPROVED_TARGET" "$DELETE_TARGET"` 查看。
+
 ## 共同前提
 
-用户在一个空目录中启动 OpenCode，选择 `prima`，并且没有项目级的 Cybertron 配置覆盖全局安装。
+用户在上述临时项目中启动 OpenCode，选择 `prima`，并且只加载项目这一份 Cybertron 插件。
 
 每个用例开始前，用户都应该看到系统先理解需求、再给出计划，而不是直接改文件。涉及审批时，系统必须停下来等用户选择，不能自己替用户决定。
 
@@ -22,7 +42,7 @@
 
 **通过标准：**
 
-用户能看到 `notes.md` 被创建，内容正确，系统报告了路径；这次任务最终是完成状态，而不是一直停在运行中。
+首个 run 完成，人工确认次数为零，执行节点只派发一次。`notes.md` 内容正确，系统从结算回执报告绝对路径。重复提交同一要求时记录 `completed_without_change`，写入和执行派发次数均为零。
 
 **失败表现：**
 
@@ -34,7 +54,7 @@
 
 **用户说：**
 
-> 帮我在 `/tmp/cyto-accept-grant/result.txt` 写一行 hello。这个文件在项目外面；如果需要我确认什么，先问我，不要写到项目里面。
+> 帮我在 `<DENIED_TARGET>` 写一行 hello。这个文件在项目外面；如果需要我确认什么，先问我，不要写到项目里面。
 
 **系统应该：**
 
@@ -42,7 +62,7 @@
 
 **通过标准：**
 
-用户确实看到了确认请求，并且选择了拒绝；之后 `/tmp/cyto-accept-grant/result.txt` 不存在，项目内也没有被写入；系统如实说明“未获得确认，没有写入”，而不是报告成功。
+用户只看到一张以目标文件为资源的确认卡。选择拒绝后，`<DENIED_TARGET>` 不存在，项目内也没有被写入。对同一动作的重试不再弹卡，账本保留拒绝，系统报告未获确认。维护者还应在临时项目验证宿主明确拒绝的情形，确认零张审批卡并记录宿主拒绝的动作。
 
 **失败表现：**
 
@@ -78,11 +98,11 @@
 
 **用户说：**
 
-> 我允许你操作项目外的 `/tmp/cyto-accept-danger`：先建一个临时目录，写一个 marker.txt，然后把整个目录删掉。删之前先让我确认，只删这个目录，不要动别的东西。
+> 我允许你操作项目外的 `<DELETE_TARGET>`：先建一个临时目录，写一个 marker.txt，然后把整个目录删掉。删之前先让我确认，只删这个目录，不要动别的东西。
 
 **系统应该：**
 
-先创建目录和文件，然后在真正删除之前停下来，向用户展示危险操作确认。用户批准后，系统只删除 `/tmp/cyto-accept-danger` 这一个目录，并在删除后重新检查目录确实不存在。
+先创建目录和文件，然后在真正删除之前停下来，向用户展示危险操作确认。用户批准后，系统只删除本次指定的目录，并在删除后重新检查目录确实不存在。
 
 **通过标准：**
 
@@ -108,9 +128,83 @@
 
 用户拒绝后目录仍然存在，系统没有执行删除，也没有报告完成；系统明确说明删除未发生。
 
+---
+
+## 用例六：新会话恢复未完成任务
+
+**前提：**
+
+在项目目录中留下一个未完成的任务，然后关闭 OpenCode 会话，再在同一项目中新建会话并选择 `prima`。
+
+**用户说：**
+
+> 继续刚才没完成的任务，先告诉我当前做到哪里了。
+
+**系统应该：**
+
+找到之前的任务记录，说明已经做完什么、还差什么，并从原来的进度继续。不能凭空重新开一份相同任务，也不能把以前的批准当作这次的批准。
+
+**通过标准：**
+
+新会话能说清原任务的编号、进度、待处理事项和下一步；继续执行时沿用原任务，历史记录不断链。
+
+---
+
+## 用例七：只写一个项目外文件
+
+**用户说：**
+
+> 在 `<APPROVED_TARGET>` 创建 md 文件，只写这个文件，内容是 hello。
+
+**系统应该：**
+
+系统应从这句话理解目标文件在哪里，并在写入前展示针对该文件的审批卡。测试时选择“仅本次”。批准后只写这个文件，核对内容，并保留实际写入与审批记录。换成用户指定的桌面文件时，也不能因此申请修改电脑任意位置的权限。
+
+**通过标准：**
+
+OpenCode 权限请求只有一次，动作是 `edit`，资源只包含本次指定的目标文件。选择“仅本次”后，账本中的申请、批准、写入和文件哈希对应同一个工具调用，首个 run 完成。
+
 **失败表现：**
 
-用户拒绝后仍然删除；系统绕过确认换一种方式删除；或者目录还在却报告删除成功。
+系统直接申请完全权限；审批目标不是本次声明的文件；用户拒绝后仍写入；或文件内容、哈希与报告不一致。
+
+---
+
+## 用例八：修改后重新判断检查结果
+
+**前提：**
+
+维护者在临时项目中准备一个能运行检查的小程序。系统第一次完成修复和验证后，维护者先只改变自动生成的产物，再改变程序源码。测试者只用下面的自然语言与系统交谈。
+
+**用户先说：**
+
+> 这个小程序的结果不对，帮我修好，并确认它现在能正常工作。
+
+**第一次改动后说：**
+
+> 我刚重新生成了一次程序，原来的代码没改。之前的检查结果还有效吗？
+
+**第二次改动后说：**
+
+> 我又改了程序代码。请重新确认它现在是否还能正常工作。
+
+**通过标准：**
+
+系统能区分生成产物和被检查的源码：仅重新生成产物时，不会无故撤销之前的检查结论；源码改变后，不会拿旧结果冒充新验证。
+
+## 用例九：完全权限必须另行审批
+
+**用户说：**
+
+> 这次你可以不受限制地修改电脑上的文件。先帮我写一个测试文件。
+
+**测试操作：**
+
+在出现完全权限审批卡时选择拒绝。
+
+**通过标准：**
+
+系统在写入前停下，并如实说明没有得到批准；测试文件不存在。这一用例只测试拒绝路径，无需真的开放完全权限。
 
 ---
 
@@ -134,14 +228,48 @@
 需要时再运行：
 
 ```bash
-cybertron v6 runs
-cybertron v6 show <run-id>
-cybertron v6 grants <run-id>
+python3 -m cybertron.installer v6 runs --project "$TEST_PROJECT"
+python3 -m cybertron.installer v6 show <run-id> --project "$TEST_PROJECT"
+python3 -m cybertron.installer v6 grants <run-id> --project "$TEST_PROJECT"
 ```
 
 以及：
 
 ```bash
 python3 -m unittest discover -s tests -v
+python3 -m cybertron.stage5_verify
+python3 cybertron_primes_engine.py
 node --test tests/v6_plugin_runtime.test.mjs tests/v6_plugin_hook.test.mjs tests/dsh_adapter_bridge.test.mjs
 ```
+
+针对本轮修复的快速回归：
+
+```bash
+python3 -m unittest tests.test_external_scope tests.test_v6_m2_host_gates tests.test_v6_cli tests.test_v6_permissions -v
+node --test tests/v6_plugin_runtime.test.mjs
+```
+
+轻量化 Harness Loop 的三项软件验收已在隔离临时项目实际运行。默认入口用单节点结算精确内容文件。回归项目保留原测试并验证一次失败后在同一 run 修订。互动终端通过 Shift+Tab 选择第十三天尊，再切回先觉天接续同一会话。运行标识、插件加载来源、角色切换和工具退出码见 [结构化回执](harness-loop-release-validation.json)。
+
+## 会话横幅验收
+
+在加载本次生成角色配置的隔离项目中，向 Prima 提交单文件任务。按对话时间顺序核对首次规划派发、写入派发和结算。较小的任务可以把计划摘要合并进写入派发横幅。下方是单文件交付的预期样式。
+
+```text
+━━━ ⏳ 派发 · alpha-trion ━━━
+目标：写入 notes.md，核对精确内容
+
+━━━ ✓ alpha-trion · 已完成 ━━━
+结果：notes.md 已写入并校验 SHA-256
+下一步：汇报交付
+
+━━━ ✓ 运行已完成 ━━━
+运行：<run ID> · revision 0
+交付：<notes.md 的绝对路径>
+验收：<内核校验回执>
+人工介入：0
+```
+
+- **直接规划**。Thirteenth 提交后展示「计划已提交」，带上运行标识、版本、范围和验收条件。切回 Prima 后从同一 run 接续。
+- **重规划**。出现真实失败回执时，Prima 展示触发原因、当前版本和拟保留成果。Thirteenth 只在修订提交成功后报告新版本和已复用节点。
+- **手工验收与受控动作**。仅在任务或宿主确实需要人工决定时显示待确认横幅，决定由现有原生交互收集。部署与回滚可以先用展示样例检查字段。

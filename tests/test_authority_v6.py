@@ -16,7 +16,8 @@ class AuthorityTests(unittest.TestCase):
 
     def test_escalation_ceilings(self):
         self.assertTrue(can_escalate("vector-prime", "vcs.push"))
-        self.assertTrue(can_escalate("megatronus", "device"))
+        self.assertTrue(can_escalate("nexus-prime", "device"))
+        self.assertFalse(can_escalate("megatronus", "device"))
         self.assertFalse(can_escalate("prima", "vcs.push"))
         self.assertFalse(can_escalate("solus-prime", "device"))
         self.assertFalse(can_escalate("liege-maximo", "vcs.write"))

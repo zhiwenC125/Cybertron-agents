@@ -27,10 +27,12 @@ def main() -> None:
         for agent in npm_agents:
             assert archive.read(f"cybertron/payload/agents/{agent}") == (
                 Path(".opencode/agents") / agent).read_bytes()
-        plugin = "plugins/cybertron.js"
-        assert f"payload/{plugin}" in npm_files
-        assert f"cybertron/payload/{plugin}" in wheel_files
-        assert archive.read(f"cybertron/payload/{plugin}") == Path(".opencode/plugins/cybertron.js").read_bytes()
+        for name in ("cybertron.js", "hook_logic.mjs", "shell_policy.mjs"):
+            plugin = f"plugins/{name}"
+            assert f"payload/{plugin}" in npm_files, plugin
+            assert f"cybertron/payload/{plugin}" in wheel_files, plugin
+            assert archive.read(f"cybertron/payload/{plugin}") == (
+                Path("cybertron/v6_plugin") / name).read_bytes(), plugin
         dsh_files = ("package.json", "cordis.patch.yml", "index.js", "bridge.js",
                      "icon.svg", "locale/en.json", "locale/zh.json", "docs/DETAIL.md")
         for rel in dsh_files:
