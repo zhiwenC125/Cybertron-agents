@@ -88,7 +88,7 @@ python3 -m cybertron.stage6_verify --live
 opencode2 debug config
 ```
 
-建议先在**专用测试空间**跑通，再用于正式知识库。
+真实验收只在已获准的**专用测试空间**运行。正式知识库写入按项目规则另行授权。[安全基线](../AGENTS.md)
 
 ## 6. 安全边界
 

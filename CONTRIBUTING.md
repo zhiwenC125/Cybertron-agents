@@ -4,9 +4,9 @@
 
 ## 开始开发
 
-1. 阅读 [架构设计](design/cybertron_13_primes_architecture.md)、[开发计划](DEVELOPMENT_PLAN.md)、[安全基线](AGENTS.md)和相关[阶段记录](docs/stages/)。
+1. 阅读 [架构设计](design/cybertron_13_primes_architecture.md)、[开发计划](DEVELOPMENT_PLAN.md)、[安全基线](AGENTS.md)和相关[阶段记录](docs/stages/v6-progress.md)。
 2. 从最新 `main` 建分支，名称说明目的，例如 `feat/model-routing` 或 `fix/installer-backup`。
-3. 修改功能时同步更新使用说明和阶段记录；不要把本机凭证、公司模型目录、项目私有文件、生成的运行账本或设备数据提交到 Git。
+3. 修改功能时同步更新使用说明。提交结构化摘要时应去掉本机路径、凭证、私有模型目录、项目文件和设备标识。完整会话和运行日志在本地或经授权的存储中保留。
 4. 创建 PR，说明用户可见行为、实现范围、验证命令、实际工具回执和遗留限制。至少由另一位协作者审查；涉及角色权限、发布流程或物理操作的变更须由仓库维护者审查。
 
 ## 代码和权限边界
@@ -23,6 +23,7 @@
 python3 -m unittest discover -s tests -v
 python3 -m cybertron.stage5_verify
 python3 cybertron_primes_engine.py
+node --test tests/*.test.mjs
 python3 scripts/bump_version.py --check
 ```
 
@@ -30,7 +31,7 @@ python3 scripts/bump_version.py --check
 
 ## PR 审查重点
 
-- 用户能否在 Build/Plan 默认体验下选择 `prima` 并直接输入自然语言；`/cybertron` 仍是可选入口。
+- 核对 Prima 默认入口、Thirteenth 直接规划和可选的 `/cybertron` 命令能按文档交接。
 - 十三个角色的权限和模型映射是否符合任务边界；配置失败是否阻塞或恢复，不能静默回退到未经允许的供应商。
 - 运行状态、宿主证据、安装升级和回滚是否可验证。
 - 文档是否区分“本地实现”“真实宿主验收”和“已公开发布”。

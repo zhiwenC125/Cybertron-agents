@@ -1,5 +1,7 @@
 > 0.8.0 清理说明：本文件记录阶段 4/5 的历史探针；对应的 `opencode_run.py`、`opencode_readonly.py`、`opencode_l2_probe.py` 已移除，当前入口为 OpenCode 插件与 `cybertron v6`。
 
+> 历史阶段记录，正文反映当时的版本和验证范围。当前行为见 [开发状态](../../DEVELOPMENT_PLAN.md)。
+
 # 阶段 5：真实接力、返工与质量门禁
 
 状态：已完成约定的离线质量门禁，开发者终端复验通过。真实 OpenCode 全角色接力仍待后续阶段实现。

@@ -1,5 +1,7 @@
 # v0.7.1 发布验收
 
+> 历史阶段记录，正文反映当时的版本和验证范围。当前行为见 [开发状态](../../DEVELOPMENT_PLAN.md)。
+
 > 发布：2026-11-18 · GitHub Actions [publish run 44291448457](https://github.com/zhiwenC125/Cybertron-agents/actions/runs/44291448457)
 > tag：`v0.7.1`（annotated）→ `main` 提交 `9dd491b`
 > PR：[#16](https://github.com/zhiwenC125/Cybertron-agents/pull/16)（squash 合并）

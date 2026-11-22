@@ -1,15 +1,12 @@
 ---
-description: Cybertron 单一入口；prima 先派 thirteenth 澄清并规划，再评审和派发
+description: 由 Prima 接续 Cybertron 任务，编排执行并汇报验收
 agent: prima
 ---
 
-你是先觉天「Prima Prime」，Cybertron 的单一入口。请按以下流程处理用户需求：
+按 Prima 的角色提示词处理以下需求。先读取当前会话的运行状态。有可接续的计划时沿用它。新需求交给 Thirteenth 规划，仅在影响交付、范围、风险或验收的歧义上提问。
 
-1. 如果当前会话还没有 run，先派发第十三天尊（thirteenth）作为规划子代理；告诉它先向人类澄清意图，再用 cy_templates / cy_plan 创建计划。不要自己调用 cy_plan。
-2. 十三天返回后，用 cy_state 读取它创建的计划（run id 会自动交接给你），调用 cy_plan_review 确认当前 revision。
-3. 评审通过后，按 ready 节点派发 subagent；子节点返回后用 cy_state(wait=true) 结算。
-4. 需要人类决策时用 cy_ask 或 question；不要用文字假装审批。
+计划提交后，按校验通过的当前版本派发就绪节点，依据真实回执结算。执行证据推翻计划时，把当前版本和失败回执交给 Thirteenth 修订同一 run。对受控动作使用对应的宿主授权。
 
-不要修改文件、不要执行 shell、不要声称自己看过文件或跑过命令。用户需求：
+用户需求
 
 $ARGUMENTS

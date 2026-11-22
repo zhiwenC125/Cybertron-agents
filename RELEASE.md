@@ -14,12 +14,12 @@
 
 ## 每次发布
 
-1. 从最新 `main` 开发布准备分支：`git switch -c release/vX.Y.Z`。
+1. 从最新 `main` 建立短期发布准备分支，例如 `git switch -c release-prep/X.Y.Z`。
 2. 运行 `python3 scripts/bump_version.py X.Y.Z`。它同时更新 npm、Python、Shell 默认 tag 和 Python fallback 版本；运行 `python3 scripts/bump_version.py --check` 核对。随后运行 `node scripts/build-payload.mjs`，更新 README、安装文档、阶段记录和变更说明。在 `docs/releases/vX.Y.Z.md` 写发布说明；`publish.yml` 会把它作为 GitHub Release 正文，缺失会先让 verify 失败。
 3. 运行 [CONTRIBUTING.md](CONTRIBUTING.md) 所列测试及安装包验收，在临时项目验证三条安装路径。提交 PR，等待 `offline` CI 与维护者审查；合并到 `main`。
-4. 在 `main` 上建立并推送指向合并提交的**附注 tag**：`git tag -a vX.Y.Z -m 'Cybertron Agents X.Y.Z'`，然后 `git push origin vX.Y.Z`。不要移动或复用已有发布 tag。
+4. 在 `main` 上建立并推送指向合并提交的**附注 tag**：`git tag -a vX.Y.Z -m 'Cybertron Agents X.Y.Z'`，然后 `git push origin vX.Y.Z`。发布 tag 保持固定。将 `release/X.Y.Z` 从同一发布提交建立并推送，用于公开标记当前发布分支。更早的发布可通过对应 tag 查阅。
 5. 在 GitHub **Actions → publish → Run workflow** 输入该 tag。工作流验证 tag 已在 `main` 历史中且版本完全一致，再构建一次、比对包内容，通过 OIDC 发布到 npm 和 PyPI，最后上传同批归档及 `SHA256SUMS` 到 GitHub Release。若某渠道已成功而后续渠道失败，只重跑失败 job；不要重复发布不可变版本。
-6. 从三个**公开**渠道下载或查询版本，检查包文件名、摘要和 CLI 版本。将验收结果写入 `docs/stages/` 并提交到 `main`。若不同渠道分别重建导致压缩包摘要不同，逐文件比对并记录各渠道自己的摘要。
+6. 从三个**公开**渠道下载或查询版本，检查包文件名、摘要和 CLI 版本。将脱敏后的结构化验收结果保存到 `docs/testing/`，并提交到 `main`。若不同渠道分别重建导致压缩包摘要不同，逐文件比对并记录各渠道自己的摘要。
 
 ## 故障处理
 

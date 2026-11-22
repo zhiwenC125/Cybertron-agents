@@ -1,5 +1,7 @@
 # 阶段 6：飞书知识库接入
 
+> 历史阶段记录，正文反映当时的版本和验证范围。当前行为见 [开发状态](../../DEVELOPMENT_PLAN.md)。
+
 状态：自建应用的 `tenant_access_token` 路径已由开发者在专用测试空间完成真实读写回环；可选 MCP 的 OpenCode V2 宿主权限判定已在本机完成 27 项检查。回执来源与验收范围见 [`06-feishu-acceptance.json`](06-feishu-acceptance.json)。实际 MCP 工具调用尚未执行。下文后半部分保留此前排障记录。
 
 ## 实现与代码分工

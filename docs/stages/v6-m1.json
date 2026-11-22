@@ -10,89 +10,9 @@
     "plan_shapes",
     "export_permission_consistency"
   ],
-  "commands": [
-    {
-      "cmd": "python3 -m unittest discover -s tests -v",
-      "cwd": "/Users/alanbanana/Cybertron-Agent",
-      "exit": 0,
-      "utc": "2026-11-16T04:08:50.170681+00:00",
-      "sha256": "d66d788ada101c6b1548e19bf3a713c4593adfb453f7c2e57fec5f9abaafa499",
-      "source": "tool",
-      "output_path": "docs/stages/v6-m1-unittest.log"
-    },
-    {
-      "cmd": "node --test tests/v6_plugin_hook.test.mjs tests/v6_plugin_runtime.test.mjs",
-      "cwd": "/Users/alanbanana/Cybertron-Agent",
-      "exit": 0,
-      "utc": "2026-11-16T04:08:50.720098+00:00",
-      "sha256": "62c2a601f8827825fe4f96e65700a116f40108b3702cb0037d5e75fbaffc2aa2",
-      "source": "tool",
-      "output_path": "docs/stages/v6-m1-plugin.log"
-    },
-    {
-      "cmd": "python3 -c 'from pathlib import Path; from cybertron.opencode_v2 import validate_bundle; errors=validate_bundle(Path('\"'\"'.'\"'\"')); print('\"'\"'bundle errors:'\"'\"', errors); raise SystemExit(bool(errors))'",
-      "cwd": "/Users/alanbanana/Cybertron-Agent",
-      "exit": 0,
-      "utc": "2026-11-16T04:08:50.769537+00:00",
-      "sha256": "39bf484f4b80873bb2d66e2a2329aede7d0024662d76714c59cda725770323c2",
-      "source": "tool",
-      "output_path": "docs/stages/v6-m1-bundle-check.log"
-    },
-    {
-      "cmd": "PYTHONPATH=. python3 tests/v6_m1_probe.py",
-      "cwd": "/Users/alanbanana/Cybertron-Agent",
-      "exit": 0,
-      "utc": "2026-11-16T04:08:51.095186+00:00",
-      "sha256": "d6bf85d4c01f95c15c8612a326dfcff49e25f62bb9922bdb5014b53327441e35",
-      "source": "tool",
-      "output_path": "docs/stages/v6-m1-plan-shapes.log"
-    },
-    {
-      "cmd": "python3 -m cybertron.stage5_verify",
-      "cwd": "/Users/alanbanana/Cybertron-Agent",
-      "exit": 0,
-      "utc": "2026-11-16T04:09:02.054872+00:00",
-      "sha256": "daa9ccab84ae38f56f829ccd1eb1cae2346eaffd4c85e18758e1340017aa3b83",
-      "source": "tool",
-      "output_path": "docs/stages/v6-m1-stage5.log"
-    },
-    {
-      "cmd": "python3 cybertron_primes_engine.py",
-      "cwd": "/Users/alanbanana/Cybertron-Agent",
-      "exit": 0,
-      "utc": "2026-11-16T04:09:02.108867+00:00",
-      "sha256": "6a765936bd6248befc8aa162b8f6660f1da1ed944c0b8e96077a6451e8d87ff4",
-      "source": "tool",
-      "output_path": "docs/stages/v6-m1-engine.log"
-    },
-    {
-      "cmd": "opencode2 debug config",
-      "cwd": "/Users/alanbanana/Cybertron-Agent",
-      "exit": 0,
-      "utc": "2026-11-16T04:09:02.152492+00:00",
-      "sha256": "a6c2af82832f0a76cbda1ee0f80d705ef49408fc50aebdb3fc3190d796564071",
-      "source": "tool",
-      "output_path": null
-    },
-    {
-      "cmd": "git diff --check",
-      "cwd": "/Users/alanbanana/Cybertron-Agent",
-      "exit": 0,
-      "utc": "2026-11-16T04:09:02.165101+00:00",
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "source": "tool",
-      "output_path": "docs/stages/v6-m1-diff-check.log"
-    }
-  ],
-  "host": null,
-  "plan_shapes_path": "docs/stages/v6-m1-plan-shapes.json",
-  "negative_cases": [
-    "seven catalog invariants reject violations",
-    "invalid graph operations preserve revision and nodes",
-    "M2 gate conclusions fail closed",
-    "native dispatch mismatch is rejected visibly"
-  ],
-  "open_issues": [
-    "Read-only review and scan nodes use scope_guard in M1; gate facts and verifier receipts remain fail-closed until M2."
-  ]
+  "historical_evidence": {
+    "source_ref": "v0.9.0",
+    "path": "docs/stages/v6-m1.json",
+    "sha256": "3ed15f173fae3115718e02bfa20921a20daae05f70fa91c77569cd931fa0296f"
+  }
 }

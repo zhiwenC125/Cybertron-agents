@@ -7,61 +7,9 @@
     "integration_test_real_subprocess",
     "out_of_scope_write_rolled_back"
   ],
-  "commands": [
-    {
-      "cmd": "PYTHONPATH=. python3 tests/v6_m0b_probe.py",
-      "exit": 0,
-      "utc": "2026-11-15T18:28:50.631108+00:00",
-      "sha256": "250f38f07a92b036ef52921d295f18bde748b6ddcdbf90b5020e53f92b36bb98",
-      "source": "tool",
-      "output_path": "docs/stages/v6-m0b-probe.log"
-    },
-    {
-      "cmd": "python3 -m unittest tests.test_scope_guard_v6 tests.test_kernel_v6 -v",
-      "exit": 0,
-      "utc": "2026-11-15T18:28:50.747701+00:00",
-      "sha256": "3a83162b5d5551151456f4fe56cedb5315d1f1a760923a1c9a97d1da22ff08ca",
-      "source": "tool",
-      "output_path": "docs/stages/v6-m0b-integration.log"
-    },
-    {
-      "cmd": "python3 -m unittest discover -s tests -v",
-      "exit": 0,
-      "utc": "2026-11-15T18:28:57.379939+00:00",
-      "sha256": "f65075da79d494dc42abf007a4aff800c1748adcb79e3dc1278dc8679582bb61",
-      "source": "tool",
-      "output_path": "docs/stages/v6-m0b-unittest.log"
-    },
-    {
-      "cmd": "python3 -m cybertron.stage5_verify",
-      "exit": 0,
-      "utc": "2026-11-15T18:29:08.104972+00:00",
-      "sha256": "ad591e181f463578ae54441475bbb2610c893d176a2ba56fbbe6d0f7c8c75541",
-      "source": "tool",
-      "output_path": "docs/stages/v6-m0b-stage5.log"
-    },
-    {
-      "cmd": "python3 cybertron_primes_engine.py",
-      "exit": 0,
-      "utc": "2026-11-15T18:29:08.160264+00:00",
-      "sha256": "6a765936bd6248befc8aa162b8f6660f1da1ed944c0b8e96077a6451e8d87ff4",
-      "source": "tool",
-      "output_path": "docs/stages/v6-m0b-engine.log"
-    }
-  ],
-  "host": null,
-  "integration_probe_path": "docs/stages/v6-m0b-integration-probe.json",
-  "integration_probe_sha256": "caa838e7790e430fdb4ca7ad8ed4c2494af7b6864623248e923a6312ce0355b6",
-  "negative_cases": [
-    "out-of-scope create/edit/delete are rolled back",
-    ".git and .cybertron/runs writes are rejected and restored",
-    "run event tampering is restored and the node fails",
-    "model-source receipt cannot complete the node",
-    "preexisting and newly created symlinks are rejected",
-    "multi-node plan is rejected before dispatch"
-  ],
-  "open_issues": [
-    "M0c must bind the dispatcher to native host task hooks and validate host receipts.",
-    "M0b rejects workspaces containing any symlink before dispatch; later scope policy may narrow this safely."
-  ]
+  "historical_evidence": {
+    "source_ref": "v0.9.0",
+    "path": "docs/stages/v6-m0b.json",
+    "sha256": "b9e4a43773377e461f75132874f4a675df6f83268ad8d55e972a0ccf502840c1"
+  }
 }

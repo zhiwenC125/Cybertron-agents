@@ -1,5 +1,7 @@
 # 阶段 I：0.2.1 三渠道发布核验
 
+> 历史阶段记录，正文反映当时的版本和验证范围。当前行为见 [开发状态](../../DEVELOPMENT_PLAN.md)。
+
 日期：2026-11-15。tag `v0.2.1` 指向提交 `5fe31e593055a18fd03af2e80e56d6095d06d8f3`；发布时 `main` 指向 `a5ffbdce6c6414148a70d37ffa450da576c0fc09`（包含 PR #4 的 workflow 修复）。PR #3 的 `offline` CI 与 `main` CI 均通过。
 
 | 渠道 | 公开地址 | 验证结果 |
