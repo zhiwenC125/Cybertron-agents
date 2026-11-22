@@ -1,5 +1,7 @@
 # 阶段 N（Phase 4）：full-access 拦截器、standing grant、DSH Grant 与 seed_from
 
+> 历史阶段记录，正文反映当时的版本和验证范围。当前行为见 [开发状态](../../DEVELOPMENT_PLAN.md)。
+
 状态：Phase 4 已实现；本阶段完成后，intent-first 实施线的 6 个检查点全部交付。
 日期：2026-11-19
 

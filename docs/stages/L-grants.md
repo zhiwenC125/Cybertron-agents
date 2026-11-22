@@ -1,5 +1,7 @@
 # 阶段 L（Phase 2）：Grant 核心与派发授权
 
+> 历史阶段记录，正文反映当时的版本和验证范围。当前行为见 [开发状态](../../DEVELOPMENT_PLAN.md)。
+
 状态：Phase 2 已实现；未改变 full-access 拦截器与飞书 standing grant（属于后续）。
 日期：2026-11-19
 

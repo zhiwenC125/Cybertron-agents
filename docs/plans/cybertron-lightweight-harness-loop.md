@@ -51,7 +51,7 @@ Prima 派发 ready 节点
 执行角色返回产物与工具反馈
    ↓
 Prima 收集状态和真实回执
-   ├─ 计划仍成立 → Megatronus 核验验收条件 → Prima 结算
+   ├─ 计划仍成立 → 回读或核验真实回执 → Prima 结算
    └─ 反馈推翻假设 → Thirteenth 在同一 run 修订受影响节点 → Prima 继续派发
 ```
 
@@ -131,6 +131,6 @@ Prima 收集状态和真实回执
 
 ## 9. 当前状态说明
 
-根目录与测试目录的 OpenCode 配置由角色注册表导出。仓库检出目录保留插件文件的原有删除状态，安装器和隔离验收从插件源目录读取运行时文件。结构化验收结果见 [Harness Loop 回执](../testing/harness-loop-release-validation.json)。
+OpenCode 角色权限从注册表导出。安装包从插件源目录分发运行时。真实宿主和自动化测试的结构化结果见 [Harness Loop 回执](../testing/harness-loop-release-validation.json)。可以按 [自然语言用例](../testing/opencode-acceptance.md) 复验。
 
 固定检查当前通过 macOS 隔离运行器执行。实体设备和远程部署由 Nexus 负责，并继续遵循项目专项审批。STM32 有独立设备代理，本轮软件场景在临时项目中验证。远程部署与设备上电的通用宿主执行入口仍未接入。

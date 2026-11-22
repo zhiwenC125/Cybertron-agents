@@ -1,14 +1,10 @@
 # 阶段 H：十三角色模型配置与混合编队
 
+> 历史阶段记录，正文反映当时的版本和验证范围。当前行为见 [开发状态](../../DEVELOPMENT_PLAN.md)。
+
 日期：2026-11-15。状态：本地验收完成，并随公开 `0.2.0` 发布。
 
-## 用户路径
-
-三种安装方式完成后，按渠道运行模型配置：npm 用 `npx -y cybertron-agents@0.4.0 models setup`；pipx 用 `cybertron models setup`（必要时先 `pipx ensurepath`）；Shell 安装用 `./.opencode/bin/cybertron models setup`（或安装器打印的绝对路径）。交互向导展示当前十三角色映射，支持只改一个角色、重新指定高/中/低三档、统一模型或退出。再次运行同一命令即可切换；`show` 查看最终映射，`doctor` 对照 OpenCode 模型目录、角色文件、命令文件与实际加载的角色，`rollback` 恢复上一份配置。`--project DIR` 配置公司项目；项目完整编队覆盖用户全局编队。
-
-已有 OpenCode 认证由 OpenCode 继续管理。`provider-add` 只登记 OpenAI 兼容网关的地址、环境变量名称和模型 ID，不读取或保存 Key；模型选择必须能从 OpenCode 模型目录中查到。可选 `--probe` 在只有合成文件的临时目录检查所选模型的读取工具和结构化回复，可能产生费用。公司网关如只配置在项目局部，在线探测需要先将该网关登记到全局 OpenCode 作用域。
-
-OpenCode 中仍用 Shift+Tab 选 `prima` 后输入自然语言，或在 Build 中运行 `/cybertron`。插件将主角色会话切换到编队中的模型并核对上下文；子角色派单显式带对应模型。run 保存编队摘要，编队切换时旧 run 阻塞，避免在同一 run 内混用模型。模型配置层不修改 `registry.py` 中的角色权限，也不授予物理操作许可。
+当前安装、模型配置和两种 OpenCode 入口以 [安装指南](../packaging-and-installation.md) 为准。以下保留 0.2.0 交付时的实现和验收说明。
 
 ## 实现与恢复
 

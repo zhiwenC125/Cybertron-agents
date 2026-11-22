@@ -39,7 +39,7 @@
       "exit_code": 0,
       "stdout_sha256": "6a765936bd6248befc8aa162b8f6660f1da1ed944c0b8e96077a6451e8d87ff4",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "summary": "on ===\n[PASS] 9-Step Software + Hardware Full-Lifecycle Ledger verified.\n[PASS] Dedicated Documentation & Feishu Wiki Steward (Alpha Trion) verified.\n[PASS] Dedicated Two-Tier Code Review (Micronus L1 + Liege Maximo L2) verified.\n[PASS] Hardware Deployment Separation verified: Nexus Prime (Cross-Compile=DENY until sandboxed, Flash=DENY) vs Megatronus (Physical Flash=ASK).\n[PASS] Exported 14 OpenCode V2 files & 1 DeepSeek Harness files to /Users/alanbanana/Cybertron-Agent/cybertron_workspace_dist"
+      "summary": "on ===\n[PASS] 9-Step Software + Hardware Full-Lifecycle Ledger verified.\n[PASS] Dedicated Documentation & Feishu Wiki Steward (Alpha Trion) verified.\n[PASS] Dedicated Two-Tier Code Review (Micronus L1 + Liege Maximo L2) verified.\n[PASS] Hardware Deployment Separation verified: Nexus Prime (Cross-Compile=DENY until sandboxed, Flash=DENY) vs Megatronus (Physical Flash=ASK).\n[PASS] Exported 14 OpenCode V2 files & 1 DeepSeek Harness files to <repository>/cybertron_workspace_dist"
     },
     {
       "argv": [

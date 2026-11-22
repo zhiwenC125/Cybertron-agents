@@ -1,5 +1,7 @@
 # 阶段 O（OpenCode 硬化）：自动推断、CLI、指标、v5 收口与 0.8.0
 
+> 历史阶段记录，正文反映当时的版本和验证范围。当前行为见 [开发状态](../../DEVELOPMENT_PLAN.md)。
+
 状态：OpenCode 侧 6 项硬化已实现；版本已 bump 到 `0.8.0`，**尚未发布渠道**。
 日期：2026-11-19
 
@@ -79,7 +81,7 @@ cybertron v6 lineage <run-id>
 
 ## 首次真实试用发现与修复（2026-11-19）
 
-在 `/Users/alanbanana/cyto-trial` 的真实试运行中，`notes.md` 成功写入，但 run 卡在 `running`。定位到三个问题并已修复：
+在 `<home>/cyto-trial` 的真实试运行中，`notes.md` 成功写入，但 run 卡在 `running`。定位到三个问题并已修复：
 
 1. **单节点状态被 intent 降级为 blocked**：节点仍在 `running`、有 active dispatch 时，单节点结果覆盖逻辑因为 `intent_blockers` 把 status 改成 `blocked`；`cy_state(wait=true)` 只在 `running` 时等待，于是永远不结算。修复：running 节点不再被降级；`cy_state` 在存在 active dispatch 时也等待并 settle。
 2. **规划子会话被误判为派发子会话**：thirteenth 创建 run 后，同一子会话刷新 context 时 `parentRun` 已存在，但它是规划子会话，没有 node binding，报 `Native child has no verified Cybertron node binding`。修复：记录 `planner/<child session>`，context hook 优先按规划子会话处理。
@@ -94,7 +96,7 @@ cybertron v6 lineage <run-id>
 
 另外确认：`workspace-write` 任务**不需要** `cy_ask`。`cy_ask` 只用于 Grant、项目外写和危险动作；普通项目内写入由节点 `write_scope` + `scope_guard` 控制。
 
-最小成功案例见 [`docs/cases/opencode-minimal-file.md`](../cases/opencode-minimal-file.md)。
+最小成功案例见 [0.8.0 最小文件实测记录](https://github.com/zhiwenC125/Cybertron-agents/blob/v0.9.0/docs/cases/opencode-minimal-file.md)。
 
 ## 验证
 

@@ -1,3 +1,0 @@
-Isolation: {'scratch_write': 'allowed', 'project_write': 'blocked', 'device_read': 'blocked', 'network_connect': 'blocked'}
-QA: completed; ledger step 6: completed
-QA evidence: (QualityEvidence(kind=<QualityKind.TEST: 'test'>, passed=True, source='sandbox://sha256/b8a4411b74f67dec814926308d22e2892a36bab9f4b914a0ada972d98dc2c0b9', source_type=<EvidenceSource.SANDBOX: 'sandbox'>, command_or_tool='python -m unittest discover -s tests -q', exit_code=0, observed_at_utc='2026-11-16T15:44:43.219751+00:00', output_sha256='b8a4411b74f67dec814926308d22e2892a36bab9f4b914a0ada972d98dc2c0b9', verified_by='MacOSSandboxRunner', reference='sandbox://sha256/b8a4411b74f67dec814926308d22e2892a36bab9f4b914a0ada972d98dc2c0b9'),)

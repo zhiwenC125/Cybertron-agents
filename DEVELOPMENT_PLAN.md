@@ -1,37 +1,22 @@
-# Cybertron → OpenCode V2 分阶段开发计划
+# Cybertron 开发状态
 
-轻量化 Harness Loop 的实现与角色职责见 [当前方案](docs/plans/cybertron-lightweight-harness-loop.md)。单文件交付、同一 run 重规划和终端角色切换的实际结果见 [结构化验收回执](docs/testing/harness-loop-release-validation.json)。
+当前公开版本为 **0.9.0**，主开发分支为 `main`，`release/0.9.0` 对应发布提交。[发布说明](docs/releases/v0.9.0.md) · [文档目录](docs/README.md)
 
-> v6 动态任务图方案见 [`design/DEVELOPMENT_PLAN.md`](design/DEVELOPMENT_PLAN.md)。v6 M0–M5 已全部通过门禁，`0.3.0` 起运行时以图计划为准；里程碑命令、回执与哈希见 [`docs/stages/v6-progress.md`](docs/stages/v6-progress.md)。本文以下 A–G 阶段与七步表记录 v5 历史验收，保留作追溯。
+## 已交付
 
-七阶段最小闭环后的运行态持久化、安装发布与双宿主后续工作，见 [`docs/handoffs/2026-11-14-runtime-architecture.md`](docs/handoffs/2026-11-14-runtime-architecture.md)。该文件的 A–G 阶段是后续实施计划，不改变下表的历史验收状态。
+| 范围 | 当前状态与证据 |
+| --- | --- |
+| OpenCode 日常软件任务 | Prima 默认入口、Thirteenth 直接规划、同一 run 修订、按任务验证，均有隔离项目验收。[实现记录](docs/plans/cybertron-lightweight-harness-loop.md) · [结构化回执](docs/testing/harness-loop-release-validation.json) |
+| 角色权限与质量门禁 | 角色注册表、宿主权限、隔离 QA 和来源校验已接入。隔离配置适用于 macOS `sandbox-exec`。[权限说明](design/role-capability-matrix.md) · [阶段 5](docs/stages/05-quality-gates.md) |
+| 安装与模型配置 | npm、PyPI 和 GitHub Release 已提供安装入口。模型编队支持全局、项目覆盖和回滚。[安装与升级](docs/packaging-and-installation.md) |
+| 飞书 | 自建应用在专用测试空间完成网关读写。按 Wiki 空间授权启用。[用户指南](docs/feishu-setup.md) · [历史回执](docs/stages/06-feishu-acceptance.json) |
+| STM32 最小设备闭环 | 旧阶段已验证最小 App 的受控烧录、SRAM 心跳和原固件恢复。[设备阶段记录](docs/stages/07-deployment.md) |
+| DSH 适配 | 随包提供实验性单一 persona 和账本工具。十三角色子会话和回执绑定仍以 OpenCode 路径为准。[适配器说明](cybertron/dsh_adapter/docs/DETAIL.md) |
 
-后续实施阶段 A（配置与安装基线）已完成本地离线开发验收，记录见 [`docs/stages/A-installation-baseline.md`](docs/stages/A-installation-baseline.md)。改动已随 `0.2.0` 发布到 npm、PyPI 和 GitHub Release。阶段 5 的隔离验收已在本轮恢复通过。
+## 尚待覆盖
 
-后续实施阶段 B（离线 RunStore）已完成本地开发验收，记录见 [`docs/stages/B-runstore.md`](docs/stages/B-runstore.md)。`cybertron run create/show/verify/resume` 仅管理本地状态，`resume` 不会调用模型或重新执行工具。
+- 完整 OTA App 与 ESP32-S3 的真机结果仍需分别验收。
+- 通用设备上电和远程部署的宿主入口仍待接入。每次实际动作继续按项目安全基线取得授权。
+- DSH 的子会话写入范围和可信回执绑定仍待实现。
 
-后续实施阶段 C（session/slug 管理）已完成本地开发验收，记录见 [`docs/stages/C-session-management.md`](docs/stages/C-session-management.md)。同一 session 可含多个 run，旧 slug 保留为别名。
-
-后续实施阶段 D（证据来源与审批围栏）已完成本地离线开发验收，记录见 [`docs/stages/D-evidence-approval.md`](docs/stages/D-evidence-approval.md)。模型文字及未验证来源不能通过 L1/L2/测试门禁；有副作用操作必须绑定具体计划和宿主核验回执。真实宿主审批与执行仍待阶段 E 接入。
-
-后续实施阶段 E 已完成 OpenCode **软件路径**的本地开发与真实宿主验收，记录见 [`docs/stages/E-opencode-orchestration.md`](docs/stages/E-opencode-orchestration.md)。在临时项目中，`prima` 自然语言与 Build 模式下的 `/cybertron` 均触发持久化 run；九步软件流程含 12 次真实角色派单、L1/L2 宿主审查回执、隔离 QA 与明确的无硬件跳过。硬件路径的物理执行仍受独立审批约束；`0.2.0` 已发布。
-
-后续阶段 J（访问模式与可读 run 目录）已完成本地开发验收，记录见 [`docs/stages/J-access-modes.md`](docs/stages/J-access-modes.md)。新增 `read-only` / `workspace` / `full` 三种 run 级访问模式、可读 run 目录 `<slug>--<短 ID>`，以及随会话模型自适应的模型选择。
-
-模型配置与混合编队的[产品方案](docs/plans/model-configuration-product-spec.md)已获用户审核，并随 `0.2.0` 发布。支持公司单 Key 多模型、私人多厂商混编、已有 OpenCode 认证复用、十三角色映射、重复切换与回滚。验收记录见[模型配置阶段](docs/stages/H-model-configuration.md)；渠道核验见[发布验收记录](docs/stages/I-release-020.md)。
-
-开发节奏：每次只交付一个阶段的代码和测试命令；开发者在终端验收并反馈结果后，再开始下一阶段。这里的七个开发阶段与引擎内部九步 SDLC 流程是两种不同的划分。
-
-截至 2026-11-14，七阶段的**最小闭环基线已达成**：第 7 阶段已通过 STM32 最小测试 App 的真实烧录、SRAM 心跳和原固件逐字节回滚。表中第 7 阶段仍标为进行中，表示完整 OTA App、ESP32-S3、隔离构建及宿主审批接口没有验收；不能把最小闭环等同于全部目标完成。
-
-| 阶段 | 状态 | 交付目标 | 阶段通过条件 |
-| --- | --- | --- | --- |
-| 1. 代码解耦与基线 | 已完成 | 模块化、保留原入口、导出配置 | Python 单元测试和自检通过 |
-| 2. 本地执行接口 | 已完成 | 统一任务/结果协议、模拟派单、多角色接力 | 模拟 13 次派发；默认停在硬件审批前；错误结果阻塞 |
-| 3. OpenCode V2 配置接入 | 已完成，用户终端验收通过 | 独立导出 V2 配置包，先关闭需要凭证的飞书 MCP；本地结构校验 | 运行导出命令；`opencode2 debug config` 能加载；检查 `prima` 和 13 个角色；无真实模型调用 |
-| 4. OpenCode V2 单角色执行 | 已完成，用户终端验收通过 | 让 `AgentExecutor` 接入一个真实的 OpenCode V2 角色 | 一个无文件改动的小任务得到结构化结果；超时、异常和身份不符时账本阻塞 |
-| **5. 真实接力与质量门禁** | **已完成，用户终端离线验收通过** | 按九步流程调度；L1/L2 拒绝后返工、重审；结构化测试证据；隔离运行测试脚本 | 注入拒绝能回派编码角色；重审完整执行；超限阻塞；无证据不能越过门禁；隔离执行的脚本不能访问实体硬件；不要求向外部模型发送项目文件 |
-| **6. 飞书知识库** | **已完成，开发者终端应用身份回环通过** | 仅钛师傅执行文档读写；租户令牌与权限隔离 | 应用身份下测试空间读写和无凭证失败；其他角色访问被拒绝 |
-| **7. 构建、硬件审批与交付** | **进行中：STM32 最小真机烧录与回滚闭环已通过** | 构建产物、目标设备清单、人工批准和回执 | 完整 OTA App、ESP32-S3、隔离构建与宿主审批接口仍需单独验收 |
-
-阶段 3 的配置加载和阶段 4 的单角色执行已由用户终端验证。用户最初未授权外部模型读取项目文件；2026-11-15 已明确允许阶段 E 的真实宿主验证。阶段 5 的 30 项单元测试、配置加载、隔离探针与真实 QA 证据入账已由用户在终端复验通过；此前外部 L2 审查结果只作为已发现问题的线索，不作为新的必需门禁。阶段 5 的原始通过范围是离线质量门禁；阶段 E 已补充真实 OpenCode 软件接力验证。阶段 6 的应用身份 Wiki 创建、追加和回读已由开发者在专用测试空间运行通过；此空间的根目录创建闭环要求自建应用获得知识库管理员权限，飞书官方支持通过将含应用机器人的群聊设为管理员来完成。可选 MCP 的本机 OpenCode V2 宿主权限判定已通过，实际 MCP 工具调用仍待核查。结构化回执见 `docs/stages/06-feishu-acceptance.json`。阶段 7 已完成硬件无关的数据契约和假设备心跳仿真，STM32 MVP 的固件工程选定本机 `OTA_Upgrade_System`，其 Bootloader 和 App 已用 ARM GCC 离线构建并核对分区大小。ST-LINK 已识别 SWD 目标，内部 64 KB Flash 已双份读取并一致性核对。开发者接好 W25Q32 后，运行中 SRAM 的驱动信息显示 JEDEC ID `0xEF4016`、4 MB 容量。开发者明确批准最小 App 的 55 KB 分区擦写，100 字节测试固件已读回核对，SRAM 心跳递增；随后原 App 已恢复，完整 64 KB 内部 Flash 与烧录前逐字节一致。真实回执见 `docs/stages/07-stm32-minimal-live-acceptance.json`。外部 W25Q32 内容与选项字节未备份；隔离构建运行器、宿主审批接口、完整 OTA App 和 ESP32-S3 真机验收仍待接入。
+历史架构、阶段记录和旧版本验收从 [历史里程碑](docs/stages/v6-progress.md) 访问。当前开发验证和发布规则见 [贡献指南](CONTRIBUTING.md) 与 [发布流程](RELEASE.md)。

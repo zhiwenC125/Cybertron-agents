@@ -1,5 +1,7 @@
 # v0.3.0 发布验收
 
+> 历史阶段记录，正文反映当时的版本和验证范围。当前行为见 [开发状态](../../DEVELOPMENT_PLAN.md)。
+
 > 发布：2026-11-17 · GitHub Actions [publish run 43930849708](https://github.com/zhiwenC125/Cybertron-agents/actions/runs/43930849708)
 > tag：`v0.3.0`（annotated `24d000e`）→ `main` 提交 `6142fbb`
 > 验收时间（UTC）：2026-11-16T18:55:04.332617+00:00

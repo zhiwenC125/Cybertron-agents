@@ -13,7 +13,7 @@
 
 让 AI 协作从一句需求走到有边界的计划、真实工具回执、审查与可恢复的执行。
 
-[快速安装](#-60-秒安装) · [工作方式](#-它如何工作) · [发布验收](docs/stages/I-release-030.md) · [完整文档](docs/packaging-and-installation.md)
+[快速安装](#-60-秒安装) · [工作方式](#-它如何工作) · [自然语言验收](docs/testing/opencode-acceptance.md) · [文档目录](docs/README.md)
 
 </div>
 
@@ -21,7 +21,7 @@
 
 ## ⚡ 60 秒安装
 
-先安装 [OpenCode V2](https://opencode.ai/) 并配置可用模型。0.6.0 默认**全局安装**：13 个角色、`/cybertron` 命令、插件和 Python 运行时写入 `~/.config/opencode`，所有项目共用；每个项目的 run 账本、模型覆盖和源码写入仍落在项目目录。安装器默认只预览，加入 `--apply` 才写入。
+先安装 [OpenCode](https://opencode.ai/) 和 Python 3.9 或更高版本，并在 OpenCode 中配置可用模型。安装器默认预览，加入 `--apply` 写入全局 OpenCode 配置。各项目保留自己的运行账本和可选模型覆盖。
 
 ### npm · 不需要全局 `cybertron` 命令
 
@@ -46,7 +46,7 @@ cybertron --version
 ```bash
 pipx install cybertron-agents==0.9.0
 pipx ensurepath
-exec zsh
+# 重新打开终端后继续
 cybertron init --apply
 cybertron models setup
 cybertron doctor --global
@@ -69,48 +69,36 @@ Shell 安装器不会修改 PATH。安装结束后使用打印出的启动器路
 "${XDG_CONFIG_HOME:-$HOME/.config}/opencode/bin/cybertron" doctor --global
 ```
 
-> **默认全局，项目只放运行产物。** 只有需要项目级角色权限或完全隔离的插件版本时，才显式使用 `--project .`；全局和项目同时安装会被 `init` 拒绝，除非加 `--allow-duplicate`。项目级模型覆盖仍可用 `cybertron models setup --project .`。
+需要项目独立安装时可用 `--project .`。验证安装、核对下载摘要和升级步骤见[安装指南](docs/packaging-and-installation.md)。
 
 ### 启动第一项任务
 
-```bash
-opencode2 debug config
-opencode2 debug agents
-```
+重启 OpenCode，使用默认的 **Prima**，直接说出需求和验收条件。
 
-在 OpenCode 中用 **Shift+Tab** 选择 `prima` 作为唯一入口，直接输入自然语言需求；prima 会先派 `thirteenth` 澄清意图并制定计划，然后自己评审、派发和结算。也可以在 Build 模式使用 `/cybertron <需求>` 进入同一入口。例如：
+> 修复登录接口的超时问题，补一个回归测试，跑过后把结果告诉我。
 
-> 修复登录接口的超时问题，补充回归测试，并说明改动影响。
+想先看方案时，用 **Shift+Tab** 选择 **Thirteenth**，确认方向后切回 Prima。在同一会话中，Prima 可以接续已提交的计划。[自然语言验收用例](docs/testing/opencode-acceptance.md)
 
-首次使用时按安装渠道运行模型配置命令：npm 用 `npx -y cybertron-agents@0.9.0 models setup`，pipx 用 `cybertron models setup`，Shell 安装用 `"${XDG_CONFIG_HOME:-$HOME/.config}/opencode/bin/cybertron" models setup`。随后通过 OpenCode 的认证流程提供模型密钥。Cybertron 的模型配置只保存模型 ID，不保存 API Key。[模型配置说明 →](docs/stages/H-model-configuration.md)
+`models setup` 可配置十三角色的模型编队。OpenCode 负责提供方认证，模型配置只保存模型 ID。[模型配置与排查](docs/packaging-and-installation.md#模型与首次启动)
 
 ---
 
 ## 🧠 它如何工作
 
 ```mermaid
-flowchart LR
-    U[自然语言需求] --> P[prima 单一入口]
-    P --> T[thirteenth 澄清意图并制定计划]
-    T --> K[内核校验权限、依赖与写入范围]
-    K --> R[prima 评审计划并派发]
-    R --> A[OpenCode 原生子代理执行]
-    A --> C[隔离检查与 L1 / L2 审查]
-    C -->|通过| E[事件账本、指标与可复用模板]
-    C -->|失败或越界| R[拒绝、回滚或局部返工]
-    R --> K
+flowchart TD
+    U[自然语言需求] --> P[默认由 Prima 接收]
+    P --> T[Thirteenth 规划]
+    U --> S[Shift+Tab 直接规划]
+    S --> T
+    T --> K[提交时校验范围、依赖和验收规则]
+    K --> D[Prima 派发就绪任务]
+    D --> V[回读产物或执行所需验证]
+    V -->|验收通过| E[依据真实回执结算]
+    V -->|证据推翻计划| T
 ```
 
-| 能力 | 具体做法 |
-| --- | --- |
-| **单一入口** | 人类只和 `prima` 对话；无 run 时 prima 先派 `thirteenth` 澄清意图并生成计划，run id 自动回调给 prima。 |
-| **动态规划** | `thirteenth` 用 `cy_plan` 提交节点与依赖；内核依据十三角色注册表裁决能力和 `write_scope`，`prima` 用 `cy_plan_review` 评审后才派发。 |
-| **有界执行** | 子代理拿到明确的写入范围；越界写入由 `scope_guard` 拒绝并回滚。 |
-| **真实门禁** | lint、构建、测试和审查保留工具回执；实际 diff 决定不可随意降低的风险门禁。 |
-| **局部恢复** | 并发写范围锁、重试与 L2 拒绝后的受影响子图重跑，避免整条流程从头开始。 |
-| **持续学习** | 完成的运行可沉淀模板；事件账本生成指标与两次运行对比。 |
-
-v6 的 M0–M5 已完成验收；真实 OpenCode 宿主中的模板复用案例将节点数从 2 减到 1、人工提问从 1 次减到 0。[查看里程碑证据 →](docs/stages/v6-progress.md)
+明确的单文件任务可以用内容和哈希验收。软件缺陷可以用真实回归测试验收。现有结果仍有效时，同一 run 重规划会复用它们。静态检查、深度审查、测试和构建按风险及交付要求选择。[当前架构](design/cybertron_13_primes_architecture.md) · [0.9.0 验收回执](docs/testing/harness-loop-release-validation.json)
 
 ## 🪐 两个宿主
 
@@ -119,7 +107,7 @@ v6 的 M0–M5 已完成验收；真实 OpenCode 宿主中的模板复用案例�
 
 ## 🛡️ 安全边界
 
-- 普通角色没有直接 Shell 测试、构建或静态检查权限；检查由固定配置的隔离运行器执行。
+- 测试、构建和静态检查使用绑定到任务的隔离检查，结果保留真实工具回执。
 - 真机上电、物理烧录和远程部署需明确目标、固件、擦写范围、回滚方案与人工审批；模拟审批不构成授权。
 - 飞书 Wiki 正文读写由 `alpha-trion` 通过受空间约束的网关执行，凭证仅从本机环境变量读取。[配置指南 →](docs/feishu-setup.md)
 
@@ -133,20 +121,13 @@ python3 -m cybertron.stage5_verify
 python3 cybertron_primes_engine.py
 ```
 
-阶段 5 隔离验证依赖 macOS `sandbox-exec`。当前 0.9.0 的发布说明见 [v0.9.0 发布说明](docs/releases/v0.9.0.md)；0.4.0 的 DSH/访问模式变更见 [v0.4.0 发布说明](docs/releases/v0.4.0.md)。
+阶段 5 隔离验证依赖 macOS 的 `sandbox-exec`。Node 插件测试、包校验与协作流程见[贡献指南](CONTRIBUTING.md)。
 
-## 📚 继续探索
+## 📚 文档
 
-| 想了解 | 文档 |
-| --- | --- |
-| 安装路径与升级 | [安装与发布方案](docs/packaging-and-installation.md) |
-| v6 设计与门禁 | [动态任务图开发计划](design/DEVELOPMENT_PLAN.md) · [里程碑证据](docs/stages/v6-progress.md) |
-| 0.9.0 具体变更 | [发布说明](docs/releases/v0.9.0.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.9.0) |
-| 0.6.0 具体变更 | [发布说明](docs/releases/v0.6.0.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.6.0) |
-| 0.5.1 具体变更 | [发布说明](docs/releases/v0.5.1.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.5.1) |
-| 0.5.0 具体变更 | [发布说明](docs/releases/v0.5.0.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.5.0) |
-| 0.4.0 具体变更 | [发布说明](docs/releases/v0.4.0.md) · [GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.4.0) |
-| 十三角色架构背景 | [架构白皮书](design/cybertron_13_primes_architecture.md) |
+- [文档目录](docs/README.md) · [当前开发状态](DEVELOPMENT_PLAN.md)
+- [安装与升级](docs/packaging-and-installation.md) · [OpenCode 自然语言验收](docs/testing/opencode-acceptance.md)
+- [v0.9.0 发布说明](docs/releases/v0.9.0.md) · [历史里程碑](docs/stages/v6-progress.md)
 
 ---
 

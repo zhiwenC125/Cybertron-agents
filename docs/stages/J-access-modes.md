@@ -1,5 +1,7 @@
 # 后续阶段 J：宿主原生权限与可读 run 目录
 
+> 历史阶段记录，正文反映当时的版本和验证范围。当前行为见 [开发状态](../../DEVELOPMENT_PLAN.md)。
+
 状态：本地开发验收通过；权限词汇与 DeepSeek Harness 的 `SandboxMode` 完全一致。
 
 ## 交付内容
