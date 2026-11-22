@@ -117,7 +117,7 @@ class WriteRoleTests(unittest.TestCase):
     def test_write_scope_requires_a_role_with_write_permission(self):
         with tempfile.TemporaryDirectory() as directory:
             bridge = V6HostBridge(Path(directory))
-            bad = PlanNode("n1", "task", "device.op", "megatronus",
+            bad = PlanNode("n1", "verify", "accept", "megatronus",
                            "create a temp file", write_scope=("tmp",),
                            acceptance=("file",), verifiers=("scope_guard",))
             with self.assertRaisesRegex(HostBridgeError, "no write/edit permission"):

@@ -17,7 +17,7 @@ class V6CliTests(unittest.TestCase):
         plan = bridge.plan(
             PlanNode("n1", "task", "doc.write", "alpha-trion", "write docs",
                      write_scope=("README.md",), acceptance=("docs",),
-                     verifiers=("scope_guard",)).to_dict(),
+                     verifiers=("scope_guard",), satisfies=("d1",)).to_dict(),
             "host-session", objective="write docs",
             intent={"goal": "write docs", "confirmed": True,
                     "done": [{"id": "d1", "criterion": "docs", "evidence": "artifact"}]})
@@ -34,6 +34,10 @@ class V6CliTests(unittest.TestCase):
         return code, buffer.getvalue()
 
     def test_runs_and_show(self):
+        discovered = V6HostBridge(self.project).list_runs()["runs"]
+        self.assertEqual(discovered[0]["run_id"], self.run_id)
+        self.assertEqual(discovered[0]["status"], "ready")
+        self.assertTrue(discovered[0]["next_actions"])
         code, text = self.output(["runs"])
         self.assertEqual(code, 0)
         self.assertIn(self.slug, text)

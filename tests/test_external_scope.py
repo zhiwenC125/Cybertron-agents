@@ -1,5 +1,6 @@
 """Workspace-write nodes may declare external paths that need host approval."""
 
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -79,11 +80,25 @@ class ExternalScopeHostTests(unittest.TestCase):
         (self.root / "notes.md").write_text("inside")
         self.target.write_text("outside")
         self.bridge.permission(plan["run_id"], "call1", "req-1", "edit", [str(self.target)])
+        self.bridge.permission(plan["run_id"], "call1", "req-1", "edit", [str(self.target)],
+                               reply="once")
         result = self.bridge.finish(plan["run_id"], returned["token"], "child-session")
         self.assertEqual(result["nodes"][0]["status"], "completed")
         completed = [event for event in self.bridge.events(plan["run_id"])
                      if event["type"] == "node.completed"][0]
         self.assertIn(str(self.target), completed["artifacts"])
+
+    def test_rejected_external_permission_does_not_count_as_approval(self):
+        plan, _, returned = self.dispatch()
+        self.bridge.permission(plan["run_id"], "call1", "req-1", "edit", [str(self.target)])
+        self.bridge.permission(plan["run_id"], "call1", "req-1", "edit", [str(self.target)],
+                               reply="reject")
+        self.target.write_text("unapproved")
+        self.bridge.finish(plan["run_id"], returned["token"], "child-session")
+        failures = [event for event in self.bridge.events(plan["run_id"])
+                    if event["type"] == "node.failed"]
+        self.assertEqual(len(failures), 1)
+        self.assertIn("external write without host approval", failures[0]["diagnostic"])
 
     def test_standing_grant_completes_without_a_per_write_request(self):
         plan, _, returned = self.dispatch()
@@ -139,6 +154,63 @@ class ExternalScopeHostTests(unittest.TestCase):
             self.bridge.bind(plan["run_id"], "call1", started["token"], "child-session",
                              ["notes.md"], ["/tmp/other.md"])
 
+    def test_exact_file_receipt_completes_without_project_code_gates(self):
+        content = "approved\n"
+        expected = hashlib.sha256(content.encode()).hexdigest()
+        self.node = node(write_scope=[], external_scope=[str(self.target)],
+                         expected_content_sha256=expected)
+        plan, _, returned = self.dispatch()
+        run_id = plan["run_id"]
+        self.assertTrue(plan["review_current"])
+        self.bridge.bind(run_id, "call1", returned["token"], "child-session", [],
+                         [str(self.target)])
+        args = (run_id, "call1", "write-1", str(self.target), expected)
+        self.assertEqual(self.bridge.external_write(*args, "requested")["outcome"], "requested")
+        self.assertEqual(self.bridge.external_write(*args, "requested")["outcome"], "approval_pending")
+        self.bridge.external_write(*args, "approved")
+        self.target.write_text(content)
+        self.bridge.external_write(*args, "applied", changed_lines=1)
+        final = self.bridge.finish(run_id, returned["token"], "child-session")
+        self.assertEqual(final["status"], "completed")
+        self.assertEqual(final["nodes"][0]["artifacts"], {str(self.target): expected})
+
+    def test_rejected_file_stays_blocked_across_repeated_calls_and_supersede(self):
+        expected = hashlib.sha256(b"declined").hexdigest()
+        self.node = node(write_scope=[], external_scope=[str(self.target)])
+        plan, _, returned = self.dispatch()
+        run_id = plan["run_id"]
+        self.bridge.bind(run_id, "call1", returned["token"], "child-session", [],
+                         [str(self.target)])
+        args = (run_id, "call1", "write-1", str(self.target), expected)
+        self.bridge.external_write(*args, "requested")
+        self.bridge.external_write(*args, "denied")
+        final = self.bridge.finish(run_id, returned["token"], "child-session")
+        self.assertEqual(final["ready_nodes"], [])
+        self.assertEqual(final["external_stops"]["n1"]["outcome"], "denied")
+        self.assertFalse(self.target.exists())
+        replacement = self.bridge.plan(self.node, "next-parent", supersedes_run_id=run_id,
+                                       change_reason="Test persisted rejection")
+        replacement_id = replacement["run_id"]
+        active = self.bridge.before(replacement_id, "n1", "alpha-trion", replacement["card"], "call2")
+        result = self.bridge.after(replacement_id, "call2", active["token"], "child-two", "completed", 20)
+        self.bridge.bind(replacement_id, "call2", result["token"], "child-two", [], [str(self.target)])
+        self.assertEqual(self.bridge.external_write(replacement_id, "call2", "write-2",
+                         str(self.target), expected, "inspect"), {"outcome": "denied"})
+
+    def test_exact_document_with_existing_contents_needs_no_dispatch(self):
+        content = b"already correct\n"
+        target = self.bridge.project / "notes.md"
+        target.write_bytes(content)
+        expected = hashlib.sha256(content).hexdigest()
+        plan = self.bridge.plan(node(expected_content_sha256=expected, satisfies=["file"]),
+                                "parent", intent={"goal": "Ensure notes.md has the expected text",
+                                "confirmed": False, "done": [{"id": "file",
+                                "criterion": "File has the requested content", "evidence": "artifact"}]})
+        self.assertEqual(plan["status"], "completed")
+        self.assertEqual(plan["nodes"][0]["outcome"], "completed_without_change")
+        self.assertEqual(plan["nodes"][0]["artifacts"], {str(target): expected})
+        self.assertNotIn("dispatch.started", [event["type"] for event in self.bridge.events(plan["run_id"])])
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -148,6 +220,6 @@ class PlanSchemaTests(unittest.TestCase):
     def test_plugin_schema_exposes_external_scope(self):
         root = Path(__file__).resolve().parent.parent
         needle = "external_scope: { type: 'array', items: { type: 'string' } }"
-        for relative in ("cybertron/v6_plugin/cybertron.js", ".opencode/plugins/cybertron.js"):
+        for relative in ("cybertron/v6_plugin/cybertron.js", "cybertron/payload/plugins/cybertron.js"):
             with self.subTest(path=relative):
                 self.assertIn(needle, (root / relative).read_text())

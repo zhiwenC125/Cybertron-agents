@@ -74,6 +74,35 @@ def diff_facts(before: Snapshot, after: Snapshot, *, device_operation: bool = Fa
     return DiffFacts(paths, lines, modules, public, firmware, device_operation)
 
 
+def diff_preview(before: Snapshot, after: Snapshot, paths: tuple[str, ...]) -> str:
+    """Bound the patch shared with the planner to changed project text."""
+    from .access import hard_denied
+    from .authority import denied_for_reviewer
+
+    preview: list[str] = []
+    remaining = 6000
+    for path in paths:
+        if hard_denied(path) or denied_for_reviewer(path):
+            continue
+        lines = []
+        for state in (before.entries.get(path), after.entries.get(path)):
+            data = state.content if state and state.kind == "file" else b""
+            if len(data) > 64_000 or b"\0" in data:
+                break
+            try:
+                lines.append(data.decode().splitlines())
+            except UnicodeDecodeError:
+                break
+        if len(lines) != 2:
+            continue
+        for line in difflib.unified_diff(*lines, fromfile=f"a/{path}", tofile=f"b/{path}", lineterm=""):
+            if len(line) + 1 > remaining:
+                return "\n".join([*preview, "[diff truncated]"])
+            preview.append(line)
+            remaining -= len(line) + 1
+    return "\n".join(preview)
+
+
 def risk_floor(facts: DiffFacts, *, simulation_available: bool = False) -> tuple[Risk, frozenset[str]]:
     if facts.device_operation:
         risk = Risk.DEVICE

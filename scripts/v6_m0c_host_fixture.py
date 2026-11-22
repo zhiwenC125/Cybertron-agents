@@ -27,7 +27,7 @@ def main() -> None:
     for file in (source / "cybertron").glob("*.py"):
         shutil.copy2(file, runtime / file.name)
     plugin_dir = destination / ".opencode" / "plugins"
-    plugin_dir.mkdir(parents=True)
+    plugin_dir.mkdir(parents=True, exist_ok=True)
     for name in ("cybertron.js", "hook_logic.mjs"):
         shutil.copy2(source / "cybertron" / "v6_plugin" / name, plugin_dir / name)
     (destination / "AGENTS.md").write_text(

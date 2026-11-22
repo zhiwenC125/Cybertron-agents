@@ -34,14 +34,14 @@ def run_self_verification(output_dir: Path) -> None:
     assert liege_breaker.verify_tool_call("edit", "firmware/main.c", "c3")[0] == PermissionEffect.DENY
     print("[PASS] Dedicated Two-Tier Code Review (Micronus L1 + Liege Maximo L2) verified.")
 
-    # 3. Verify Hardware Cross-Compilation (Nexus Prime ALLOW) vs Physical Hardware Flashing (Megatronus ASK)
+    # 3. Verify deployment approval and independent read-only acceptance.
     nexus_breaker = MegatronusCircuitBreaker(orchestrator.primes["nexus-prime"].permissions)
     megatronus_breaker = MegatronusCircuitBreaker(orchestrator.primes["megatronus"].permissions)
     assert nexus_breaker.verify_tool_call("shell", "arm-none-eabi-gcc -c firmware/main.c", "h1")[0] == PermissionEffect.ALLOW
-    assert nexus_breaker.verify_tool_call("shell", "openocd -f interface/stlink.cfg", "h2")[0] == PermissionEffect.DENY
-    assert megatronus_breaker.verify_tool_call("shell", "openocd -f interface/stlink.cfg", "h3")[0] == PermissionEffect.ASK
-    assert megatronus_breaker.verify_tool_call("shell", "esptool.py write_flash 0x1000 fw.bin", "h4")[0] == PermissionEffect.ASK
-    print("[PASS] Hardware Deployment Separation verified: Nexus Prime (Cross-Compile=ALLOW, Flash=DENY) vs Megatronus (Physical Flash=ASK).")
+    assert megatronus_breaker.verify_tool_call("shell", "openocd -f interface/stlink.cfg", "h2")[0] == PermissionEffect.DENY
+    assert nexus_breaker.verify_tool_call("shell", "openocd -f interface/stlink.cfg", "h3")[0] == PermissionEffect.ASK
+    assert nexus_breaker.verify_tool_call("shell", "esptool.py write_flash 0x1000 fw.bin", "h4")[0] == PermissionEffect.ASK
+    print("[PASS] Nexus build and deployment approval, plus read-only Megatronus acceptance verified.")
 
     oc_files = compile_opencode_v2_assets(output_dir)
     dsh_files = compile_deepseek_harness_assets(output_dir)

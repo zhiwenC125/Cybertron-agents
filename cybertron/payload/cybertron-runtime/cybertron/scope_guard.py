@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, Tuple
 
-from .access import DEFAULT_ACCESS_MODE, hard_denied, normalize_access_mode
+from .access import DEFAULT_ACCESS_MODE, HOST_STATE_DIRECTORIES, hard_denied, normalize_access_mode
 
 
 class ScopeGuardError(RuntimeError):
@@ -55,11 +55,12 @@ class ScopeGuard:
     """Check a node's actual workspace diff; never follow workspace symlinks."""
 
     def __init__(self, workspace: Path, write_scope: Iterable[str],
-                 access_mode: str = DEFAULT_ACCESS_MODE) -> None:
+                 access_mode: str = DEFAULT_ACCESS_MODE, *, host_manages_state: bool = False) -> None:
         self.workspace = Path(workspace).absolute()
         if not self.workspace.is_dir() or self.workspace.is_symlink():
             raise ScopeGuardError("workspace must be a real directory")
         self.access_mode = normalize_access_mode(access_mode)
+        self.host_manages_state = host_manages_state
         self.write_scope = tuple(write_scope)
         for scope in self.write_scope:
             if not isinstance(scope, str) or not scope:
@@ -73,6 +74,16 @@ class ScopeGuard:
     @staticmethod
     def _hard_denied(path: str) -> bool:
         return hard_denied(path)
+
+    def _host_managed(self, relative: str) -> bool:
+        parent, _, remainder = relative.partition("/")
+        return (self.host_manages_state and parent == ".cybertron"
+                and remainder.split("/", 1)[0] in HOST_STATE_DIRECTORIES)
+
+    def project_snapshot(self, snapshot: Snapshot) -> Snapshot:
+        """Project older dispatch snapshots onto the current guard scope."""
+        return Snapshot({path: state for path, state in snapshot.entries.items()
+                         if not self._host_managed(path)})
 
     def _allowed(self, path: str, *, is_dir: bool) -> bool:
         if self._hard_denied(path):
@@ -106,6 +117,9 @@ class ScopeGuard:
             for name in list(dirs):
                 path = base / name
                 rel = path.relative_to(self.workspace).as_posix()
+                if self._host_managed(rel):
+                    dirs.remove(name)
+                    continue
                 info = path.lstat()
                 if stat.S_ISLNK(info.st_mode):
                     entries[rel] = FileState("symlink", os.readlink(path).encode(), info.st_mode)
@@ -125,6 +139,8 @@ class ScopeGuard:
             for name in files:
                 path = base / name
                 rel = path.relative_to(self.workspace).as_posix()
+                if self._host_managed(rel):
+                    continue
                 info = path.lstat()
                 if stat.S_ISLNK(info.st_mode):
                     entries[rel] = FileState("symlink", os.readlink(path).encode(), info.st_mode)

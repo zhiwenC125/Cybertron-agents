@@ -54,6 +54,21 @@ class V6HostBridgeTests(unittest.TestCase):
         self.assertEqual(result["ready_nodes"], ["n1"])
         self.assertFalse((self.root / "escape.txt").exists())
 
+    def test_settlement_preserves_another_sessions_new_plan(self):
+        scan = dict(self.node, capability="scan.static", role="onyx-prime", write_scope=[])
+        first = self.bridge.plan(scan, "first", session_title="Read existing notes")
+        call = self.bridge.before(first["run_id"], "n1", "onyx-prime", first["card"], "scan")
+        self.bridge.after(first["run_id"], "scan", call["token"], "scan-child", "completed", 1)
+
+        second = self.bridge.plan(self.node, "second", session_title="Plan a separate note")
+        second_dir = Path(second["run_dir"])
+        ledger_before = (second_dir / "events.jsonl").read_bytes()
+        result = self.bridge.finish(first["run_id"], call["token"], "scan-child")
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual((second_dir / "events.jsonl").read_bytes(), ledger_before)
+        self.assertEqual(self.bridge.state(second["run_id"])["status"], "ready")
+
     def test_bad_card_and_model_claim_are_rejected(self):
         plan = self.bridge.plan(self.node, "parent")
         with self.assertRaises(HostBridgeError):

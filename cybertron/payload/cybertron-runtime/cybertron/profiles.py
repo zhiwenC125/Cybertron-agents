@@ -23,6 +23,14 @@ class CheckRejected(ValueError):
     pass
 
 
+CHECK_TARGETS = {
+    "lint": ("review.l1", "micronus-prime"),
+    "build": ("toolchain", "nexus-prime"),
+    "test": ("test.write", "alchemist"),
+    "sim": ("test.write", "alchemist"),
+}
+
+
 @dataclass(frozen=True)
 class CheckReceipt:
     source: str
@@ -126,9 +134,10 @@ def _run(argv: list[str], cwd: Path, scratch: Path) -> CheckReceipt:
                         hashlib.sha256(output.encode()).hexdigest(), output)
 
 
-def run_check(project: Path, target: str) -> dict:
+def check_profile(project: Path, target: str) -> str:
+    """Check fixed runner prerequisites without running project code."""
     project = Path(project).resolve()
-    if not project.is_dir() or target not in {"lint", "build", "test", "sim"}:
+    if not project.is_dir() or target not in CHECK_TARGETS:
         raise CheckRejected("invalid project or check target")
     if target == "sim":
         if not (project / "sim.resc").is_file() or not (project / "sim.expect").is_file():
@@ -136,8 +145,40 @@ def run_check(project: Path, target: str) -> dict:
         profile = "renode"
     else:
         profile = detect_profile(project)
-    if profile in {"cmake-c", "cmake-arm"} and target == "test":
-        raise CheckRejected("CMake test target requires a declared test framework")
+    tools = {
+        "python": {"test": ("python3",)},
+        "node": {"test": ("node",)},
+        "renode": {"sim": ("renode",)},
+        "cmake-c": {"lint": ("cmake", "clang-tidy"), "build": ("cmake",)},
+        "cmake-arm": {"lint": ("cmake", "clang-tidy", "arm-none-eabi-gcc"),
+                      "build": ("cmake", "arm-none-eabi-gcc")},
+    }[profile].get(target)
+    if tools is None:
+        if profile.startswith("cmake-") and target == "test":
+            raise CheckRejected("CMake test target requires a declared test framework")
+        raise CheckRejected(f"{profile} profile does not provide {target}")
+    if target == "sim" and not (project / "sim.expect").read_text().strip():
+        raise CheckRejected("sim.expect is empty")
+    for tool in ("sandbox-exec", *tools):
+        _binary(tool)
+    return profile
+
+
+def verification_tools(project: Path) -> dict:
+    targets = {}
+    for target, (capability, role) in CHECK_TARGETS.items():
+        try:
+            status = {"available": True, "profile": check_profile(project, target)}
+        except (CheckRejected, OSError) as exc:
+            status = {"available": False, "reason": str(exc)}
+        targets[target] = {**status, "kind": "verify", "capability": capability,
+                           "role": role, "receipt": "sandbox"}
+    return targets
+
+
+def run_check(project: Path, target: str) -> dict:
+    project = Path(project).resolve()
+    profile = check_profile(project, target)
     with tempfile.TemporaryDirectory(prefix="cybertron-check-") as temporary:
         scratch = Path(temporary).resolve()
         copy = scratch / "project"

@@ -1,5 +1,5 @@
 ---
-description: "[钛师傅 · Alpha Trion] 专职技术文档撰写官与飞书知识库总管：负责项目全部文档编写及飞书Wiki双向同步，并执行长上下文原子压缩。"
+description: "[钛师傅 · Alpha Trion] 负责工程文档、知识整理与扩展，以及授权空间内的飞书 Wiki 同步。"
 mode: subagent
 model: deepseek/deepseek-flash
 steps: 15

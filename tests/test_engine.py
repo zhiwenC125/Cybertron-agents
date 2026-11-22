@@ -59,10 +59,10 @@ class EngineTests(unittest.TestCase):
         agents = {agent.agent_id: agent for agent in THIRTEEN_PRIMES_REGISTRY}
         nexus = MegatronusCircuitBreaker(agents["nexus-prime"].permissions)
         megatronus = MegatronusCircuitBreaker(agents["megatronus"].permissions)
-        self.assertEqual(nexus.verify_tool_call("shell", "openocd -f board.cfg", "n")[0], PermissionEffect.DENY)
+        self.assertEqual(megatronus.verify_tool_call("shell", "openocd -f board.cfg", "n")[0], PermissionEffect.DENY)
         self.assertEqual(nexus.verify_tool_call("shell", "make all", "build")[0], PermissionEffect.ALLOW)
-        self.assertEqual(nexus.verify_tool_call("shell", "pio run -t upload", "upload")[0], PermissionEffect.DENY)
-        self.assertEqual(megatronus.verify_tool_call("shell", "openocd -f board.cfg", "m")[0], PermissionEffect.ASK)
+        self.assertEqual(nexus.verify_tool_call("shell", "pio run -t upload", "upload")[0], PermissionEffect.ASK)
+        self.assertEqual(nexus.verify_tool_call("shell", "openocd -f board.cfg", "m")[0], PermissionEffect.ASK)
         self.assertEqual(
             nexus.verify_tool_call("shell", "cmake .; rm -rf build", "chained")[0],
             PermissionEffect.DENY,

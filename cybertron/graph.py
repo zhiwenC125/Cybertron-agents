@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 from fnmatch import fnmatchcase
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -18,7 +19,8 @@ class GraphRejected(ValueError):
 NODE_KINDS = frozenset({"task", "review", "verify", "human", "device_op"})
 NODE_STATES = frozenset({"pending", "running", "completed", "failed", "blocked", "cancelled", "stale"})
 GRAPH_OPERATIONS = ("add_node", "add_edge", "reassign_role", "split_node", "retry_node",
-                    "insert_gate", "mark_not_applicable", "request_human", "complete_run")
+                    "insert_gate", "mark_not_applicable", "request_human", "complete_run",
+                    "revise")
 
 # Registry is the only v6 capability and role-scope source of truth.
 from .access import (DEFAULT_ACCESS_MODE, hard_denied, is_external_scope,
@@ -39,9 +41,7 @@ def _scope_allowed(scope: str, roots: Tuple[str, ...]) -> bool:
     parts = scope.split("/")
     if any(part in ("", ".", "..") for part in parts):
         return False
-    if parts[0] == ".git" or parts[:2] == [".cybertron", "runs"]:
-        return False
-    if scope == "opencode.jsonc" or scope.startswith(".opencode/"):
+    if hard_denied(scope):
         return False
     # A scope is either an exact path, a root-level extension glob, or a
     # directory subtree. Reject other glob forms instead of guessing subset.
@@ -79,6 +79,8 @@ class PlanNode:
     status: str = "pending"
     satisfies: Tuple[str, ...] = ()
     requires: Tuple[str, ...] = ()
+    expected_content_sha256: str | None = None
+    check_target: str | None = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -90,6 +92,9 @@ class PlanNode:
             "acceptance": list(self.acceptance), "verifiers": list(self.verifiers),
             "budget": dict(self.budget), "status": self.status,
             "satisfies": list(self.satisfies), "requires": list(self.requires),
+            **({"expected_content_sha256": self.expected_content_sha256}
+               if self.expected_content_sha256 is not None else {}),
+            **({"check_target": self.check_target} if self.check_target is not None else {}),
         }
 
     @classmethod
@@ -109,6 +114,8 @@ class PlanNode:
                 status=data.get("status", "pending"),
                 satisfies=tuple(data.get("satisfies", ())),
                 requires=tuple(data.get("requires", ())),
+                expected_content_sha256=data.get("expected_content_sha256"),
+                check_target=data.get("check_target"),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise GraphRejected("invalid node payload") from exc
@@ -122,7 +129,7 @@ class PlanGraph:
                  gates: Iterable[str] = (), human_requests: Iterable[str] = (),
                  attempts: Mapping[str, int] = None, complete: bool = False,
                  access_mode: str = DEFAULT_ACCESS_MODE,
-                 intent: Intent | None = None):
+                 intent: Intent | None = None, planned_verification: bool = False):
         assert_catalog()
         self.access_mode = normalize_access_mode(access_mode)
         items = list(nodes)
@@ -139,6 +146,7 @@ class PlanGraph:
         if intent is not None and not isinstance(intent, Intent):
             raise GraphRejected("intent must be an Intent")
         self.intent = intent
+        self.planned_verification = planned_verification
         self.validate()
 
     def validate(self) -> None:
@@ -173,6 +181,14 @@ class PlanGraph:
             if len(set(node.depends_on)) != len(node.depends_on) or any(dep not in self.nodes for dep in node.depends_on):
                 raise GraphRejected("duplicate or missing dependency")
             self._validate_write_scope(node, roles[node.role])
+            if node.expected_content_sha256 is not None:
+                targets = (*node.write_scope, *node.external_scope)
+                if (not isinstance(node.expected_content_sha256, str)
+                        or not re.fullmatch(r"[a-f0-9]{64}", node.expected_content_sha256)
+                        or len(targets) != 1 or any(mark in targets[0] for mark in "*?")):
+                    raise GraphRejected("expected file content requires one exact path and a SHA-256 hash")
+            if node.check_target is not None and not isinstance(node.check_target, str):
+                raise GraphRejected("check_target must be a string")
             attempts = node.budget.get("max_attempts")
             if type(attempts) is not int or attempts < 1:
                 raise GraphRejected("invalid max_attempts")
@@ -254,6 +270,8 @@ class PlanGraph:
                    "access_mode": self.access_mode}
         if self.intent is not None:
             payload["intent"] = self.intent.to_dict()
+        if self.planned_verification:
+            payload["planned_verification"] = True
         return payload
 
     @classmethod
@@ -267,6 +285,7 @@ class PlanGraph:
                        human_requests=data.get("human_requests", ()),
                        attempts=data.get("attempts", {}), complete=data.get("complete", False),
                        access_mode=data.get("access_mode", DEFAULT_ACCESS_MODE),
+                       planned_verification=data.get("planned_verification", False),
                        intent=(Intent.from_dict(data["intent"])
                                if data.get("intent") is not None else None))
         except (KeyError, TypeError, ValueError) as exc:
@@ -289,13 +308,14 @@ class PlanGraph:
         self.events.append({"type": "plan.op.proposed", "op_id": op_id,
                             "operation": copy.deepcopy(dict(operation))})
         try:
-            if operation.get("plan_revision") != self.revision:
+            if type(operation.get("plan_revision")) is not int or operation["plan_revision"] != self.revision:
                 raise GraphRejected("stale plan_revision")
             candidate = copy.deepcopy(self.nodes)
             gates = list(self.gates)
             human_requests = list(self.human_requests)
             attempts = dict(self.attempts)
             complete = self.complete
+            planned_verification = self.planned_verification
             kind = operation.get("op")
             if complete:
                 raise GraphRejected("completed run cannot be replanned")
@@ -358,6 +378,28 @@ class PlanGraph:
                 if not isinstance(gate, str) or not gate or gate in gates:
                     raise GraphRejected("invalid or duplicate gate")
                 gates.append(gate)
+            elif kind == "revise":
+                reason = operation.get("reason")
+                if not isinstance(reason, str) or not reason.strip():
+                    raise GraphRejected("revision requires a reason")
+                changed = [PlanNode.from_dict(item) for item in operation.get("nodes", ())]
+                removed = operation.get("remove_nodes", ())
+                retried = operation.get("retry_nodes", ())
+                ids = [node.node_id for node in changed]
+                if (len(set(ids)) != len(ids) or any(node.status != "pending" for node in changed)
+                        or not set(removed) <= candidate.keys() or set(removed) & set(ids)
+                        or not set(retried) <= candidate.keys() - set(removed)):
+                    raise GraphRejected("invalid revision nodes")
+                for node_id in removed:
+                    del candidate[node_id]
+                    attempts.pop(node_id, None)
+                for node in changed:
+                    candidate[node.node_id] = node
+                    attempts.pop(node.node_id, None)
+                for node_id in retried:
+                    attempts.pop(node_id, None)
+                gates = list(operation.get("gates", gates))
+                planned_verification = True
             elif kind == "mark_not_applicable":
                 # M2 supplies risk-floor and verifier facts. Until then no
                 # model proposal can establish this conclusion.
@@ -376,7 +418,7 @@ class PlanGraph:
             PlanGraph(candidate.values(), revision=self.revision + 1,
                       gates=gates, human_requests=human_requests, attempts=attempts,
                       complete=complete, access_mode=self.access_mode,
-                      intent=self.intent)
+                      intent=self.intent, planned_verification=planned_verification)
         except (GraphRejected, KeyError, TypeError, ValueError, AttributeError) as exc:
             reason = str(exc) if isinstance(exc, GraphRejected) else "invalid operation payload"
             self.events.append({"type": "plan.op.rejected", "op_id": op_id, "reason": reason})
@@ -386,6 +428,7 @@ class PlanGraph:
         self.human_requests = human_requests
         self.attempts = attempts
         self.complete = complete
+        self.planned_verification = planned_verification
         self.revision += 1
         self.applied_ops[op_id] = {"fingerprint": fingerprint, "revision": self.revision}
         self.events.append({"type": "plan.op.applied", "op_id": op_id, "plan_revision": self.revision})

@@ -1,35 +1,35 @@
 # Cybertron v6：账本治理的动态任务图多智能体架构方案
 
-> 日期：2026-11-15 范围：本地项目 `forge` 与 `Cybertron-agents` 的架构对比、Cybertron 被压成 pipeline 的成因、简单任务失败诊断，以及 v6 动态多智能体架构与迁移路线。 依据：两个仓库的源码、`opencode2 debug agents` 实际生效权限、沙箱复现结果。
+> 日期：2026-11-15 范围：参考流程与 Cybertron 的架构对比、Cybertron 被压成 pipeline 的成因、简单任务失败诊断，以及 v6 动态多智能体架构与迁移路线。 依据：两个仓库的源码、`opencode2 debug agents` 实际生效权限、沙箱复现结果。
 >
 > 本文是 v6 设计提案，描述目标架构；已交付阶段与历史验收状态见根目录 [`DEVELOPMENT_PLAN.md`](../DEVELOPMENT_PLAN.md)。
 
 ## 一、结论摘要
 
-1. 两个项目的根本差别在于对"计划"的定位。forge 的计划是运行时产物，由 `forge-architect` 现场生成 `PLAN.md`；Cybertron 的计划是代码常量，9 个 `LedgerStep` 写死在构造函数里，编排器只能推进"当前未完成的那一步"。
+1. 两个项目的根本差别在于对"计划"的定位。参考流程 的计划是运行时产物，由 `架构规划角色` 现场生成 `PLAN.md`；Cybertron 的计划是代码常量，9 个 `LedgerStep` 写死在构造函数里，编排器只能推进"当前未完成的那一步"。
 2. Cybertron 的动态性丢失，起点是"把计划当成 schema"。之后的权限、存储、宿主插件、验收标准都在这个前提上层层固化。
 3. 现状下 Cybertron 无法完成简单任务。根目录写一个 md 文件，全系统没有角色有写权限；即使写到 `docs/`，也会在第 6 步因为 "Ran 0 tests" 被阻塞。
-4. v6 的方向是 **LLM 提议计划变更，代码裁决合法性**：保留 forge 式的编排判断力，保留 Cybertron 的事件溯源和证据内核，两者之间只通过带类型的接口通信。
+4. v6 的方向是 **LLM 提议计划变更，代码裁决合法性**：保留 参考流程式的编排判断力，保留 Cybertron 的事件溯源和证据内核，两者之间只通过带类型的接口通信。
 
-## 二、forge 与 Cybertron 的差异
+## 二、参考流程 与 Cybertron 的差异
 
-| 维度     | forge                                                        | Cybertron-agents（现状）                                     |
+| 维度     | 参考流程                                                        | Cybertron-agents（现状）                                     |
 | -------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| 编排主体 | LLM（`forge-orchestrator`，没有文件工具，只有 `task` 和 `forge_state`） | 确定性 Python（`RunCoordinator` + `PrimaDispatcher`）        |
+| 编排主体 | LLM（`编排角色`，没有文件工具，只有 `task` 和 状态写入接口） | 确定性 Python（`RunCoordinator` + `PrimaDispatcher`）        |
 | 计划来源 | 运行时由 architect 生成 `PLAN.md`，unit 数量可变             | `create_full_sdlc_hardware_ledger()` 里写死 9 步             |
-| 路由     | 7 类意图路由，`forge-factory` 兜底                           | 只有 `next_step()` 一种动作                                  |
+| 路由     | 按意图路由，`临时专才设计角色` 兜底                           | 只有 `next_step()` 一种动作                                  |
 | 角色定义 | 按职责                                                       | 按 SDLC 阶段一对一绑定（`registry.py` 的 `sdlc_stage`）      |
 | 状态     | PLAN.md（人读，LLM 写回）+ STATE.json（纯 Python 工具写，状态值由编排者给出） | `events.jsonl` + 快照，审计更强，但 schema 锁死 9 步         |
-| 门禁     | S1–S5、U1–U5，质量深度可按变更范围调整，有 N/A 条件          | 强类型证据、硬件审批、`outcome_unknown` 不自动重试           |
-| 返工     | 失败路由表 + `back_to_architect` 重规划                      | 只有一条硬编码：L2 拒绝后回退第 4、5 步                      |
+| 门禁     | 阶段门禁与人工审批，质量深度可按变更范围调整，有 N/A 条件          | 强类型证据、硬件审批、`outcome_unknown` 不自动重试           |
+| 返工     | 失败路由表 + 退回规划 重规划                      | 只有一条硬编码：L2 拒绝后回退第 4、5 步                      |
 | 派单     | 宿主原生 `task` 工具派 subagent                              | 插件删掉 subagent 工具，Python 为每个角色起一次 `opencode2 run` 子进程 |
 
-forge 也有自己的短板：
+参考流程 也有自己的短板：
 
-- 状态双轨：STATE.json 由编排者调用确定性的 `forge_state` 写入，但状态值由编排者给出，`write` 只校验步骤名、不校验状态值；PLAN.md 的 Pipeline 节由 LLM（forge-knowledge Scene 0）写回。
+- 状态双轨：STATE.json 由编排者调用确定性的 状态写入接口 写入，但状态值由编排者给出，`write` 只校验步骤名、不校验状态值；PLAN.md 的 Pipeline 节由 LLM（知识整理角色 状态写回步骤）写回。
 - quality、review 的 PASS 来自模型摘要，没有工具回执。
 - 实现完成之后，deploy → quality → review → oracle → verification → knowledge 仍是一条固定管道。
-- `forge-factory` 只输出临时 agent 的规格，OpenCode 不能在运行时注册新 agent，所以规格实际无法执行。
+- `临时专才设计角色` 只输出临时 agent 的规格，OpenCode 不能在运行时注册新 agent，所以规格实际无法执行。
 
 ## 三、Cybertron 为什么被压成了 pipeline
 
@@ -99,7 +99,7 @@ summary: Sandboxed tests failed or ran zero tests:
 
 ### 5.1 定位
 
-- 前半段保留 forge 式的判断力：prima 负责规划和路由。
+- 前半段保留 参考流程式的判断力：prima 负责规划和路由。
 - 后半段保留 Cybertron 的内核：状态、证据、权限、副作用全部由确定性代码掌握。
 - 两者之间只通过带类型的接口通信：图操作（GraphOp）、上下文包、结构化结果。
 
@@ -135,7 +135,7 @@ summary: Sandboxed tests failed or ran zero tests:
 | Loop-1 节点修复  | 内核                 | 角色返回后运行该节点的验证器（diff 范围、lint、测试、构建）；失败时把诊断附加到同一节点重新派发 | `max_attempts`（默认 2）；或连续两次失败指纹相同，此时交给 Loop-2 |
 | Loop-2 编排循环  | prima                | 读全局状态，提交图操作（插入、拆分、换角色、请求用户），派发就绪节点，直到验收标准全部满足 | 验收标准全部有证据；或 `max_replans`（默认 3）/ `max_dispatches` 用完，升级给用户 |
 
-forge 的"连续两轮 concern 指纹无变化就 escalate"保留到 Loop-1。区别在于由内核比较验证器输出的哈希，而不是让编排者自己判断有没有进展。
+参考流程 的"连续两轮 concern 指纹无变化就 escalate"保留到 Loop-1。区别在于由内核比较验证器输出的哈希，而不是让编排者自己判断有没有进展。
 
 循环预算的默认值写在内核配置里，不交给模型决定：
 
@@ -150,7 +150,7 @@ forge 的"连续两轮 concern 指纹无变化就 escalate"保留到 Loop-1。�
 
 ### 5.4 交互层：子代理必须是宿主原生的
 
-派单的界面不由内核绘制。prima 调用宿主原生 `task` 工具，子代理以一张内联卡片出现在同一会话里：名字、目标、一行职责说明，自己的 Thought 与工具流，可以 `Ctrl+B` 转入后台，也可以取消；父级的思考与 `cy_*` 调用保持可见。forge 的这张卡片就是参照。
+派单的界面不由内核绘制。prima 调用宿主原生 `task` 工具，子代理以一张内联卡片出现在同一会话里：名字、目标、一行职责说明，自己的 Thought 与工具流，可以 `Ctrl+B` 转入后台，也可以取消；父级的思考与 `cy_*` 调用保持可见。参考流程 的这张卡片就是参照。
 
 内核不重写这层 UI，只通过插件钩子做三件事：派发前校验、派发后记账、结束后验产物。
 
@@ -351,22 +351,22 @@ flash:  {broker: true, tool: openocd}
 
 修 bug 时如果 L2 拒绝，只把 n3 标记为过期并带着反馈重跑，n1 和 n2 的结果保留。现状会把第 4、5 步整体清空。
 
-## 十、与 forge 的对比
+## 十、与 参考流程 的对比
 
-| 维度         | forge                                                        | Cybertron v6                                                 |
+| 维度         | 参考流程                                                        | Cybertron v6                                                 |
 | ------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | 计划         | PLAN.md 的 checkbox                                          | 经过校验的图 + 可重放的操作日志                              |
 | 实现完成之后 | 固定 6 步管道 + N/A 条件                                     | 按风险计算门禁下限，只能加不能减                             |
-| 状态写回     | STATE.json 由编排者经 `forge_state` 写，值不校验；PLAN.md 由 LLM（forge-knowledge）写 | 只由内核写，LLM 不碰状态                                     |
+| 状态写回     | STATE.json 由编排者经 状态写入接口 写，值不校验；PLAN.md 由 LLM（知识整理角色）写 | 只由内核写，LLM 不碰状态                                     |
 | 门禁证据     | 模型摘要                                                     | 带类型的回执（sandbox/host/tool/human）                      |
 | 写权限       | 角色静态配置                                                 | 按节点范围 + diff 守卫 + 自动回滚                            |
 | 并行         | 各 unit 串行                                                 | 按写范围上锁的并行                                           |
-| 表外任务     | forge-factory 只输出规格，没有执行者                         | 按职责类型覆盖 + skill 注入；缺口登记后由用户决定（见 13.8） |
+| 表外任务     | 临时专才设计角色 只输出规格，没有执行者                         | 按职责类型覆盖 + skill 注入；缺口登记后由用户决定（见 13.8） |
 | 硬件         | 首次部署时确认一次                                           | 每次操作都审批，绑定设备和固件哈希，带回滚                   |
 | 恢复         | 读 PLAN.md                                                   | 事件重放 + `outcome_unknown`                                 |
 | 宿主         | 只支持 OpenCode                                              | 宿主适配器，可接 OpenCode、DSH                               |
 
-从 forge 直接沿用：编排者没有文件工具、意图路由、派单时传路径不传内容、只在少数节点打断用户、PROJECT_CONTEXT/RULES/LEARNINGS 知识层、派发前后的中文状态横幅、原生 subagent 卡片与后台/取消。
+从 参考流程 直接沿用：编排者没有文件工具、意图路由、派单时传路径不传内容、只在少数节点打断用户、项目背景、规则和经验 知识层、派发前后的中文状态横幅、原生 subagent 卡片与后台/取消。
 
 ## 十一、迁移路线
 
@@ -418,37 +418,37 @@ flash:  {broker: true, tool: openocd}
 5. 知识和模板可以影响规划，但不能绕过校验器。
 6. 派单界面归宿主：内核不自建子代理 UI，只在宿主没有原生 subagent 时降级到 `cy_dispatch`。
 
-## 十三、向 forge 与 nexus-matrix 学习：13 天尊的能力分配
+## 十三、向 参考流程 与 nexus-matrix 学习：13 天尊的能力分配
 
-> 依据：`forge/opencode/agents/` 下 19 个 agent 定义；`Nexus/plugins/nexus-matrix`（0.1.1）的 `roles/catalog.js` 与 `prompts/*.md`。
+> 依据：参考流程的角色定义；`Nexus/plugins/nexus-matrix`（0.1.1）的 `roles/catalog.js` 与 `prompts/*.md`。
 
 ### 13.1 两个参照系各自的取舍
 
-**原则：向 forge 学"需要哪些职能"，向 matrix 学"怎么约束一个角色"。**
+**原则：向 参考流程 学"需要哪些职能"，向 matrix 学"怎么约束一个角色"。**
 
-- forge 的 19 个 agent 职能齐全，但约束主要写在提示词里，状态也由 LLM 写回。
+- 参考流程 的 多种常驻角色 职能齐全，但约束主要写在提示词里，状态也由 LLM 写回。
 - matrix 的约束写成了代码（角色目录、读写根、工具类别、fail-closed 守卫），但删掉了知识层、调试、独立测试和多道审查。
-- 13 天尊的数量处在两者之间：比 matrix 多出几个角色，可以把 matrix 合并掉的职责重新拆开；又比 forge 少一半，不会过于分散。
+- 13 天尊的数量处在两者之间：比 matrix 多出几个角色，可以把 matrix 合并掉的职责重新拆开；又比 参考流程 少一半，不会过于分散。
 
-matrix 相对 forge 精简掉的内容：
+matrix 相对 参考流程 精简掉的内容：
 
-| 精简项             | forge 中的形态                                               | matrix 中的形态                                              |
+| 精简项             | 参考流程 中的形态                                               | matrix 中的形态                                              |
 | ------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| 跨 run 知识层      | forge-knowledge、forge-knowledge-expander 维护 MODULE_CONTEXT / LEARNINGS / BUG_PATTERNS | 无；事实只存在当前 run 目录，多数角色禁止访问 `$FORGE`       |
+| 跨 run 知识层      | 知识整理角色、知识扩展角色 维护 模块背景、经验和故障模式 | 无；事实只存在当前 run 目录，多数角色禁止访问 参考知识目录       |
 | 独立验收链         | quality → review → oracle → verification 四道                | 只有一个 code-review；verification 由 gate + orchestrator 承担；oracle 删除 |
-| 调试专家           | forge-debug：先查根因、三击规则、blast radius、必附回归测试  | 无；code-analysis 没有 bash，无法复现                        |
-| 写测试与写代码分离 | forge-test 独立编写测试                                      | code-implementation 默认可写 `tests/**`，自写自测            |
-| 动态造角色         | forge-factory 输出临时 agent 规格                            | `assertCatalog()` 写死 10 个角色                             |
-| 编排者流程规则     | S1–S5、U1–U5、O1–O12、C1–C18 与固定后半段管道                | 只保留计划确认门，交人收窄为五类情形                         |
-| 组织规范           | forge-git 的 Issue-ID 红线（R1/R2）；forge-deploy 完整部署链 | git 只要求 `type(scope): summary`；device-test 只做验证      |
+| 调试专家           | 故障诊断角色：先查根因、三击规则、blast radius、必附回归测试  | 无；code-analysis 没有 bash，无法复现                        |
+| 写测试与写代码分离 | 测试角色 独立编写测试                                      | code-implementation 默认可写 `tests/**`，自写自测            |
+| 动态造角色         | 临时专才设计角色 输出临时 agent 规格                            | `assertCatalog()` 写死 10 个角色                             |
+| 编排者流程规则     | 阶段门禁与人工审批、O1–O12、C1–C18 与固定后半段管道                | 只保留计划确认门，交人收窄为五类情形                         |
+| 组织规范           | 版本管理角色 的 Issue-ID 红线（R1/R2）；部署角色负责完整部署链 | git 只要求 `type(scope): summary`；device-test 只做验证      |
 
 matrix 同时把很多约束从提示词搬进了代码：按角色的读写根、命令模式、工具能力类别、executor-guard 运行时拦截、结构化结果、runtime 写状态、幂等、心跳超时、崩溃恢复、gate 事实落盘。
 
 ### 13.2 13 天尊职能分配表
 
-| 天尊           | 职能                                                         | 来自 forge                                 | 来自 matrix                | 写根上限                                     | 执行能力                            |
+| 天尊           | 职能                                                         | 来自 参考流程                                 | 来自 matrix                | 写根上限                                     | 执行能力                            |
 | -------------- | ------------------------------------------------------------ | ------------------------------------------ | -------------------------- | -------------------------------------------- | ----------------------------------- |
-| prima          | 规划、路由、派发、决策                                       | forge-orchestrator、emb-forge-orchestrator | orchestrator               | 无文件与命令工具；cy_* + 原生 task           | 无                                  |
+| prima          | 规划、路由、派发、决策                                       | 编排角色、嵌入式编排角色 | orchestrator               | 无文件与命令工具；cy_* + 原生 task           | 无                                  |
 | thirteenth     | 前端：意图澄清、对外只读取证；后端：逐条核对 AC、交付        | intent-analyst、verification               | intent                     | 本节点产物                                   | 只读                                |
 | onyx-prime     | 代码制图、影响面分析、节点展开、全仓只读审计清单             | codebase-cartographer、knowledge-expander  | code-analysis              | 本节点产物                                   | 只读                                |
 | vector-prime   | git 考古、根因诊断（只诊断不修复）、专项分析（性能、抓包等） | debug 的调查部分                           | 无                         | 本节点产物                                   | 固定只读 git 命令 + `cy_check` 复现 |
@@ -470,7 +470,7 @@ matrix 同时把很多约束从提示词搬进了代码：按角色的读写根�
 
 以下工作由内核承担，不分配给任何天尊：
 
-- **状态写回**：forge 里由 forge-knowledge 的 Scene 0 写，这是 forge 最大的缺陷，不继承。
+- **状态写回**：参考流程 里由 知识整理角色 的 状态写回步骤 写，这是 参考流程 最大的缺陷，不继承。
 - **执行 lint/构建/测试**：matrix 让 build-test 用 deny-only shell 直接执行，它自己的文档也承认这不是沙箱。Cybertron 已有 `sandbox-exec` 隔离运行器，比 matrix 更强。
 - **汇总 gate 事实**：沿用 matrix 的做法，gate 只给事实，不做决策。
 
@@ -478,12 +478,12 @@ matrix 同时把很多约束从提示词搬进了代码：按角色的读写根�
 
 多出的角色可以把四条职责分离链重新拆开：
 
-| 分离链                        | forge                       | matrix                                         | 13 天尊                                         |
+| 分离链                        | 参考流程                       | matrix                                         | 13 天尊                                         |
 | ----------------------------- | --------------------------- | ---------------------------------------------- | ----------------------------------------------- |
 | 写实现 ≠ 写测试 ≠ 审查 ≠ 验收 | 有                          | 实现角色同时写测试，审查只有一道，没有独立验收 | solus ≠ alchemist ≠ micronus/liege ≠ thirteenth |
-| 诊断 ≠ 修复                   | 由 forge-debug 一个角色包办 | 没有诊断角色                                   | vector ≠ solus                                  |
+| 诊断 ≠ 修复                   | 由 故障诊断角色 一个角色包办 | 没有诊断角色                                   | vector ≠ solus                                  |
 | 集成 ≠ 物理执行               | git 与 deploy 分开          | git 与 device-test 分开                        | nexus ≠ megatronus                              |
-| 知识沉淀 ≠ 运行状态           | 都由 forge-knowledge 负责   | 没有知识层                                     | alpha-trion ≠ 内核                              |
+| 知识沉淀 ≠ 运行状态           | 都由 知识整理角色 负责   | 没有知识层                                     | alpha-trion ≠ 内核                              |
 
 这四条链就是 Cybertron 做这套设计的理由。如果最后又像 matrix 那样合并回去，13 个角色只剩名字上的区别。
 
@@ -530,7 +530,7 @@ class PrimeRole:
 - deny-only bash：实现类角色改用内核提供的 `cy_check(target)`，在沙箱里按工具链配置档执行，结果返回给角色。Loop-0 工具循环照样能拿到反馈，执行过程也可信。
 - 去掉设备的逐次审批：matrix 为了便利去掉了 DevLink 的逐次审批。Cybertron 的硬件定位决定了必须保留。
 
-### 13.5 从 forge 学：补回 matrix 删掉的职能
+### 13.5 从 参考流程 学：补回 matrix 删掉的职能
 
 **1. 跨 run 知识层，由 alpha-trion 负责**
 
@@ -547,7 +547,7 @@ liege 审查结论 ────┘     .cybertron/knowledge/
               内核把相关条目注入下一个 run 的每个节点 context.md
 ```
 
-知识写回在 run 结束时作为一个节点执行。不要像 forge 那样每一步都写回，状态更不能交给它写。
+知识写回在 run 结束时作为一个节点执行。不要像 参考流程 那样每一步都写回，状态更不能交给它写。
 
 **2. 调试流程拆给三个角色**
 
@@ -557,29 +557,29 @@ liege 审查结论 ────┘     .cybertron/knowledge/
 2. alchemist 编写回归测试。
 3. solus 做最小修复。
 
-forge-debug 的纪律保留下来，但改为由内核检查：
+故障诊断角色 的纪律保留下来，但改为由内核检查：
 
 - 同一假设的指纹连续失败 3 次（三击规则），内核拒绝再次派发同一假设。
 - 修复节点必须关联一条回归测试证据，否则无法完成。
 
 **3. 两道审查，再加一道异构审查**
 
-- micronus 负责 forge-quality 那一层：规则、禁用模式、TODO、测试缺口。
-- liege 负责 forge-review 那一层：逻辑、架构、接口兼容。
+- micronus 负责 静态质量检查角色 那一层：规则、禁用模式、TODO、测试缺口。
+- liege 负责 深度审查角色 那一层：逻辑、架构、接口兼容。
 - 门禁策略判定为高风险时，额外插入一次 liege 审查，换另一家模型执行。这就是 oracle，不需要新增角色。
 
 **4. 不设临时专才**
 
-forge 用 forge-factory 兜底，但它只输出规格，没有执行者。Cybertron 不设专才：任务按职责类型由现有天尊承接，领域知识用 skill 注入，能力映射不到任何角色时登记缺口、交给用户决定。详见 13.8。
+参考流程 用 临时专才设计角色 兜底，但它只输出规格，没有执行者。Cybertron 不设专才：任务按职责类型由现有天尊承接，领域知识用 skill 注入，能力映射不到任何角色时登记缺口、交给用户决定。详见 13.8。
 
 **5. 组织规范**
 
-- nexus-prime 提交前，内核校验两件事：暂存文件都在本 run 的 write_scope 内；feat/perf 类型的提交带有 Issue-ID（forge 的 R1/R2）。
-- push 和首次部署走审批（forge 的 U2）。
+- nexus-prime 提交前，内核校验两件事：暂存文件都在本 run 的 write_scope 内；feat/perf 类型的提交带有 Issue-ID（既有提交规范）。
+- push 和首次部署走审批（既有审批规范）。
 
 ### 13.6 需要避开的问题：用代号路由
 
-forge 和 matrix 的角色名本身就说明职能（`forge-test`、`code-review`），LLM 路由时不容易出错。"liege-maximo""alchemist"这类代号要靠记忆映射，prima 容易派错角色。
+参考流程 和 matrix 的角色名本身就说明职能（`测试角色`、`code-review`），LLM 路由时不容易出错。"liege-maximo""alchemist"这类代号要靠记忆映射，prima 容易派错角色。
 
 prima 在 `cy_plan` 里只写能力 ID，例如 `capability: "test.write"`，由内核解析出对应的天尊。天尊名字只用于展示和日志。
 
@@ -600,11 +600,11 @@ prima 在 `cy_plan` 里只写能力 ID，例如 `capability: "test.write"`，由
 
 **专才的需求来自角色按"工具"切得太细。** v5 白皮书的原则是"一尊一专职、零权限重叠"，例如 onyx 只能用 read/glob/grep、禁止碰 git，vector 只能用 git、禁止扫库。任务稍微跨一点就没人能接。matrix 的角色按职责划分：code-analysis 负责"读全仓、产出报告"，读什么、分析什么都不限，所以 10 个角色就不需要专才。
 
-forge 与 matrix 的现状：
+参考流程 与 matrix 的现状：
 
 |        | 谁设计专才                             | 谁执行                                                       | 权限能否按任务定制 |
 | ------ | -------------------------------------- | ------------------------------------------------------------ | ------------------ |
-| forge  | forge-factory 输出临时 agent 规格      | 没有专门执行者；OpenCode 运行中不能注册新 agent，只能借用现有 agent | 否                 |
+| 参考流程  | 临时专才设计角色 输出临时 agent 规格      | 没有专门执行者；OpenCode 运行中不能注册新 agent，只能借用现有 agent | 否                 |
 | matrix | 无（`assertCatalog()` 固定 10 个角色） | ad-hoc 节点：给现有角色派一个不属于计划阶段的短任务          | 否                 |
 
 **按职责类型重新划分 13 天尊。** 任何任务都能归到下面五类之一，只要每类都有角色能接任意目标，就不存在"没人能做"的任务。
@@ -617,9 +617,9 @@ forge 与 matrix 的现状：
 | 判定                     | micronus、liege、thirteenth                               | liege 的审查范围按节点定，可以是本次 diff，也可以是全仓      |
 | 有副作用的执行           | nexus、megatronus、alpha-trion                            | 分别负责 git、设备操作、外部系统写入                         |
 
-**从 forge 和 matrix 借的四个机制：**
+**从 参考流程 和 matrix 借的四个机制：**
 
-1. **领域知识用 skill 注入，不新增角色。** matrix 的 planner 靠 `matrix-plan-contract` skill 拿到计划契约；forge-plugin 支持用 `extends` 继承提示词。Cybertron 的节点声明 `skills: [...]`，内核把 skill 内容放进该节点的 context.md。skill 只提供知识，不附带任何权限。
+1. **领域知识用 skill 注入，不新增角色。** matrix 的 planner 靠 `matrix-plan-contract` skill 拿到计划契约；参考插件 支持用 `extends` 继承提示词。Cybertron 的节点声明 `skills: [...]`，内核把 skill 内容放进该节点的 context.md。skill 只提供知识，不附带任何权限。
 2. **统一的产物契约。** 结果结构统一（参照 `matrix.result/v1`），产物按 kind 区分：report、inventory、patch、test、doc、plan、verdict。角色目录写明每个角色能产出哪些 kind。
 3. **按节点授予能力类别。** 参照 matrix 的 deny-only + toolClasses：角色目录定上限，节点在上限内申请，内核校验。
 4. **计划外的临时节点。** 对应 matrix 的 ad-hoc 节点，在 v6 里就是 prima 用 `add_node` 插入一个节点，写明能力和目标。
@@ -637,23 +637,23 @@ forge 与 matrix 的现状：
 
 **代价：** 角色变宽后静态权限上限也变大，要靠 M0 的按节点 write_scope 守卫收窄，所以这项调整要等 M0 完成后再做。
 
-## 十四、治理方式对比：Cybertron 账本、forge 与 matrix
+## 十四、治理方式对比：Cybertron 账本、参考流程 与 matrix
 
-> 依据：`forge/opencode/tools/state_tool.py`；`Nexus/plugins/nexus-matrix/src/tools/gate.js` 与 `prompts/orchestrator.md`；`Cybertron-agents/cybertron/runstore.py`、`execution.py`、`dispatch.py`。
+> 依据：参考流程的状态接口；`Nexus/plugins/nexus-matrix/src/tools/gate.js` 与 `prompts/orchestrator.md`；`Cybertron-agents/cybertron/runstore.py`、`execution.py`、`dispatch.py`。
 
 ### 14.1 结论
 
 三者的底线一样：编排者都不直接碰文件。差别在于由谁宣布"事实"和"通过"：
 
-- **forge**：事实和结论都可以由 LLM 宣布。
+- **参考流程**：事实和结论都可以由 LLM 宣布。
 - **matrix**：节点结算事实由代码保管；AC 的 pass/fail 由编排者提交，代码只做形式校验。
 - **Cybertron 账本**：事实由代码保管；哪些证据能让门禁通过、预算何时耗尽，也由代码决定。
 
 ### 14.2 逐项对比
 
-| 维度            | forge                                                        | matrix                                                       | Cybertron 账本                                               |
+| 维度            | 参考流程                                                        | matrix                                                       | Cybertron 账本                                               |
 | --------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| 状态由谁写      | 双轨：STATE.json 由编排者调用 `forge_state`（纯 Python）写，值由编排者给出；PLAN.md 的 Pipeline 节由 forge-knowledge（LLM）写 | runtime 写，节点结算后按固定顺序落盘：result → artifacts → gate → events → state → decisions；编排者没有写文件的工具 | RunStore 写。`events.jsonl` 是权威来源，快照是它的投影，可以重放 |
+| 状态由谁写      | 双轨：STATE.json 由编排者调用 状态写入接口（纯 Python）写，值由编排者给出；PLAN.md 的 Pipeline 节由 知识整理角色（LLM）写 | runtime 写，节点结算后按固定顺序落盘：result → artifacts → gate → events → state → decisions；编排者没有写文件的工具 | RunStore 写。`events.jsonl` 是权威来源，快照是它的投影，可以重放 |
 | 状态值是否校验  | `write` 只校验步骤名存在，状态值不校验；`set` 可写任意点分路径 | 节点生命周期由代码管：拒绝重复派发与重复结算；计划未确认不能派发计划阶段 | 代码校验转换合法性                                           |
 | 计划治理        | architect 生成 PLAN.md，用户确认后按 checkbox 三态推进       | planner 产出 `plan.json`，schema 校验禁止多余字段；确认门记录 revision，revision 变化时 runner fail-closed | 现状：9 步写死在代码里。v6：每个 GraphOp 逐条校验，提议、应用、拒绝都记入账本 |
 | 下一步由谁定    | orchestrator 按提示词规则（S1–S5、O1–O12）和固定后半段管道   | orchestrator 自行判断；配置明确拒绝 `states`、`transitions`、`stageMaxRetries` 等字段，只有 watchdog 当安全阀 | 现状：代码的 `next_step()`。v6：prima 提议，内核按预算和门禁下限裁决 |
@@ -669,7 +669,7 @@ forge 与 matrix 的现状：
 
 |                | 下一步由谁决定        | 状态由谁落盘                                                 | 状态转换由谁校验                                             |
 | -------------- | --------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| forge          | orchestrator（LLM）   | `forge_state` 工具写入，值由 orchestrator 给出；PLAN.md 由 forge-knowledge 写 | 只靠提示词                                                   |
+| 参考流程          | orchestrator（LLM）   | 状态写入接口 工具写入，值由 orchestrator 给出；PLAN.md 由 知识整理角色 写 | 只靠提示词                                                   |
 | matrix         | orchestrator（LLM）   | runtime                                                      | 代码只管节点生命周期和不变量，流程顺序不管                   |
 | Cybertron 现状 | 代码（`next_step()`） | RunStore                                                     | 代码：整条九步流程都是状态机，这也是它变成 pipeline 的原因   |
 | Cybertron v6   | prima 提议，内核裁决  | 内核                                                         | 代码管节点生命周期（pending、running、completed、failed、cancelled、stale）和图的合法性；流程顺序由计划图决定 |
@@ -678,12 +678,12 @@ v6 借鉴的是 matrix 的做法：保留节点级状态机，去掉流程级状
 
 ### 14.4 三个本质区别
 
-1. **谁保管事实。** forge 只算半个账本：PLAN.md 由 LLM 写回，所以文档专门规定"没收到 `PIPELINE_WRITE_OK` 就视为未持久化"。matrix 和 Cybertron 都把节点事实交给代码。
+1. **谁保管事实。** 参考流程 只算半个账本：PLAN.md 由 LLM 写回，所以文档专门规定"缺少写入确认即视为未持久化"。matrix 和 Cybertron 都把节点事实交给代码。
 2. **谁有判定权。** 这是 matrix 和 Cybertron 最大的分歧。matrix 的原则是"不得按固定流程、固定次数或阈值决策"，AC 结论也由编排者提交。Cybertron 把一部分判断收回代码：哪类证据能过门、门禁下限在哪、预算何时耗尽、是否在空转。v6 的说法是"判断归 LLM，合法性和预算归代码"。
 3. **证据有没有来源类型。** matrix 也区分宿主证据和模型报告（例如 build-test 的 `prepare_result` 里的退出码"仍是模型报告"），但这些区分散在各个角色的规则里。Cybertron 的 `QualityEvidence` 把来源做成枚举字段，门禁直接按类型拒绝。
 
 ### 14.5 各自的代价
 
-- **forge**：最灵活，但状态和质量结论都可能被模型"说成真的"。
+- **参考流程**：最灵活，但状态和质量结论都可能被模型"说成真的"。
 - **matrix**：灵活，节点事实可信。风险在于编排者基于真实事实做出糟糕的判断，或在 gate 里把证据不足的 AC 记成 pass；代码不拦这些，只有超时兜底。设备侧对模型的信任也更多。
 - **Cybertron**：最难被模型骗。但治理用过头就是现状：连计划本身都被管成了常量，写一个 md 都过不了。v6 的修正是把治理对象从"计划长什么样"改成"计划的变更是否合法、证据是否可信"。

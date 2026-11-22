@@ -50,28 +50,7 @@ export default {
         "* -o *"
       ]
     },
-    "quintus-prime": {
-      "allow": [
-        "mkdir -p *"
-      ],
-      "ask": [],
-      "deny": []
-    },
     "solus-prime": {
-      "allow": [
-        "ruff format *",
-        "ruff check *",
-        "clang-format *",
-        "cargo fmt *",
-        "cmake --build *",
-        "make *"
-      ],
-      "ask": [],
-      "deny": [
-        "*--output*"
-      ]
-    },
-    "amalgamous": {
       "allow": [
         "ruff format *",
         "ruff check *",
@@ -131,36 +110,13 @@ export default {
       ],
       "ask": [
         "docker build*",
-        "docker compose build*"
-      ],
-      "deny": [
+        "docker compose build*",
         "pio run -t upload*",
         "openocd *",
         "esptool*",
-        "st-flash*"
-      ]
-    },
-    "megatronus": {
-      "allow": [
-        "git status --short",
-        "lsusb*",
-        "ls /dev/tty*",
-        "cat /dev/tty*",
-        "pio device monitor*",
-        "openocd --version"
-      ],
-      "ask": [
-        "screen *",
-        "python3 -m serial.tools.miniterm *",
-        "cp *",
-        "mv *",
-        "git checkout *",
+        "st-flash*",
         "ssh *",
-        "scp *",
-        "openocd *",
-        "esptool*",
-        "pio run -t upload*",
-        "st-flash*"
+        "scp *"
       ],
       "deny": []
     }

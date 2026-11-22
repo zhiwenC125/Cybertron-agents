@@ -35,7 +35,8 @@ def compile_shell_policy_module(target: Path) -> Path:
 
 
 def compile_opencode_v2_assets(target_dir: Path, *, include_feishu: bool = False,
-                               disable_legacy_cybertron: bool = True) -> List[Path]:
+                               disable_legacy_cybertron: bool = True,
+                               emit_shell_policy: bool = True) -> List[Path]:
     """Generates OpenCode V2 native configuration files for all 13 Primes."""
     assert_catalog()
     generated: List[Path] = []
@@ -87,6 +88,7 @@ def compile_opencode_v2_assets(target_dir: Path, *, include_feishu: bool = False
 
     opencode_jsonc = {
         "$schema": "https://opencode.ai/config.json",
+        "default_agent": "prima",
         "agents": agents_json_map,
     }
     if disable_legacy_cybertron:
@@ -129,8 +131,9 @@ def compile_opencode_v2_assets(target_dir: Path, *, include_feishu: bool = False
     jsonc_path = target_dir / "opencode.jsonc"
     jsonc_path.write_text(json.dumps(opencode_jsonc, ensure_ascii=False, indent=2), encoding="utf-8")
     generated.append(jsonc_path)
-    generated.append(compile_shell_policy_module(
-        target_dir / ".opencode" / "plugins" / "shell_policy.mjs"))
+    if emit_shell_policy:
+        generated.append(compile_shell_policy_module(
+            target_dir / ".opencode" / "plugins" / "shell_policy.mjs"))
     return generated
 
 
@@ -153,7 +156,8 @@ def compile_deepseek_harness_assets(target_dir: Path) -> List[Path]:
             "l2_security_reviewer": "liege-maximo",
             "qa_and_sil_verifier": "alchemist",
             "cross_compile_and_prep": "nexus-prime",
-            "physical_flash_gatekeeper": "megatronus",
+            "physical_flash_gatekeeper": "nexus-prime",
+            "acceptance_verifier": "megatronus",
         },
         "agents": [
             {

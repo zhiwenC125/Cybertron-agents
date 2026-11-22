@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "version": "0.9.0",
+  "software_acceptance": {
+    "single_file_and_hash": "passed in isolated Live OpenCode run",
+    "exact_content_without_dispatch": "covered by the kernel regression suite",
+    "prior_live_regression_failure_then_success": {
+      "environment": "isolated OpenCode project",
+      "plan_revisions": [
+        0,
+        1
+      ],
+      "commands_exit_codes": [
+        1,
+        0
+      ],
+      "same_run": true,
+      "unrelated_node_reused": true
+    },
+    "prior_live_thirteenth_then_prima": {
+      "environment": "isolated OpenCode project",
+      "same_session": true,
+      "same_run": true,
+      "native_terminal_agent_switch": true
+    },
+    "user_python_retest": {
+      "ledger_sha256": "7eeb418097ca8a00fee411918000ee324d57a5985f276ec58a58cd029cdedb34",
+      "runtime_completed": true,
+      "test_exit_codes": [
+        0
+      ],
+      "replan_trigger": "static review tool failure",
+      "plan_revisions": [
+        0,
+        1
+      ],
+      "reused_nodes": [
+        "recon",
+        "fix",
+        "verify_tests"
+      ],
+      "test_file_unchanged": true
+    },
+    "user_plan_preview_then_execution": {
+      "ledger_sha256": "76b2671679561090bc682cee0ad7cca9e8d5025952626086fbc8c24576281462",
+      "same_session": true,
+      "dispatched_nodes": 1
+    },
+    "user_exact_file_allow": {
+      "ledger_sha256": "5e94649193aa86fbf91abf0ccc4484a215896ee6f0cdac27319676a4f9b32176",
+      "target": "approved.md",
+      "allow_receipts": 1,
+      "hash_matches_artifact": true
+    },
+    "user_exact_file_deny": {
+      "ledger_sha256": "8f61bf5feade895a97ed5fd3d042e98d1681a0c87932941d28598b0c1d51209d",
+      "target": "denied.md",
+      "deny_receipts": 1,
+      "write_applied": false
+    },
+    "unavailable_verification": "covered by plan-validation tests"
+  },
+  "release_scope": "software and workspace approval; hardware actions and remote deployment require separate authorization",
+  "local_release_gates": {
+    "python_unittest_passed": 329,
+    "node_plugin_tests_passed": 13,
+    "concurrent_dispatch_rejection_preserves_receipt": "passed",
+    "cross_session_plan_survives_settlement": "passed",
+    "stage5_isolated_qa": "passed",
+    "engine_self_check": "passed",
+    "npm_and_wheel_content_comparison": "passed"
+  }
+}

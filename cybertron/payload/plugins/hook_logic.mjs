@@ -1,3 +1,7 @@
+import path from 'node:path';
+import os from 'node:os';
+import { lstatSync, realpathSync } from 'node:fs';
+
 export function nativeDispatch(event) {
   const card = event.input?.description;
   const match = /^\[([^\]]+)\] ([^|]+) \| (.+)$/.exec(card || '');
@@ -43,16 +47,17 @@ export function childPermissionRules({ accessMode, writeScope, externalScope }) 
       { action: 'edit', resource: '.git/**', effect: 'deny' },
       { action: 'edit', resource: '.opencode/**', effect: 'deny' },
       { action: 'edit', resource: '.cybertron/runs/**', effect: 'deny' },
+      { action: 'edit', resource: '.cybertron/templates/**', effect: 'deny' },
       { action: 'edit', resource: 'opencode.jsonc', effect: 'deny' },
       { action: 'shell', resource: '*', effect: 'deny' },
     ]
   }
-  const external = (externalScope || []).flatMap(path => ([
-    { action: 'external_directory', resource: path, effect: 'ask' },
-    { action: 'external_directory', resource: path + '/*', effect: 'ask' },
-    { action: 'edit', resource: path, effect: 'ask' },
-    { action: 'edit', resource: path + '/*', effect: 'ask' },
-  ]))
+  const external = externalScope?.length === 1 ? [
+    // V2 checks dirname(target)/* before checking the exact file with edit.
+    // Both still require the plugin's per-tool scope check.
+    { action: 'external_directory', resource: path.join(path.dirname(externalScope[0]), '*'), effect: 'ask' },
+    { action: 'edit', resource: externalScope[0], effect: 'ask' },
+  ] : [];
   return [
     { action: 'edit', resource: '*', effect: 'deny' },
     ...(writeScope || []).map(resource => ({ action: 'edit', resource, effect: 'allow' })),
@@ -62,46 +67,30 @@ export function childPermissionRules({ accessMode, writeScope, externalScope }) 
   ]
 }
 
-const normalizePath = value => String(value).replace(/\/\*$/, '').replace(/\/+$/, '')
-
-/** True when `target` is `root` or lies below it. */
-export function pathCovered(roots, target) {
-  const value = normalizePath(target)
-  return (roots || []).some(root => {
-    const base = normalizePath(root)
-    return value === base || value.startsWith(base + '/')
-  })
+export function outsideProject(project, target) {
+  const relative = path.relative(project, target);
+  return relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative);
 }
 
-/**
- * Decide what the permission hook should do with one evaluation.
- * Returns 'skip' for project-internal or relative paths, 'ask' when every
- * outside path is covered by the node's declared external scope, and 'deny'
- * otherwise. `external_directory` reports the directory boundary of a write,
- * so containment may hold in either direction.
- */
-export function externalGate({ action, resources, external, projectRoot, effect }) {
-  const outside = (resources || []).filter(value => value.startsWith('/') || value.startsWith('~'))
-  if (!outside.length) return 'skip'
-  if (outside.every(value => pathCovered([projectRoot], value))) return 'skip'
-  const related = value => (external || []).some(root =>
-    pathCovered([value], root) || pathCovered([root], value))
-  const declared = action === 'external_directory'
-    ? outside.every(related)
-    : outside.every(value => pathCovered(external, value))
-  if (!declared) return 'deny'
-  // A saved "always" approval resolves the write to allow before this hook
-  // runs; keep it and record a standing grant instead of asking again.
-  return effect === 'allow' ? 'allow' : 'ask'
+export function toolPath(project, value) {
+  if (typeof value !== 'string' || !value) return null;
+  return path.resolve(project, value.startsWith('~/') ? path.join(os.homedir(), value.slice(2)) : value);
 }
 
-/** True when every outside resource is covered by a recorded "always" grant. */
-export function grantCovers({ resources, grants }) {
-  if (!grants || !grants.length) return false
-  const related = value => grants.some(root =>
-    pathCovered([value], root) || pathCovered([root], value))
-  return (resources || []).every(value =>
-    value.startsWith('/') || value.startsWith('~') ? related(value) : true)
+/** Identify the exact leaf before and after the approval wait. */
+export function externalFileState(target) {
+  const parent = path.dirname(target);
+  if (realpathSync(parent) !== parent || !lstatSync(parent).isDirectory())
+    throw new Error('External write requires an existing canonical parent directory');
+  const directory = lstatSync(parent, { bigint: true });
+  const file = lstatSync(target, { throwIfNoEntry: false, bigint: true });
+  if (file && (!file.isFile() || file.nlink !== 1n))
+    throw new Error('External write requires a regular file with no symbolic or hard links');
+  return {
+    exists: Boolean(file),
+    identity: [directory.dev, directory.ino, file?.dev, file?.ino,
+      file?.ctimeNs, file?.size].map(String).join(':'),
+  };
 }
 
 /** A run that can no longer accept nodes; a new request may start a fresh run. */

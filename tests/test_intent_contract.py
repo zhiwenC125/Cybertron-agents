@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from cybertron.graph import GraphRejected, PlanGraph, PlanNode
-from cybertron.host_v6 import V6HostBridge
+from cybertron.host_v6 import PlanValidationError, V6HostBridge
 from cybertron.intent import Intent, IntentRejected, coverage
 
 
@@ -99,31 +99,28 @@ class HostIntentTests(unittest.TestCase):
         return self.bridge.plan(nodes, "host-session", objective="update README",
                                 intent=intent_payload)
 
-    def test_review_blocks_uncovered_done(self):
-        result = self.create(intent(done=[
-            {"id": "d1", "criterion": "README updated", "evidence": "artifact"},
-            {"id": "d2", "criterion": "test passes", "evidence": "test"},
-        ]))
-        review = self.bridge.review_plan(result["run_id"])
-        self.assertFalse(review["approved"])
-        self.assertIn("intent.done.uncovered", [item["code"] for item in review["blocking"]])
+    def test_submission_blocks_uncovered_done(self):
+        with self.assertRaises(PlanValidationError) as rejected:
+            self.create(intent(done=[
+                {"id": "d1", "criterion": "README updated", "evidence": "artifact"},
+                {"id": "d2", "criterion": "test passes", "evidence": "test"},
+            ]))
+        self.assertIn("intent.done.uncovered", [item["code"] for item in rejected.exception.findings])
 
-    def test_review_blocks_forbidden_capability_and_path(self):
-        by_capability = self.create(intent(forbidden_capabilities=["doc.write"]))
-        review = self.bridge.review_plan(by_capability["run_id"])
-        self.assertIn("intent.capability", [item["code"] for item in review["blocking"]])
+    def test_submission_blocks_forbidden_capability_and_path(self):
+        for intent_payload, code in [
+            (intent(forbidden_capabilities=["doc.write"]), "intent.capability"),
+            (intent(forbidden_paths=["README.md"]), "intent.path"),
+        ]:
+            with self.subTest(code=code), self.assertRaises(PlanValidationError) as rejected:
+                self.create(intent_payload)
+            self.assertIn(code, [item["code"] for item in rejected.exception.findings])
 
-        self.bridge = V6HostBridge(Path(self.temp.name) / "second")
-        self.bridge._dir if False else None
-        (Path(self.temp.name) / "second").mkdir()
-        self.bridge = V6HostBridge(Path(self.temp.name) / "second")
-        by_path = self.create(intent(forbidden_paths=["README.md"]))
-        review = self.bridge.review_plan(by_path["run_id"])
-        self.assertIn("intent.path", [item["code"] for item in review["blocking"]])
-
-    def test_unconfirmed_intent_is_rejected_at_creation(self):
-        with self.assertRaises(Exception):
-            self.create(intent(confirmed=False))
+    def test_clear_intent_is_accepted_without_confirmation(self):
+        result = self.create(intent(confirmed=False))
+        self.assertEqual(result["ready_nodes"], ["n1"])
+        self.assertFalse(result["intent"]["confirmed"])
+        self.assertNotIn("human.requested", [event["type"] for event in self.bridge.events(result["run_id"])])
 
     def test_completion_requires_artifact_evidence(self):
         result = self.create()
@@ -263,7 +260,6 @@ class PluginSchemaTests(unittest.TestCase):
     def test_plugin_schema_exposes_intent_and_satisfies(self):
         root = Path(__file__).resolve().parent.parent
         for relative in ("cybertron/v6_plugin/cybertron.js",
-                         ".opencode/plugins/cybertron.js",
                          "cybertron/payload/plugins/cybertron.js"):
             with self.subTest(path=relative):
                 text = (root / relative).read_text()

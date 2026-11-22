@@ -1,5 +1,7 @@
 # Cybertron → OpenCode V2 分阶段开发计划
 
+轻量化 Harness Loop 的实现与角色职责见 [当前方案](docs/plans/cybertron-lightweight-harness-loop.md)。单文件交付、同一 run 重规划和终端角色切换的实际结果见 [结构化验收回执](docs/testing/harness-loop-release-validation.json)。
+
 > v6 动态任务图方案见 [`design/DEVELOPMENT_PLAN.md`](design/DEVELOPMENT_PLAN.md)。v6 M0–M5 已全部通过门禁，`0.3.0` 起运行时以图计划为准；里程碑命令、回执与哈希见 [`docs/stages/v6-progress.md`](docs/stages/v6-progress.md)。本文以下 A–G 阶段与七步表记录 v5 历史验收，保留作追溯。
 
 七阶段最小闭环后的运行态持久化、安装发布与双宿主后续工作，见 [`docs/handoffs/2026-11-14-runtime-architecture.md`](docs/handoffs/2026-11-14-runtime-architecture.md)。该文件的 A–G 阶段是后续实施计划，不改变下表的历史验收状态。

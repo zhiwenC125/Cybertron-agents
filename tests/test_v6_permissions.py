@@ -21,16 +21,14 @@ class V6PermissionTests(unittest.TestCase):
         root = Path(__file__).resolve().parent.parent
         for name in ("cybertron.js", "hook_logic.mjs"):
             source = (root / "cybertron" / "v6_plugin" / name).read_bytes()
-            for generated in (root / ".opencode" / "plugins" / name,
-                              root / "cybertron" / "payload" / "plugins" / name):
-                with self.subTest(path=str(generated)):
-                    self.assertEqual(generated.read_bytes(), source)
+            generated = root / "cybertron" / "payload" / "plugins" / name
+            with self.subTest(path=str(generated)):
+                self.assertEqual(generated.read_bytes(), source)
 
     def test_shell_policy_module_matches_registry(self):
         root = Path(__file__).resolve().parent.parent
         expected = shell_policy_module()
         for path in (root / "cybertron" / "v6_plugin" / "shell_policy.mjs",
-                     root / ".opencode" / "plugins" / "shell_policy.mjs",
                      root / "cybertron" / "payload" / "plugins" / "shell_policy.mjs"):
             with self.subTest(path=str(path)):
                 self.assertEqual(path.read_text(), expected)
@@ -44,7 +42,8 @@ class V6PermissionTests(unittest.TestCase):
     def test_prima_dispatches_but_does_not_author_plans(self):
         prima = THIRTEEN_PRIMES_REGISTRY[0]
         breaker = MegatronusCircuitBreaker(prima.permissions)
-        for tool in ("cy_state", "cy_plan_review", "cy_ask", "cy_templates", "cy_metrics"):
+        for tool in ("cy_state", "cy_ask", "cy_templates", "cy_metrics",
+                     "cy_runs", "cy_resume"):
             with self.subTest(tool=tool):
                 self.assertEqual(breaker.verify_tool_call(tool, "*", tool)[0],
                                  PermissionEffect.ALLOW)
@@ -53,14 +52,12 @@ class V6PermissionTests(unittest.TestCase):
         self.assertEqual(breaker.verify_tool_call(
             "cybertron_run", "*", "legacy")[0], PermissionEffect.DENY)
 
-    def test_only_prima_reviews_plans(self):
+    def test_model_roles_do_not_call_plan_review(self):
         for agent in THIRTEEN_PRIMES_REGISTRY:
             with self.subTest(agent=agent.agent_id):
                 effect, _ = MegatronusCircuitBreaker(agent.permissions).verify_tool_call(
                     "cy_plan_review", "*", agent.agent_id)
-                self.assertEqual(effect, PermissionEffect.ALLOW
-                                 if agent.agent_id == "prima"
-                                 else PermissionEffect.DENY)
+                self.assertEqual(effect, PermissionEffect.DENY)
 
     def test_thirteenth_owns_the_plan(self):
         thirteenth = next(agent for agent in THIRTEEN_PRIMES_REGISTRY
@@ -96,10 +93,15 @@ class V6PermissionTests(unittest.TestCase):
             "cy_ask_decision", "Confirm?", "ask")[0], PermissionEffect.ASK)
         self.assertEqual(breaker.verify_tool_call(
             "question", "*", "question")[0], PermissionEffect.ALLOW)
+        for role in THIRTEEN_PRIMES_REGISTRY:
+            effect, _ = MegatronusCircuitBreaker(role.permissions).verify_tool_call(
+                "cy_full_access_decision", "*", role.agent_id)
+            self.assertEqual(effect, PermissionEffect.ASK
+                             if role.agent_id in {"prima", "thirteenth"}
+                             else PermissionEffect.DENY)
 
     def test_cy_check_is_granted_only_to_isolated_check_roles(self):
-        allowed = {"micronus-prime", "nexus-prime", "alchemist", "solus-prime",
-                   "amalgamous"}
+        allowed = {"quintus-prime", "micronus-prime", "nexus-prime", "alchemist"}
         for agent in THIRTEEN_PRIMES_REGISTRY:
             with self.subTest(agent=agent.agent_id):
                 effect, _ = MegatronusCircuitBreaker(agent.permissions).verify_tool_call(
@@ -191,20 +193,21 @@ class V6PermissionTests(unittest.TestCase):
             ],
             "nexus-prime": [
                 ("cmake -S . -B build", PermissionEffect.ALLOW),
-                ("pio run -t upload", PermissionEffect.DENY),
-                ("openocd -f board.cfg", PermissionEffect.DENY),
-            ],
-            "megatronus": [
-                ("cat /dev/ttyACM0", PermissionEffect.ALLOW),
+                ("pio run -t upload", PermissionEffect.ASK),
                 ("openocd -f board.cfg", PermissionEffect.ASK),
                 ("ssh board.local", PermissionEffect.ASK),
+            ],
+            "megatronus": [
+                ("cat /dev/ttyACM0", PermissionEffect.DENY),
+                ("openocd -f board.cfg", PermissionEffect.DENY),
+                ("ssh board.local", PermissionEffect.DENY),
             ],
             "solus-prime": [
                 ("clang-format -i src/main.c", PermissionEffect.ALLOW),
                 ("git push", PermissionEffect.DENY),
             ],
             "amalgamous": [
-                ("cargo fmt --all", PermissionEffect.ALLOW),
+                ("cargo fmt --all", PermissionEffect.DENY),
                 ("openocd -f board.cfg", PermissionEffect.DENY),
             ],
         }
