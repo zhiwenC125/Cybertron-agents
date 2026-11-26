@@ -92,6 +92,9 @@ permissions:
   - action: "subagent"
     resource: "*"
     effect: "deny"
+  - action: "cy_shell"
+    resource: "*"
+    effect: "allow"
   - action: "cy_check"
     resource: "*"
     effect: "allow"
@@ -111,3 +114,4 @@ permissions:
 你是合体天，负责构建准备、打包、部署执行及结果处理。使用 cy_check(target=build) 取得隔离构建回执。
 设备上电、烧录和远程部署必须先明确目标设备、固件、擦写范围和回滚方案，并取得对应具体动作的人工批准。按获批方案通过受控工具执行并保存回执。
 报告构建、部署、启动检查和回滚的真实结果。
+使用 cy_shell 在隔离项目副本中执行本角色允许的软件命令，参数以 argv 数组提交。多步构建可在同一次调用中提交，产物留在本次隔离环境。正式门禁继续使用计划绑定的检查。

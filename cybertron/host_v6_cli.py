@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import sys
 from pathlib import Path
 
@@ -17,7 +18,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("operation", choices=("plan", "plan_op", "state", "runs", "review_plan", "ask",
                                              "before", "after", "bind", "permission", "external_write",
                                              "review_reject", "finish",
-                                             "check", "templates", "metrics",
+                                             "check", "fenced_shell", "templates", "metrics",
                                              "grant_request", "grant_approve", "grant_deny",
                                              "grant_revoke", "grants", "intercept",
                                              "gate_tool", "capabilities", "planning_tools", "verify_acceptance",
@@ -32,6 +33,12 @@ def main(argv: list[str] | None = None) -> int:
                 data["run_id"], data["target"], data.get("call_id"),
                 data.get("node_id"), data.get("child_session_id"))
                       if data.get("run_id") else run_check(args.project, data["target"]))
+        elif args.operation == "fenced_shell":
+            def cancel(_signum, _frame):
+                raise KeyboardInterrupt
+            signal.signal(signal.SIGTERM, cancel)
+            result = bridge.fenced_shell(data["run_id"], data["call_id"], data["child_session_id"],
+                                         data["role"], data["commands"], data.get("cwd", "."))
         elif args.operation == "templates":
             result = V6HostBridge(args.project).templates()
         elif args.operation == "runs":
@@ -109,12 +116,14 @@ def main(argv: list[str] | None = None) -> int:
                 satisfies_map=data.get("satisfies"), parent_run_id=data.get("parent_run_id"),
                 supersedes_run_id=data.get("supersedes_run_id"),
                 change_reason=data.get("change_reason", ""), seed_from_run_id=data.get("seed_from_run_id"),
-                planned_verification=bool(data.get("planned_verification")), gates=data.get("gates"))
+                planned_verification=bool(data.get("planned_verification")),
+                adaptive_verification=bool(data.get("adaptive_verification")), gates=data.get("gates"))
         elif args.operation == "plan_op":
             result = bridge.plan_op(data["run_id"], data["operation"],
                                     planner_session_id=data.get("planner_session_id"))
         elif args.operation == "state":
-            result = bridge.state(data["run_id"])
+            result = (bridge.verify_pending(data["run_id"], retry=bool(data.get("retry_checks")))
+                      if data.get("verify_pending") else bridge.state(data["run_id"]))
         elif args.operation == "review_plan":
             result = bridge.review_plan(data["run_id"])
         elif args.operation == "ask":

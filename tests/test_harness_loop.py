@@ -64,6 +64,139 @@ class HarnessLoopTests(unittest.TestCase):
                                   write_scope=["cybertron/registry.py"]),
                              "planner", access_mode="danger-full-access", planned_verification=True)
 
+    def test_adaptive_admits_unavailable_check_but_reports_it_before_completion(self):
+        write = node("write", "doc.write", "alpha-trion", write_scope=["notes.md"],
+                     verifiers=["scope_guard", "build"])
+        state = self.bridge.plan(write, "planner", adaptive_verification=True)
+        self.assertEqual(state["ready_nodes"], ["write"])
+        self.assertTrue(any(finding["code"] == "check.unavailable" and finding["severity"] == "warning"
+                            for finding in state["review"]["findings"]))
+        run_id = state["run_id"]
+        dispatch = self.dispatch(run_id, "write")
+        (self.project / "notes.md").write_text("Delivered.\n")
+        self.finish(run_id, dispatch)
+        state = self.bridge.verify_pending(run_id)
+        self.assertEqual(state["status"], "blocked")
+        self.assertEqual(state["pending_checks"][0]["status"], "unavailable")
+        self.assertNotIn("run.completed", {event["type"] for event in self.bridge.events(run_id)})
+        self.assertIn("unavailable", Path(state["plan_path"]).read_text())
+
+    @unittest.skipUnless(shutil.which("sandbox-exec"), "requires macOS sandbox runner")
+    @unittest.skipIf(os.environ.get("CYBERTRON_SANDBOX") == "1",
+                     "nested sandbox-exec is unsupported")
+    def test_adaptive_code_diff_runs_real_checks_and_preserves_independent_work(self):
+        (self.project / "pyproject.toml").write_text('[project]\nname = "example"\n')
+        (self.project / "src").mkdir()
+        (self.project / "tests").mkdir()
+        path = self.project / "src" / "value.py"
+        path.write_text("VALUE = 1\n")
+        (self.project / "tests" / "test_value.py").write_text(
+            "import unittest\nfrom src.value import VALUE\n"
+            "class Check(unittest.TestCase):\n"
+            "    def test_value(self): self.assertEqual(VALUE, 3)\n"
+        )
+        fix = node("fix", "code.write", "solus-prime", write_scope=["src/value.py"])
+        scan = node("scan", "scan.static", "onyx-prime")
+        follow = node("follow", "scan.static", "onyx-prime", depends_on=["fix"])
+        state = self.bridge.plan([fix, scan, follow], "planner", adaptive_verification=True)
+        run_id = state["run_id"]
+        dispatch = self.dispatch(run_id, "fix")
+        path.write_text("VALUE = 2\n")
+        state = self.finish(run_id, dispatch)
+        self.assertEqual(state["pending_gates"], ["test"])
+        state = self.bridge.verify_pending(run_id)
+        self.assertEqual(state["ready_nodes"], ["scan"])
+        self.assertEqual(state["pending_checks"][0]["status"], "fail")
+        self.assertTrue(state["pending_checks"][0]["can_retry"])
+        failed = next(e for e in self.bridge.events(run_id) if e["type"] == "gate.check")
+        self.assertTrue(failed["inline"])
+        self.assertEqual(failed["receipt"]["exit"], 1)
+        self.finish(run_id, self.dispatch(run_id, "scan"))
+        self.bridge.verify_pending(run_id)
+        self.assertEqual(len([e for e in self.bridge.events(run_id) if e["type"] == "gate.check"]), 1)
+
+        revised = self.bridge.plan_op(run_id, {
+            "op": "revise", "op_id": "correct", "plan_revision": 0, "reason": "Wrong value",
+            "nodes": [dict(fix, objective="Set the value to 3")],
+        })
+        self.assertEqual(revised["ready_nodes"], ["fix"])
+        dispatch = self.dispatch(run_id, "fix", 2)
+        path.write_text("VALUE = 3\n")
+        self.finish(run_id, dispatch)
+        self.assertEqual(self.bridge.verify_pending(run_id)["ready_nodes"], ["follow"])
+        state = self.finish(run_id, self.dispatch(run_id, "follow"))
+        self.assertEqual(state["status"], "completed")
+        receipts = [e["receipt"]["exit"] for e in self.bridge.events(run_id) if e["type"] == "gate.check"]
+        self.assertEqual(receipts, [1, 0])
+        path.write_text("VALUE = 4\n")
+        self.assertEqual(self.bridge.state(run_id)["status"], "completed")
+
+    @unittest.skipUnless(shutil.which("sandbox-exec"), "requires macOS sandbox runner")
+    @unittest.skipIf(os.environ.get("CYBERTRON_SANDBOX") == "1",
+                     "nested sandbox-exec is unsupported")
+    def test_adaptive_interface_requires_review_and_acceptance_after_real_test(self):
+        (self.project / "pyproject.toml").write_text('[project]\nname = "example"\n')
+        (self.project / "src").mkdir()
+        (self.project / "tests").mkdir()
+        path = self.project / "src" / "interfaces.py"
+        path.write_text("VALUE = 1\n")
+        (self.project / "tests" / "test_interface.py").write_text(
+            "import unittest\nfrom src.interfaces import VALUE\n"
+            "class Check(unittest.TestCase):\n"
+            "    def test_value(self): self.assertEqual(VALUE, 2)\n"
+        )
+        fix = node("fix", "code.write", "solus-prime", write_scope=["src/interfaces.py"])
+        state = self.bridge.plan(fix, "planner", adaptive_verification=True)
+        run_id = state["run_id"]
+        dispatch = self.dispatch(run_id, "fix")
+        path.write_text("VALUE = 2\n")
+        self.finish(run_id, dispatch)
+        state = self.bridge.verify_pending(run_id)
+        self.assertEqual(state["pending_gates"], ["accept", "review.l2.full"])
+        self.assertEqual(state["status"], "blocked")
+        review = node("review", "review.l2", "liege-maximo", kind="review", depends_on=["fix"])
+        accept = node("accept", "accept", "megatronus", kind="verify", depends_on=["review"])
+        state = self.bridge.plan_op(run_id, {"op": "revise", "op_id": "review-risk",
+                                            "plan_revision": 0, "reason": "Interface diff",
+                                            "nodes": [review, accept]})
+        self.assertEqual(state["ready_nodes"], ["review"])
+        dispatch = self.dispatch(run_id, "review")
+        self.bridge.observe_review_read(run_id, dispatch[0], dispatch[1], str(path), "a" * 64)
+        self.assertEqual(self.finish(run_id, dispatch)["ready_nodes"], ["accept"])
+        dispatch = self.dispatch(run_id, "accept")
+        self.bridge.verify_acceptance(run_id, dispatch[0], dispatch[1], True, "Verified interface.")
+        self.assertEqual(self.finish(run_id, dispatch)["status"], "completed")
+
+    @unittest.skipUnless(shutil.which("sandbox-exec"), "requires macOS sandbox runner")
+    @unittest.skipIf(os.environ.get("CYBERTRON_SANDBOX") == "1",
+                     "nested sandbox-exec is unsupported")
+    def test_adaptive_waits_for_planned_test_author_and_runs_the_suite_once(self):
+        (self.project / "pyproject.toml").write_text('[project]\nname = "example"\n')
+        (self.project / "src").mkdir()
+        (self.project / "tests").mkdir()
+        fix = node("fix", "code.write", "solus-prime", write_scope=["src/value.py"])
+        tests = node("write-tests", "test.write", "alchemist", depends_on=["fix"],
+                     write_scope=["tests/test_value.py"])
+        state = self.bridge.plan([fix, tests], "planner", adaptive_verification=True)
+        run_id = state["run_id"]
+        dispatch = self.dispatch(run_id, "fix")
+        (self.project / "src" / "value.py").write_text("VALUE = 2\n")
+        state = self.finish(run_id, dispatch)
+        self.assertEqual(state["ready_nodes"], ["write-tests"])
+        self.assertEqual(state["pending_checks"][0]["status"], "waiting_for_tests")
+        self.bridge.verify_pending(run_id)
+        self.assertEqual(self.bridge.metrics(run_id)["run"]["gate_checks"], 0)
+        dispatch = self.dispatch(run_id, "write-tests")
+        (self.project / "tests" / "test_value.py").write_text(
+            "import unittest\nfrom src.value import VALUE\n"
+            "class Check(unittest.TestCase):\n"
+            "    def test_value(self): self.assertEqual(VALUE, 2)\n"
+        )
+        self.finish(run_id, dispatch)
+        state = self.bridge.verify_pending(run_id)
+        self.assertEqual(state["status"], "completed")
+        self.assertEqual(self.bridge.metrics(run_id)["run"]["gate_checks"], 1)
+
     @unittest.skipUnless(shutil.which("sandbox-exec"), "requires macOS sandbox runner")
     @unittest.skipIf(os.environ.get("CYBERTRON_SANDBOX") == "1",
                      "nested sandbox-exec is unsupported")

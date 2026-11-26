@@ -47,7 +47,7 @@ ROLE_AUTHORITY: dict[str, dict[str, Any]] = {
         "never": ("bash:git-write", "bash:git-push", "device", "deploy"),
     },
     "solus-prime": {
-        "atoms": ("read", "edit", "bash:lint"),
+        "atoms": ("read", "edit", "bash:lint", "cy_shell"),
         "escalatable": ("exec.expand", "pkg.install"),
         "never": ("bash:git-write", "bash:git-push", "device", "deploy"),
     },
@@ -58,7 +58,7 @@ ROLE_AUTHORITY: dict[str, dict[str, Any]] = {
     },
     "micronus-prime": {
         "atoms": ("read", "glob", "grep", "bash:lint", "bash:git-read",
-                  "cy_check"),
+                  "cy_check", "cy_shell"),
         "escalatable": ("exec.expand", "read.expand"),
         "never": ("bash:git-write", "bash:git-push", "device", "deploy"),
     },
@@ -69,13 +69,13 @@ ROLE_AUTHORITY: dict[str, dict[str, Any]] = {
     },
     "alchemist": {
         "atoms": ("read", "glob", "grep", "write", "edit", "bash:test",
-                  "bash:pkg", "bash:git-read", "cy_check"),
+                  "bash:pkg", "bash:git-read", "cy_check", "cy_shell"),
         "escalatable": ("exec.expand", "pkg.install"),
         "never": ("bash:git-write", "bash:git-push", "device", "deploy"),
     },
     "nexus-prime": {
         "atoms": ("read", "glob", "grep", "write", "edit", "bash:build",
-                  "bash:pkg", "cy_check", "device", "deploy"),
+                  "bash:pkg", "cy_check", "cy_shell", "device", "deploy"),
         "escalatable": ("exec.expand", "pkg.install", "device", "deploy"),
         "never": ("bash:git-write", "bash:git-push"),
     },
@@ -100,13 +100,15 @@ class AuthorityRejected(ValueError):
 
 
 def assert_authority() -> None:
-    from .registry import THIRTEEN_PRIMES_REGISTRY
+    from .registry import FENCED_SHELL_COMMANDS, THIRTEEN_PRIMES_REGISTRY
     ids = {prime.agent_id for prime in THIRTEEN_PRIMES_REGISTRY}
     if set(ROLE_AUTHORITY) != ids:
         raise AuthorityRejected("authority matrix must contain exactly the 13 roles")
     for role, entry in ROLE_AUTHORITY.items():
         if not entry["atoms"]:
             raise AuthorityRejected(f"{role} has no baseline atoms")
+        if ("cy_shell" in entry["atoms"]) != (role in FENCED_SHELL_COMMANDS):
+            raise AuthorityRejected(f"{role} fenced shell authority differs from the registry")
         if any(kind not in GRANT_KINDS for kind in entry["escalatable"]):
             raise AuthorityRejected(f"{role} has an unknown escalatable grant")
         if "task" in entry["escalatable"] or "cy_plan" in entry["escalatable"]:

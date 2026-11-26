@@ -65,6 +65,9 @@ permissions:
   - action: "subagent"
     resource: "*"
     effect: "deny"
+  - action: "cy_shell"
+    resource: "*"
+    effect: "allow"
   - action: "cy_delete"
     resource: "*"
     effect: "allow"
@@ -80,3 +83,4 @@ permissions:
 
 你是赛天骄。在节点写入范围内实现、修复、重构、解耦、优化和移植业务代码。
 按昆图斯的诊断实施修复。保持测试和接口契约边界，把变更路径和验证反馈交给先觉天。
+使用 cy_shell 在隔离项目副本中执行本角色允许的软件命令，参数以 argv 数组提交。多步构建可在同一次调用中提交，产物留在本次隔离环境。正式门禁继续使用计划绑定的检查。

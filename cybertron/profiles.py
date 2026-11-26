@@ -30,6 +30,15 @@ CHECK_TARGETS = {
     "sim": ("test.write", "alchemist"),
 }
 
+PROFILE_TOOLS = {
+    "python": {"test": ("python3",)},
+    "node": {"test": ("node",)},
+    "renode": {"sim": ("renode",)},
+    "cmake-c": {"lint": ("cmake", "clang-tidy"), "build": ("cmake",)},
+    "cmake-arm": {"lint": ("cmake", "clang-tidy", "arm-none-eabi-gcc"),
+                  "build": ("cmake", "arm-none-eabi-gcc")},
+}
+
 
 @dataclass(frozen=True)
 class CheckReceipt:
@@ -145,14 +154,7 @@ def check_profile(project: Path, target: str) -> str:
         profile = "renode"
     else:
         profile = detect_profile(project)
-    tools = {
-        "python": {"test": ("python3",)},
-        "node": {"test": ("node",)},
-        "renode": {"sim": ("renode",)},
-        "cmake-c": {"lint": ("cmake", "clang-tidy"), "build": ("cmake",)},
-        "cmake-arm": {"lint": ("cmake", "clang-tidy", "arm-none-eabi-gcc"),
-                      "build": ("cmake", "arm-none-eabi-gcc")},
-    }[profile].get(target)
+    tools = PROFILE_TOOLS[profile].get(target)
     if tools is None:
         if profile.startswith("cmake-") and target == "test":
             raise CheckRejected("CMake test target requires a declared test framework")

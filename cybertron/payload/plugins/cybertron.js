@@ -5,7 +5,7 @@ import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nativeDispatch, childSession, nativeToolStatus, childPermissionRules,
+import { nativeDispatch, childSession, nativeToolStatus, childPermissionRules, samePermissionRules,
   outsideProject, toolPath, externalFileState, runIsTerminal, reviewerPathDenied } from './hook_logic.mjs';
 import shellPolicy from './shell_policy.mjs';
 
@@ -24,7 +24,8 @@ const globToRegExp = pattern => {
 const shellVerdict = (policy, command) => {
   const match = pattern => globToRegExp(pattern).test(command);
   if ((policy.deny || []).some(match)) return 'deny';
-  if ((policy.allow || []).some(match) || (policy.ask || []).some(match)) return 'allow';
+  if ((policy.ask || []).some(match)) return 'ask';
+  if ((policy.allow || []).some(match)) return 'allow';
   return 'unlisted';
 };
 const noWriteRequested = text =>
@@ -103,8 +104,8 @@ const nodeInput = {
     write_scope: { type: 'array', items: { type: 'string' } },
     external_scope: { type: 'array', items: { type: 'string' } },
     acceptance: { type: 'array', items: { type: 'string' } },
-    verifiers: { type: 'array', items: { type: 'string', enum: ['scope_guard', 'loop1'] },
-      description: 'Use ["scope_guard"]. Put runnable checks in dedicated verify nodes.' },
+    verifiers: { type: 'array', items: { type: 'string', enum: ['scope_guard', 'loop1', 'lint', 'build', 'test', 'sim'] },
+      description: 'Include scope_guard. In workspace-write, a task may declare fixed checks such as test. The kernel runs them after the task.' },
     satisfies: { type: 'array', items: { type: 'string' },
       description: 'Lowercase IDs of the acceptance criteria this node covers.' },
     requires: { type: 'array', items: { type: 'string' } },
@@ -284,7 +285,9 @@ export default Plugin.define({
             change_reason: input.change_reason || pendingSupersede?.change_reason || '',
             seed_from_run_id: input.seed_from_run_id, access_mode,
             session_title: session?.title || input.objective || '', slug: input.slug || '',
-            host_session_id: entry, host: 'opencode', planned_verification: true, gates: input.gates,
+            host_session_id: entry, host: 'opencode',
+            planned_verification: access_mode !== 'workspace-write',
+            adaptive_verification: access_mode === 'workspace-write', gates: input.gates,
           }, context.signal);
           if ((supersede || !run_id) && access_mode === 'danger-full-access') {
             await bridge('ask', project, { run_id: result.run_id,
@@ -309,15 +312,18 @@ export default Plugin.define({
         },
       });
       editor.add({
-        name: 'cy_state', description: 'Read the v6 run; wait for the native child to finish before settling the node.',
+        name: 'cy_state', description: 'Read the v6 run. With wait=true, settle native children and run pending fixed checks. After resolving the cause of a failed check, use wait=true and retry_checks=true for a bounded retry.',
         input: { type: 'object', properties: {
           wait: { type: 'boolean' },
+          retry_checks: { type: 'boolean' },
         }, additionalProperties: false },
         execute: async (input, context) => {
           if (!['prima', 'thirteenth'].includes(context.agent))
             throw new Error('Only prima may settle and thirteenth may read the run state');
           if (context.agent === 'thirteenth' && input.wait)
             throw new Error('The planner may read the run but prima owns wait/settle');
+          if (input.retry_checks && !input.wait)
+            throw new Error('Retrying fixed checks requires wait=true');
           const session = await ctx.session.get({ sessionID: context.sessionID });
           const handoff = session?.parentID && await ctx.storage.get(`planning-request/${session.parentID}`);
           let run_id = handoff?.run_id || await ctx.storage.get(`run/${context.sessionID}`);
@@ -351,6 +357,11 @@ export default Plugin.define({
                   child_session_id: active.child_session_id, child_error }, context.signal);
               await ctx.storage.remove(`tool_error/${active.child_session_id}`);
             }
+          }
+          if (input.wait && state.pending_checks?.length && !state.active_dispatches?.length) {
+            state = await bridge('state', project, {
+              run_id, verify_pending: true, retry_checks: input.retry_checks === true,
+            }, context.signal);
           }
           return { content: JSON.stringify(state) };
         },
@@ -499,6 +510,33 @@ export default Plugin.define({
         execute: async (input, context) => {
           if (context.agent !== 'prima') throw new Error('Only prima may read metrics');
           const result = await bridge('metrics', project, { run_id: input.run_id }, context.signal);
+          return { content: JSON.stringify(result) };
+        },
+      });
+      editor.add({
+        name: 'cy_shell',
+        description: 'Run role-approved software commands in a disposable project copy. Each command is an argv array. Commands share build, dist, and target directories for this call. Returns sandbox output and receipts.',
+        input: { type: 'object', properties: {
+          commands: { type: 'array', minItems: 1, maxItems: 4,
+            items: { type: 'array', minItems: 1, maxItems: 32, items: { type: 'string' } } },
+          cwd: { type: 'string', description: 'Project-relative working directory. Defaults to the project root.' },
+        }, required: ['commands'], additionalProperties: false },
+        execute: async (input, context) => {
+          const binding = await ctx.storage.get(`child/${context.sessionID}`);
+          if (!shellPolicy.fencedShellCommands[context.agent] ||
+              binding?.access_mode !== 'workspace-write' || binding.check_target ||
+              !['task', 'review'].includes(binding.kind) ||
+              !await ctx.storage.get(`bound/${context.sessionID}`))
+            throw new Error('cy_shell requires an allowed role and a verified project child');
+          await ctx.permission.assert({
+            sessionID: context.sessionID,
+            source: { type: 'tool', messageID: context.messageID, id: context.id },
+            action: 'cy_shell', resources: input.commands.map(argv => argv[0]),
+          });
+          const result = await bridge('fenced_shell', project, {
+            run_id: binding.run_id, call_id: binding.call_id, child_session_id: context.sessionID,
+            role: context.agent, commands: input.commands, cwd: input.cwd,
+          }, context.signal);
           return { content: JSON.stringify(result) };
         },
       });
@@ -670,7 +708,7 @@ export default Plugin.define({
             throw new Error(`Cybertron: reviewer cannot read sensitive path: ${value}`);
       }
       if (event.tool === 'shell' || event.tool === 'bash') {
-        const role = event.agent;
+        const role = event.agent || (await ctx.session.get({ sessionID: event.sessionID }))?.agent;
         const policy = shellPolicy.roles?.[role];
         if (!policy) {
           if ((shellPolicy.cybertronRoles || []).includes(role))
@@ -694,6 +732,8 @@ export default Plugin.define({
           await ctx.storage.set(`tool_error/${event.sessionID}`, true);
           throw new Error(`Cybertron: shell command is not allow-listed for ${role}: ${command}`);
         }
+        if (verdict === 'allow' && shellPolicy.fencedShellCommands[role])
+          throw new Error('Cybertron: use cy_shell for software commands in a verified project node');
         return;
       }
       if (event.tool !== 'subagent') return;
@@ -916,14 +956,15 @@ export default Plugin.define({
         const handoff = session.parentID && await ctx.storage.get(`planning-request/${session.parentID}`);
         if (session.parentID && !handoff) throw new Error('Planner has no active handoff from prima');
         for (const tool of ['cy_ask', 'cy_runs', 'cy_resume', 'cy_escalate', 'cy_new_run',
-          'cy_metrics', 'cy_check', 'cy_verify', 'cy_review_reject', 'subagent']) delete event.tools[tool];
+          'cy_metrics', 'cy_check', 'cy_shell', 'cy_verify', 'cy_review_reject', 'subagent']) delete event.tools[tool];
         event.system.push({ type: 'text', text: handoff?.run_id
           ? `Cybertron replanning: call cy_state for run ${handoff.run_id} revision ${handoff.plan_revision}. Use cy_plan with operation {op: "revise", op_id, plan_revision, reason, nodes, retry_nodes}. Supply only changed/new nodes. Keep the goal, acceptance criteria, and authorized scopes. Preserve unrelated receipts. Retry failed checks after fixing their inputs.`
-          : 'Cybertron planning: submit clear requests directly. Ask a native question only for a consequential ambiguity. For one exact Markdown document use alpha-trion, kind task, capability doc.write, verifiers ["scope_guard"], expected_content, and one artifact criterion bound by the node satisfies array. For business source use solus-prime and code.write. For required tests, use cy_capabilities to find an available verify target, then bind it to the criterion and producer dependencies. Submit explicit nodes with narrow scopes. Prima takes over in this session.' });
+          : 'Cybertron planning: submit clear requests directly. Ask a native question only for a consequential ambiguity. For one exact Markdown document use alpha-trion, kind task, capability doc.write, verifiers ["scope_guard"], expected_content, and one artifact criterion bound by the node satisfies array. For business source use solus-prime and code.write. In workspace-write, put routine fixed checks on the producing task, for example verifiers ["scope_guard", "test"], and bind the test criterion through satisfies. Use a separate verify node when an independent verification role is needed or in other access modes. Submit narrow scopes. Prima takes over in this session.' });
         return;
       }
       if (event.agent !== 'prima') {
         const parentRun = session.parentID && await ctx.storage.get(`run/${session.parentID}`);
+        let allowFencedShell = false;
         if (parentRun) {
           let binding;
           for (let attempt = 0; attempt < 100; attempt++) {
@@ -954,7 +995,7 @@ export default Plugin.define({
             }
             await ctx.session.update({ sessionID: event.sessionID, permissions });
             const updated = await ctx.session.get({ sessionID: event.sessionID });
-            if (JSON.stringify(updated.permissions) !== JSON.stringify(permissions))
+            if (!samePermissionRules(updated.permissions, permissions))
               throw new Error('Native child permission binding was not persisted');
             const dispatch = await ctx.storage.get(`dispatch/${binding.call_id}`);
             if (!dispatch || dispatch.run_id !== binding.run_id)
@@ -965,11 +1006,20 @@ export default Plugin.define({
               external_scope: binding.external_scope || [] });
             await ctx.storage.set(`bound/${event.sessionID}`, true);
           }
+          const commands = shellPolicy.fencedShellCommands[event.agent];
+          allowFencedShell = Boolean(commands && binding.access_mode === 'workspace-write' &&
+            !binding.check_target && ['task', 'review'].includes(binding.kind));
+          if (commands) {
+            delete event.tools.shell;
+            delete event.tools.bash;
+          }
+          if (allowFencedShell) event.system.push({ type: 'text', text:
+            'Use cy_shell for this node. Allowed argv prefixes: ' + JSON.stringify(commands) });
           if (binding.check_target) {
             event.system.push({ type: 'text', text: `This node requires cy_check with target "${binding.check_target}". Run that tool once now and return its real receipt to Prima.` });
           } else if (binding.planned_verification && binding.kind === 'review') {
             for (const tool of ['cy_check', 'shell', 'bash']) delete event.tools[tool];
-            event.system.push({ type: 'text', text: 'Review this node using the supplied diff and permitted read-only tools. Read the relevant project files, then report findings. Executable checks belong to separate bound verify nodes.' });
+            event.system.push({ type: 'text', text: 'Review this node using the supplied diff and permitted read-only tools. Read the relevant project files, then report findings. Formal executable checks belong to separate bound verify nodes.' });
           } else if (binding.kind === 'verify' && event.agent === 'megatronus') {
             const state = await bridge('state', project, { run_id: binding.run_id });
             const receipts = state.planning_context.checks.map(check => ({
@@ -993,6 +1043,7 @@ export default Plugin.define({
         delete event.tools.cy_templates;
         delete event.tools.cy_metrics;
         delete event.tools.subagent;
+        if (!allowFencedShell) delete event.tools.cy_shell;
         if (event.agent !== 'liege-maximo') delete event.tools.cy_review_reject;
         if (!['quintus-prime', 'micronus-prime', 'nexus-prime', 'alchemist'].includes(event.agent))
           delete event.tools.cy_check;
@@ -1019,6 +1070,7 @@ export default Plugin.define({
       }
       delete event.tools.cy_verify;
       delete event.tools.cy_check;
+      delete event.tools.cy_shell;
       event.system.push({ type: 'text', text:
         'Cybertron dispatcher: call cy_state first to discover a same-session plan. In another session, use cy_runs and cy_resume if the user wants to continue a persisted run. For a new request dispatch thirteenth. Call cy_state(wait=true) after every native dispatch even if the tool says it is running in the background. Follow next_actions and use the exact kernel card. Pass verify targets to their registered roles and give megatronus the acceptance criteria and the existing receipts. When next_actions names thirteenth, hand over the existing run ID, revision, failure diagnostics and receipts, then wait for the revised plan. Keep working until the ledger completes, a human decision is required, or the ledger identifies a blocker you cannot resolve.' });
     });

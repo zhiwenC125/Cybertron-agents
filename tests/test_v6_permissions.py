@@ -109,6 +109,20 @@ class V6PermissionTests(unittest.TestCase):
                 self.assertEqual(effect, PermissionEffect.ALLOW if agent.agent_id in allowed
                                  else PermissionEffect.DENY)
 
+    def test_fenced_shell_access_matches_both_host_exports(self):
+        allowed = {"solus-prime", "micronus-prime", "alchemist", "nexus-prime"}
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            compile_opencode_v2_assets(root)
+            config = json.loads((root / "opencode.jsonc").read_text())
+            for role, settings in config["agents"].items():
+                with self.subTest(role=role):
+                    rules = [rule for rule in settings["permissions"] if rule["action"] == "cy_shell"]
+                    granted = {"action": "cy_shell", "resource": "*", "effect": "allow"}
+                    self.assertEqual(rules, [granted] if role in allowed else [])
+                    markdown = (root / ".opencode" / "agents" / f"{role}.md").read_text()
+                    self.assertEqual('  - action: "cy_shell"' in markdown, role in allowed)
+
     def test_only_l2_reviewer_can_record_rejection(self):
         for agent in THIRTEEN_PRIMES_REGISTRY:
             with self.subTest(agent=agent.agent_id):
