@@ -67,6 +67,15 @@ export function childPermissionRules({ accessMode, writeScope, externalScope }) 
   ]
 }
 
+export function samePermissionRules(actual, expected) {
+  return Array.isArray(actual) && actual.length === expected.length &&
+    expected.every((rule, index) => {
+      const current = actual[index];
+      return current?.action === rule.action && current.resource === rule.resource &&
+        current.effect === rule.effect;
+    });
+}
+
 export function outsideProject(project, target) {
   const relative = path.relative(project, target);
   return relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative);

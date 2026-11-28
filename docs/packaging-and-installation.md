@@ -1,6 +1,6 @@
 # 安装、升级与排查
 
-当前公开版本为 **0.9.0**。[GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.9.0) · [npm](https://www.npmjs.com/package/cybertron-agents/v/0.9.0) · [PyPI](https://pypi.org/project/cybertron-agents/0.9.0/)
+当前公开版本为 **0.10.0**。[GitHub Release](https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.10.0) · [npm](https://www.npmjs.com/package/cybertron-agents/v/0.10.0) · [PyPI](https://pypi.org/project/cybertron-agents/0.10.0/)
 
 ## 选择一种安装方式
 
@@ -9,17 +9,17 @@
 ### npm
 
 ```bash
-npx -y cybertron-agents@0.9.0 init --dry-run
-npx -y cybertron-agents@0.9.0 init --apply
-npx -y cybertron-agents@0.9.0 doctor --global
+npx -y cybertron-agents@0.10.0 init --dry-run
+npx -y cybertron-agents@0.10.0 init --apply
+npx -y cybertron-agents@0.10.0 doctor --global
 ```
 
-用 `npx` 时，后续子命令也带 `npx -y cybertron-agents@0.9.0`。需要直接运行 `cybertron` 时，可用 `npm install -g cybertron-agents@0.9.0` 安装 CLI，之后再执行 `cybertron init --apply`。
+用 `npx` 时，后续子命令也带 `npx -y cybertron-agents@0.10.0`。需要直接运行 `cybertron` 时，可用 `npm install -g cybertron-agents@0.10.0` 安装 CLI，之后再执行 `cybertron init --apply`。
 
 ### pipx
 
 ```bash
-pipx install cybertron-agents==0.9.0
+pipx install cybertron-agents==0.10.0
 pipx ensurepath
 # 重新打开终端后执行下面两条命令
 cybertron init --apply
@@ -31,8 +31,8 @@ cybertron doctor --global
 ### GitHub Release
 
 ```bash
-curl -fsSL https://github.com/zhiwenC125/Cybertron-agents/releases/download/v0.9.0/install.sh -o install.sh
-curl -fsSL https://github.com/zhiwenC125/Cybertron-agents/releases/download/v0.9.0/SHA256SUMS -o SHA256SUMS
+curl -fsSL https://github.com/zhiwenC125/Cybertron-agents/releases/download/v0.10.0/install.sh -o install.sh
+curl -fsSL https://github.com/zhiwenC125/Cybertron-agents/releases/download/v0.10.0/SHA256SUMS -o SHA256SUMS
 awk '$2 == "install.sh"' SHA256SUMS | shasum -a 256 -c -
 bash install.sh --dry-run
 bash install.sh --apply
@@ -49,11 +49,11 @@ bash install.sh --apply
 
 ## 模型与首次启动
 
-运行 `cybertron models setup`，按提示设置十三角色的模型。可用 `models show` 查看映射、`models doctor` 核对加载、`models rollback` 恢复上一版。npm 用户以 `npx -y cybertron-agents@0.9.0` 代替 `cybertron`，Shell 用户用安装器给出的启动器路径。
+运行 `cybertron models setup`，按提示设置十三角色的模型。可用 `models show` 查看映射、`models doctor` 核对加载、`models rollback` 恢复上一版。npm 用户以 `npx -y cybertron-agents@0.10.0` 代替 `cybertron`，Shell 用户用安装器给出的启动器路径。
 
 OpenCode 负责模型认证。Cybertron 的模型配置保存模型 ID，提供方 API Key 通过 OpenCode 或对应环境变量配置。兼容 OpenAI API 的自有网关可用 `cybertron models provider-add` 登记。
 
-重启 OpenCode 后，默认用 Prima 直接描述任务。想先看方案时，用 Shift+Tab 切到 Thirteenth，之后切回 Prima 执行。使用 0.9.0 发布包时，直接选择 Prima。仓库 `main` 上的可选命令 `/cybertron <需求>` 已更新为同一条轻量化流程。[自然语言验收用例](testing/opencode-acceptance.md)
+重启 OpenCode 后，默认用 Prima 直接描述任务。想先看方案时，用 Shift+Tab 切到 Thirteenth，之后切回 Prima 执行。也可以用 `/cybertron <需求>` 进入同一流程。项目内写入任务生成 `plan.md`，用 `cy_state` 查看具体路径。[自然语言验收用例](testing/opencode-acceptance.md)
 
 ## 升级与排查
 

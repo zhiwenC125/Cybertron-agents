@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import sys
 from pathlib import Path
 
@@ -16,8 +17,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cybertron-v6-host")
     parser.add_argument("operation", choices=("plan", "plan_op", "state", "runs", "review_plan", "ask",
                                              "before", "after", "bind", "permission", "external_write",
-                                             "review_reject", "finish",
-                                             "check", "templates", "metrics",
+                                             "review_reject", "finish", "record_interruption",
+                                             "check", "fenced_shell", "templates", "metrics",
                                              "grant_request", "grant_approve", "grant_deny",
                                              "grant_revoke", "grants", "intercept",
                                              "gate_tool", "capabilities", "planning_tools", "verify_acceptance",
@@ -32,6 +33,12 @@ def main(argv: list[str] | None = None) -> int:
                 data["run_id"], data["target"], data.get("call_id"),
                 data.get("node_id"), data.get("child_session_id"))
                       if data.get("run_id") else run_check(args.project, data["target"]))
+        elif args.operation == "fenced_shell":
+            def cancel(_signum, _frame):
+                raise KeyboardInterrupt
+            signal.signal(signal.SIGTERM, cancel)
+            result = bridge.fenced_shell(data["run_id"], data["call_id"], data["child_session_id"],
+                                         data["role"], data["commands"], data.get("cwd", "."))
         elif args.operation == "templates":
             result = V6HostBridge(args.project).templates()
         elif args.operation == "runs":
@@ -71,6 +78,9 @@ def main(argv: list[str] | None = None) -> int:
                                               data["child_session_id"], data["passed"], data["findings"])
         elif args.operation == "planning_handoff":
             result = bridge.planning_handoff(data["run_id"], data["parent_session_id"])
+        elif args.operation == "record_interruption":
+            result = bridge.record_interruption(data["run_id"], data["session_id"],
+                                                data["stage"], data["reason"], data.get("event_id"))
         elif args.operation == "review_read":
             bridge.observe_review_read(data["run_id"], data["call_id"], data["child_session_id"],
                                        data["path"], data["output_sha256"])
@@ -88,7 +98,10 @@ def main(argv: list[str] | None = None) -> int:
                 template = data["template"]
                 objective = template["objective"]
                 if template.get("type") == "bug_fix":
-                    graph = bug_fix_template(objective, tuple(template["write_scope"]))
+                    graph = bug_fix_template(
+                        objective, tuple(template["write_scope"]),
+                        lightweight=bool(data.get("adaptive_verification"))
+                        and access_mode in {None, "workspace-write"} and data.get("host", "opencode") == "opencode")
                     request_class = "bug-fix"
                 elif template.get("type") == "read_only_scan":
                     if template.get("write_scope"):
@@ -109,12 +122,14 @@ def main(argv: list[str] | None = None) -> int:
                 satisfies_map=data.get("satisfies"), parent_run_id=data.get("parent_run_id"),
                 supersedes_run_id=data.get("supersedes_run_id"),
                 change_reason=data.get("change_reason", ""), seed_from_run_id=data.get("seed_from_run_id"),
-                planned_verification=bool(data.get("planned_verification")), gates=data.get("gates"))
+                planned_verification=bool(data.get("planned_verification")),
+                adaptive_verification=bool(data.get("adaptive_verification")), gates=data.get("gates"))
         elif args.operation == "plan_op":
             result = bridge.plan_op(data["run_id"], data["operation"],
                                     planner_session_id=data.get("planner_session_id"))
         elif args.operation == "state":
-            result = bridge.state(data["run_id"])
+            result = (bridge.verify_pending(data["run_id"], retry=bool(data.get("retry_checks")))
+                      if data.get("verify_pending") else bridge.published_state(data["run_id"]))
         elif args.operation == "review_plan":
             result = bridge.review_plan(data["run_id"])
         elif args.operation == "ask":

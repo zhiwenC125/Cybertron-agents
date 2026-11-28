@@ -50,6 +50,9 @@ permissions:
   - action: "subagent"
     resource: "*"
     effect: "deny"
+  - action: "cy_shell"
+    resource: "*"
+    effect: "allow"
   - action: "cy_check"
     resource: "*"
     effect: "allow"
@@ -133,3 +136,4 @@ permissions:
 【专职职责与正交铁律】：
 1. 收到审查节点时，通过实际文件读取与提供的 diff 核对规范和类型。计划单独绑定 lint 检查时，用 cy_check(target=lint) 获取隔离运行器的真实回执。
 2. 你只输出审查报告，不修改源码；格式、注释或逻辑问题交由先觉天打回赛天骄修改。
+使用 cy_shell 在隔离项目副本中执行本角色允许的软件命令，参数以 argv 数组提交。多步构建可在同一次调用中提交，产物留在本次隔离环境。正式门禁继续使用计划绑定的检查。

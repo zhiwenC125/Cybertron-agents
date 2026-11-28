@@ -109,13 +109,20 @@ def run_metrics(run_dir: Path) -> dict[str, Any]:
     else:
         status = "completed"
     created = _first(events, "plan.created") or {}
+    first_change = _first(events, "gate.required")
+    if plan.get("adaptive_verification"):
+        if _first(events, "run.completed"):
+            status = "completed"
+        elif status == "completed":
+            status = "gated"
     dispatches = sum(event.get("type") == "dispatch.started" for event in events)
     retries = sum(event.get("type") == "node.retry" for event in events)
     interventions = sum(event.get("type") in {"human.requested", "approval.granted", "external.write.requested"}
                         for event in events)
-    gate_checks = sum(event.get("type") == "gate.check" for event in events)
-    gate_failures = sum(event.get("type") == "gate.check" and event.get("status") != "pass"
-                        for event in events)
+    checks = {event.get("check_id", index): event for index, event in enumerate(events)
+              if event.get("type") == "gate.check"}
+    gate_checks = len(checks)
+    gate_failures = sum(event.get("status") != "pass" for event in checks.values())
     grants_requested = sum(event.get("type") == "grant.requested" for event in events)
     grants_granted = sum(event.get("type") == "grant.granted" for event in events)
     grants_denied = sum(event.get("type") == "grant.denied" for event in events)
@@ -142,6 +149,8 @@ def run_metrics(run_dir: Path) -> dict[str, Any]:
         "confirm_granted": confirm_granted,
         "first_pass": retries == 0 and gate_failures == 0 and status == "completed",
         "duration_s": round(_duration(events), 3),
+        "first_change_settled_s": (round(_duration([created, first_change]), 3)
+                                   if created and first_change else None),
         "started_utc": events[0].get("utc") if events else None,
         "status": status,
     }

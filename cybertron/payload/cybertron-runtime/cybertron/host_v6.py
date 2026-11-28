@@ -14,6 +14,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -26,6 +27,7 @@ from .access import (DEFAULT_ACCESS_MODE, hard_denied, is_external_scope, normal
                      resolve_scope, slugify_title)
 from .graph import GraphRejected, PlanGraph, PlanNode, _scope_allowed
 from .authority import can_escalate, denied_for_reviewer
+from .fenced_shell import ShellRejected, run_fenced_shell
 from .gates import Risk, diff_facts, diff_preview, risk_floor
 from .grants import (GRANT_KINDS, MAX_TTL_SECONDS, GrantRejected, binding_hash,
                      clamp_ttl, covers, normalize_constraints, normalize_kind,
@@ -36,7 +38,8 @@ from .toolgate import infer as infer_grants
 from .learning import (TemplateRejected, distill_template, instantiate, is_request_class,
                        list_templates, load_template, request_class_of, save_template)
 from .metrics import MetricsError, collect, render_panel, run_metrics, summarize, template_summary
-from .profiles import CHECK_TARGETS, CheckRejected, run_check, verification_tools
+from .profiles import (CHECK_TARGETS, PROFILE_TOOLS, CheckRejected, check_inputs_digest, detect_profile,
+                       run_check, verification_tools)
 from .scope_guard import FileState, ScopeGuard, Snapshot
 from .scheduler_v6 import affected_subgraph, dispatchable, scopes_overlap
 
@@ -213,18 +216,7 @@ class V6HostBridge:
         return _hash(json.dumps(visible, sort_keys=True).encode())
 
     def _check_inputs_digest(self, target: str) -> str:
-        """Hash exactly the source tree copied into a fixed isolated check."""
-        snapshot = ScopeGuard(self.project, ()).snapshot()
-        ignored = {".git", "node_modules", ".venv", "__pycache__"}
-        if target != "sim":
-            ignored.add("build")
-        visible = {}
-        for name, state in snapshot.entries.items():
-            parts = name.split("/")
-            if parts[0] == ".cybertron" or any(part in ignored for part in parts):
-                continue
-            visible[name] = (state.kind, state.mode, state.sha256)
-        return _hash(json.dumps(visible, sort_keys=True).encode())
+        return check_inputs_digest(self.project, target)
 
     @staticmethod
     def _grant_time(value: str) -> datetime:
@@ -456,28 +448,99 @@ class V6HostBridge:
             if node_id not in current["ready_nodes"] and node_id not in active \
                     and node_id not in completed:
                 raise HostBridgeError("node is not ready, active, or completed")
+        result = self._run_check(run_id, graph, target, [node_id], call_id=call_id,
+                                 diagnostic=diagnostic)
+        return {**result, "run_id": run_id, "state": self.state(run_id)}
+
+    def _run_check(self, run_id: str, graph: PlanGraph, target: str,
+                   node_ids: list[str | None], *, call_id: str | None = None,
+                   diagnostic: bool = False, inline: bool = False) -> dict:
         inputs_before = self._check_inputs_digest(target)
-        try:
-            result = run_check(self.project, target)
-        except (CheckRejected, OSError) as exc:
-            if not planned:
-                raise
-            result = {"status": "unavailable", "profile": None, "target": target,
-                      "diagnostic": str(exc), "receipts": []}
+        reusable = next((event for event in reversed(self.events(run_id))
+                         if event["type"] in {"gate.check", "diagnostic.check"}
+                         and event["gate"] == target
+                         and event.get("inputs_sha256") == inputs_before
+                         and event["status"] in {"pass", "fail"}
+                         and event.get("receipts") and event.get("check_id")), None) if graph.adaptive_verification else None
+        if reusable:
+            result = {key: reusable[key] for key in ("status", "profile", "diagnostic", "receipts")}
+            result["target"] = target
+        else:
+            try:
+                result = run_check(self.project, target)
+            except (CheckRejected, OSError) as exc:
+                if not graph.planned_verification:
+                    raise
+                result = {"status": "unavailable", "profile": None, "target": target,
+                          "diagnostic": str(exc), "receipts": []}
         inputs_after = self._check_inputs_digest(target)
-        if inputs_before != inputs_after:
+        inputs_checked = result.get("inputs_sha256", inputs_before)
+        if inputs_before != inputs_after or inputs_checked != inputs_after:
             result = {**result, "status": "stale"}
         receipts = result["receipts"]
         last = receipts[-1] if receipts else None
         diagnosis = result.get("diagnostic") or (last["output"][-4000:] if last and result["status"] != "pass" else None)
-        self._append(run_id, "diagnostic.check" if diagnostic else "gate.check",
-                     gate=target, status=result["status"],
-                     profile=result["profile"], node_id=node_id, call_id=call_id,
-                     plan_revision=graph.revision, diagnostic=diagnosis, receipt={
-                         key: last[key] for key in ("source", "command", "exit", "utc", "sha256")
-                     } if last else None, receipts=receipts,
-                     inputs_sha256=inputs_after, input_target=target)
-        return {**result, "run_id": run_id, "state": self.state(run_id)}
+        check_id = reusable["check_id"] if reusable else _new_ledger_id()
+        for node_id in node_ids:
+            self._append(run_id, "diagnostic.check" if diagnostic else "gate.check",
+                         gate=target, status=result["status"], inline=inline, check_id=check_id,
+                         reused=bool(reusable),
+                         profile=result["profile"], node_id=node_id, call_id=call_id,
+                         plan_revision=graph.revision, diagnostic=diagnosis, receipt={
+                             key: last[key] for key in ("source", "command", "exit", "utc", "sha256")
+                         } if last else None, receipts=receipts,
+                         inputs_sha256=inputs_checked, input_target=target)
+        return {**result, "check_id": check_id, "reused": bool(reusable)}
+
+    @_serialized
+    def verify_pending(self, run_id: str, *, retry: bool = False) -> dict:
+        """Settle outstanding fixed checks after the active writers have returned."""
+        state = self.state(run_id)
+        checks = state.get("pending_checks", [])
+        if (not checks or any(node["write_scope"] or node["external_scope"]
+                             for node in state["nodes"] if node["status"] == "running")
+                or not state["review_current"]
+                or state["status"] == "superseded"):
+            return state
+        graph = self._graph(run_id)
+        targets: dict[str, list[str | None]] = {}
+        for check in checks:
+            if check["status"] == "pending" or retry and check["can_retry"]:
+                targets.setdefault(check["target"], []).append(check["node_id"])
+        for target, node_ids in targets.items():
+            self._run_check(run_id, graph, target, node_ids, inline=True)
+        self._maybe_complete(run_id)
+        return self._publish_plan(self.state(run_id))
+
+    @_serialized
+    def fenced_shell(self, run_id: str, call_id: str, child_session_id: str,
+                     role: str, commands: object, cwd: str = ".") -> dict:
+        state = self.state(run_id)
+        graph = self._graph(run_id)
+        active = next((entry for entry in state["active_dispatches"]
+                       if entry["call_id"] == call_id and child_session_id
+                       and entry["child_session_id"] == child_session_id), None)
+        events = self.events(run_id)
+        if (state["host"] != "opencode" or state["access_mode"] != "workspace-write"
+                or not state["review_current"] or state["status"] != "running" or active is None
+                or not any(event["type"] == "dispatch.bound" and event["call_id"] == call_id
+                           and event["child_session_id"] == child_session_id for event in events)):
+            raise HostBridgeError("cy_shell requires an active, verified project child")
+        node = graph.nodes[active["node_id"]]
+        if node.role != role or node.kind not in {"task", "review"} or node.check_target:
+            raise HostBridgeError("cy_shell is not permitted for this node and role")
+        try:
+            result = run_fenced_shell(self.project, role, commands, cwd)
+        except (ShellRejected, OSError) as exc:
+            self._append(run_id, "shell.rejected", node_id=node.node_id, call_id=call_id,
+                         role=role, plan_revision=graph.revision, diagnostic=str(exc))
+            raise HostBridgeError(str(exc)) from exc
+        self._append(run_id, "shell.executed", node_id=node.node_id, call_id=call_id,
+                     role=role, plan_revision=graph.revision,
+                     **{key: result[key] for key in ("cwd", "status", "inputs_sha256", "source_intact")},
+                     receipts=[{key: value for key, value in item.items() if key != "output"}
+                               for item in result["receipts"]])
+        return result
 
     def capabilities(self) -> dict:
         from .graph import CAPABILITY_CATALOG
@@ -528,8 +591,11 @@ class V6HostBridge:
                      item["evidence"] == "receipt" and node_id in item["covered_by"])]
         if passed and unmet:
             raise HostBridgeError("acceptance evidence is missing for: " + ", ".join(unmet))
+        if passed and graph.adaptive_verification and set(state["pending_gates"]) - {"accept"}:
+            raise HostBridgeError("required verification must pass before independent acceptance")
         result = {"passed": passed, "findings": findings[:4000],
-                  "criteria": state["intent_coverage"]}
+                  "criteria": state["intent_coverage"],
+                  **({"verified_inputs": state["verified_inputs"]} if graph.adaptive_verification else {})}
         self._append(run_id, "acceptance.checked", node_id=node_id, call_id=call_id,
                      plan_revision=graph.revision, **result)
         return result
@@ -693,7 +759,8 @@ class V6HostBridge:
              supersedes_run_id: str | None = None,
              change_reason: str = "",
              seed_from_run_id: str | None = None,
-             planned_verification: bool = False, gates: list[str] | None = None) -> dict:
+             planned_verification: bool = False, gates: list[str] | None = None,
+             adaptive_verification: bool = False) -> dict:
         if not isinstance(host_session_id, str) or not host_session_id:
             raise HostBridgeError("host session ID is required")
         if host not in {"opencode", "dsh"}:
@@ -768,7 +835,8 @@ class V6HostBridge:
                 graph_seed = PlanGraph(node_objects, access_mode=mode, intent=intent_obj)
             except (GraphRejected, TypeError) as exc:
                 raise HostBridgeError(str(exc)) from exc
-        graph_seed.planned_verification = planned_verification
+        graph_seed.adaptive_verification = adaptive_verification and host == "opencode" and mode == "workspace-write"
+        graph_seed.planned_verification = planned_verification or graph_seed.adaptive_verification
         graph_seed.gates = list(gates or ())
         graph_seed.validate()
         require_isolated_workspace(self.project, mode)
@@ -862,7 +930,7 @@ class V6HostBridge:
         result["access_mode"] = mode
         result["title"] = title[:200]
         result["slug"] = slug
-        return result
+        return self._publish_plan(result)
 
     @staticmethod
     def _exact_file(graph: PlanGraph) -> bool:
@@ -907,6 +975,9 @@ class V6HostBridge:
         if not graph.nodes:
             add("blocking", "graph.empty", "the plan requires at least one node")
         tools = verification_tools(self.project) if graph.planned_verification else {}
+        test_tool = tools.get("test", {})
+        python_tests_missing = (test_tool.get("profile") == "python"
+                                and not any((self.project / "tests").rglob("test*.py")))
         gate_nodes = {"scope_guard": list(graph.nodes.values())}
         for node in graph.nodes.values():
             valid_kinds = {"task", "review", "verify"} if graph.planned_verification else {"task", "review"}
@@ -920,9 +991,24 @@ class V6HostBridge:
                 add("blocking", "node.write_scope", str(exc), node.node_id)
             if not node.acceptance:
                 add("blocking", "node.acceptance", "node has no acceptance criteria", node.node_id)
-            if "scope_guard" not in node.verifiers or set(node.verifiers) - {"scope_guard", "loop1"}:
+            inline_targets = set(node.verifiers) & CHECK_TARGETS.keys()
+            allowed = {"scope_guard", "loop1"}
+            if graph.adaptive_verification and node.kind == "task":
+                allowed.update(CHECK_TARGETS)
+                for target in sorted(inline_targets):
+                    gate_nodes.setdefault(target, []).append(node)
+                    if graph.intent and CHECK_TARGETS[target][0] in graph.intent.forbidden_capabilities:
+                        add("blocking", "intent.capability",
+                            f"{target} requires a capability forbidden by the intent", node.node_id)
+                    if not tools[target]["available"]:
+                        add("warning", "check.unavailable",
+                            f"{target} cannot run: {tools[target]['reason']}", node.node_id)
+                    elif target == "test" and python_tests_missing:
+                        add("warning", "check.tests_missing",
+                            "Python test needs a discoverable suite when the task settles", node.node_id)
+            if "scope_guard" not in node.verifiers or set(node.verifiers) - allowed:
                 add("blocking", "node.scope_guard",
-                    'use node verifiers ["scope_guard"]; additional checks need separate verify nodes',
+                    'use scope_guard and declare fixed checks on an eligible task or verify node',
                     node.node_id)
             if node.kind == "verify" and node.capability == "accept":
                 dependencies = {other.node_id for other in graph.nodes.values()
@@ -952,17 +1038,19 @@ class V6HostBridge:
                     add("blocking", "check.binding",
                         "verify node needs a fixed check target and its registered role, with no write scope or grants",
                         node.node_id)
-                elif not check["available"]:
-                    add("blocking", "check.unavailable",
-                        f"{node.check_target} cannot run: {check['reason']}", node.node_id)
                 else:
-                    gate_nodes.setdefault(node.check_target, []).append(node)
-                    if check["profile"] == "python" and not any((self.project / "tests").rglob("test*.py")):
+                    if check["available"] or graph.adaptive_verification:
+                        gate_nodes.setdefault(node.check_target, []).append(node)
+                    severity = "warning" if graph.adaptive_verification else "blocking"
+                    if not check["available"]:
+                        add(severity, "check.unavailable",
+                            f"{node.check_target} cannot run: {check['reason']}", node.node_id)
+                    elif node.check_target == "test" and python_tests_missing:
                         producers = (other for other in graph.nodes.values()
                                      if node.node_id != other.node_id and
                                      node.node_id in affected_subgraph(graph, other.node_id))
                         if not any(other.capability == "test.write" and other.write_scope for other in producers):
-                            add("blocking", "check.tests_missing",
+                            add(severity, "check.tests_missing",
                                 "Python test needs a tests/test*.py suite or a dependent test-writing step",
                                 node.node_id)
             if node.kind == "review":
@@ -1004,7 +1092,7 @@ class V6HostBridge:
                     covered.setdefault(done_id, []).append(node)
             for done in graph.intent.done:
                 if not covered.get(done.id):
-                    add("blocking", "intent.done.uncovered",
+                    add("warning" if graph.adaptive_verification else "blocking", "intent.done.uncovered",
                         f"done criterion {done.id!r} has no satisfying node")
                 elif graph.planned_verification and not any(
                     done.evidence == "receipt"
@@ -1013,7 +1101,8 @@ class V6HostBridge:
                     or done.evidence == "review" and node.kind == "review"
                     for node in covered[done.id]
                 ):
-                    add("blocking", "intent.evidence", f"done criterion {done.id!r} needs an achievable "
+                    add("warning" if graph.adaptive_verification else "blocking",
+                        "intent.evidence", f"done criterion {done.id!r} needs an achievable "
                         f"{done.evidence} receipt", covered[done.id][0].node_id)
             forbidden_capabilities = set(graph.intent.forbidden_capabilities)
             for node in graph.nodes.values():
@@ -1035,15 +1124,81 @@ class V6HostBridge:
             for gate in graph.gates:
                 base = "review.l2" if gate in {"review.l2.light", "review.l2.full"} else gate
                 if base not in gate_nodes:
-                    add("blocking", "gate.unbound", f"required verification {gate!r} has no usable covering node")
+                    # A gate the plan explicitly requests must have a covering node.
+                    # Kernel-selected adaptive gates are added after the diff is known,
+                    # so they never appear here and never create an unsatisfiable run.
+                    add("blocking", "gate.unbound",
+                        f"required verification {gate!r} has no usable covering node")
             tests = [*gate_nodes.get("test", ()), *gate_nodes.get("sim", ())]
-            if tests and not any(all(verifier.node_id in affected_subgraph(graph, test.node_id)
+            if not graph.adaptive_verification and tests and not any(all(verifier.node_id in affected_subgraph(graph, test.node_id)
                                      for test in tests)
                                  for verifier in gate_nodes.get("accept", ())):
                 add("blocking", "accept.unbound",
                     'A final verify node with role "megatronus" and capability "accept" must depend '
                     "on the test/simulation checks and the remaining acceptance evidence")
         return {"approved": not blocking, "blocking": blocking, "findings": findings}
+
+    def _adaptive_gates(self, risk: Risk) -> set[str]:
+        """Select native software checks from the detected profile and actual diff."""
+        if risk == Risk.DOCUMENT:
+            return set()
+        try:
+            gates = set(PROFILE_TOOLS[detect_profile(self.project)])
+        except CheckRejected:
+            gates = {"test"}
+        if (self.project / "sim.resc").is_file() and (self.project / "sim.expect").is_file():
+            if risk >= Risk.FIRMWARE:
+                gates.add("sim")
+        if risk >= Risk.INTERFACE:
+            gates.update({"review.l2.full", "accept"})
+        return gates
+
+    def _record_verification_scope(self, run_id: str, current: Snapshot) -> None:
+        """Measure the net diff from each path's first dispatch baseline."""
+        original: dict[str, FileState] = {}
+        owners: dict[str, str] = {}
+        external: dict[str, tuple[str, int]] = {}
+        started: dict[str, str] = {}
+        for event in self.events(run_id):
+            node_id = event.get("node_id")
+            if event["type"] == "dispatch.started":
+                started[node_id] = event["call_id"]
+            if event["type"] != "gate.required":
+                continue
+            paths = event.get("changed_paths", ())
+            first_paths = [path for path in paths if not Path(path).is_absolute() and path not in owners]
+            if first_paths:
+                call_id = event.get("call_id") or started[node_id]
+                baseline = _decode(self._snapshot_path(run_id, call_id).read_bytes())
+                original.update({path: baseline.entries[path] for path in first_paths if path in baseline.entries})
+            for path in paths:
+                if Path(path).is_absolute():
+                    external[path] = (node_id, event["changed_lines"])
+                else:
+                    owners[path] = node_id
+
+        facts = diff_facts(Snapshot(original), Snapshot({
+            path: current.entries[path] for path in owners if path in current.entries
+        }))
+        risk, _ = risk_floor(facts)
+        if not facts.paths and external and all(Path(path).suffix in {".md", ".txt"}
+                                                 for path in external):
+            risk = Risk.DOCUMENT
+        if external and (any(Path(path).suffix not in {".md", ".txt"} for path in external)
+                         or facts.changed_lines + sum(lines for _, lines in external.values()) > 200):
+            risk = max(risk, Risk.INTERFACE)
+        if not facts.paths and not external:
+            risk = Risk.DOCUMENT
+        node_ids = {owners[path] for path in facts.paths}
+        node_ids.update(node_id for node_id, _ in external.values())
+        code_nodes = {owners[path] for path in facts.paths if not path.endswith(".md")}
+        code_nodes.update(node_id for path, (node_id, _) in external.items()
+                          if Path(path).suffix not in {".md", ".txt"})
+        self._append(run_id, "verification.scope", risk=risk.name.lower(),
+                     changed_paths=[*facts.paths, *sorted(external)], modules=list(facts.modules),
+                     changed_lines=facts.changed_lines + sum(lines for _, lines in external.values()),
+                     node_ids=sorted(node_ids), code_nodes=sorted(code_nodes or node_ids),
+                     gates=sorted(self._adaptive_gates(risk)))
 
     def review_plan(self, run_id: str, *, reviewer: str = "prima") -> dict:
         """Record prima's review of the current plan revision before dispatch."""
@@ -1089,7 +1244,13 @@ class V6HostBridge:
                     for call_id, entry in list(active_calls.items()):
                         if entry["node_id"] == node_id:
                             del active_calls[call_id]
+        current_events = [event for index, event in enumerate(events)
+                          if index > invalidated.get(event.get("node_id"), -1)]
+        settled = graph.adaptive_verification and any(event["type"] == "run.completed" for event in events)
         required_gates = set(graph.gates)
+        inline_targets: dict[str, set[str]] = {}
+        verification_scope = next((event for event in reversed(events)
+                                   if event["type"] == "verification.scope"), None)
         if graph.planned_verification:
             required_gates.add("scope_guard")
             required_gates.update(node.check_target or node.capability for node in graph.nodes.values()
@@ -1098,66 +1259,179 @@ class V6HostBridge:
             for event in events:
                 if event["type"] == "gate.required":
                     required_gates.update(event["gates"])
+        if graph.adaptive_verification:
+            for node in graph.nodes.values():
+                if node.kind == "task" and status[node.node_id] == "completed":
+                    inline_targets[node.node_id] = set(node.verifiers) & CHECK_TARGETS.keys()
+            scopes = ([(verification_scope["code_nodes"], verification_scope["gates"])]
+                      if verification_scope is not None else
+                      [([event["node_id"]], event["gates"]) for event in events
+                       if event["type"] == "gate.required"])
+            for producers, scope_gates in scopes:
+                gates = set(scope_gates)
+                required_gates.update(gates)
+                for node_id in producers:
+                    if node_id not in inline_targets:
+                        continue
+                    independent = {graph.nodes[dep].check_target
+                                   for dep in affected_subgraph(graph, node_id)
+                                   if graph.nodes[dep].kind == "verify"}
+                    inline_targets[node_id].update((gates & CHECK_TARGETS.keys()) - independent)
+            for targets in inline_targets.values():
+                required_gates.update(targets)
         passed_gates = set()
         passed_gate_nodes: dict[str, set[str]] = {}
+        verified_inputs = {}
         if "completed" in status.values():
             passed_gates.add("scope_guard")
         current_digest = self._workspace_digest() if any(
             event["type"] == "gate.check" and "inputs_sha256" not in event
             for event in events) else None
         input_digests: dict[str, str] = {}
-        checks = {(event.get("node_id"), event["gate"]): event for index, event in enumerate(events)
-                  if event["type"] == "gate.check"
-                  and index > invalidated.get(event.get("node_id"), -1)}
+        checks = {(event.get("node_id"), event["gate"]): event for event in current_events
+                  if event["type"] == "gate.check"}
+        pending_checks = []
+        for node_id, targets in inline_targets.items():
+            for target in sorted(targets):
+                if graph.intent and CHECK_TARGETS[target][0] in graph.intent.forbidden_capabilities:
+                    pending_checks.append({"node_id": node_id, "target": target, "status": "blocked",
+                                           "diagnostic": "The intent forbids this check capability.",
+                                           "can_retry": False})
+                    continue
+                if target == "test":
+                    test_authors = [dependent for dependent in affected_subgraph(graph, node_id)
+                                    if dependent != node_id and status[dependent] != "completed"
+                                    and graph.nodes[dependent].kind == "task"
+                                    and graph.nodes[dependent].capability == "test.write"
+                                    and graph.nodes[dependent].write_scope]
+                    if test_authors:
+                        pending_checks.append({"node_id": node_id, "target": target,
+                                               "status": "waiting_for_tests",
+                                               "test_authors": test_authors, "can_retry": False})
+                        continue
+                latest = checks.get((node_id, target))
+                if latest is None or not latest.get("inline"):
+                    pending_checks.append({"node_id": node_id, "target": target,
+                                           "status": "pending", "can_retry": False})
+                    continue
+                if not settled and target not in input_digests:
+                    input_digests[target] = self._check_inputs_digest(target)
+                digest = input_digests.get(target, latest["inputs_sha256"])
+                if latest["inputs_sha256"] != digest:
+                    pending_checks.append({"node_id": node_id, "target": target,
+                                           "status": "pending", "can_retry": False})
+                elif latest["status"] != "pass":
+                    attempts = sum(event["type"] == "gate.check" and event.get("inline")
+                                   and event.get("node_id") == node_id and event["gate"] == target
+                                   and event["inputs_sha256"] == digest for event in current_events)
+                    pending_checks.append({"node_id": node_id, "target": target,
+                                           "status": latest["status"], "diagnostic": latest["diagnostic"],
+                                           "can_retry": latest["status"] == "stale" and
+                                           attempts < graph.nodes[node_id].budget["max_attempts"]})
         for (node_id, gate), event in checks.items():
             if event["status"] != "pass":
                 continue
-            if graph.planned_verification and (
-                    node_id not in graph.nodes or graph.nodes[node_id].check_target != gate):
-                continue
+            if graph.planned_verification:
+                if event.get("inline"):
+                    if gate not in inline_targets.get(node_id, ()):
+                        continue
+                elif node_id not in graph.nodes or graph.nodes[node_id].check_target != gate:
+                    continue
             if "inputs_sha256" in event:
                 target = event.get("input_target")
                 if target not in {"lint", "build", "test", "sim"}:
                     continue
-                if target not in input_digests:
+                if not settled and target not in input_digests:
                     input_digests[target] = self._check_inputs_digest(target)
-                valid = event["inputs_sha256"] == input_digests[target]
+                valid = settled or event["inputs_sha256"] == input_digests[target]
             else:
                 valid = event.get("workspace_sha256") == current_digest
             if valid:
                 passed_gates.add(event["gate"])
+                if "inputs_sha256" in event:
+                    verified_inputs[gate] = event["inputs_sha256"]
                 if isinstance(node_id, str) and node_id:
                     passed_gate_nodes.setdefault(event["gate"], set()).add(node_id)
+        full_review_required = graph.adaptive_verification and "review.l2.full" in required_gates
+        if full_review_required:
+            required_gates.discard("review.l2")
+        scope_producers = set(verification_scope["node_ids"] if verification_scope else ())
+        ancestors = {node_id: set() for node_id in graph.nodes}
+        if full_review_required:
+            for producer in graph.nodes:
+                for consumer in affected_subgraph(graph, producer):
+                    if consumer != producer:
+                        ancestors[consumer].add(producer)
+        full_review_nodes = {node.node_id for node in graph.nodes.values()
+                             if node.kind == "review" and node.capability == "review.l2"
+                             and scope_producers <= ancestors[node.node_id]}
         if graph.planned_verification:
+            completed_events = {event["node_id"]: event for event in current_events
+                                if event["type"] == "node.completed"}
             for node in graph.nodes.values():
                 if status[node.node_id] != "completed":
                     continue
-                if (node.kind == "verify" and node.check_target
-                        and node.node_id not in passed_gate_nodes.get(node.check_target, ())):
+                stale = (node.kind == "verify" and node.check_target
+                         and node.node_id not in passed_gate_nodes.get(node.check_target, ()))
+                if graph.adaptive_verification and not settled and (
+                        node.capability == "accept" or node.kind == "review"):
+                    if "test" not in input_digests:
+                        input_digests["test"] = self._check_inputs_digest("test")
+                    evidence = completed_events.get(node.node_id, {})
+                    stale = (evidence.get("review_inputs_sha256") != input_digests["test"] or
+                             full_review_required and node.capability == "accept"
+                             and not full_review_nodes & ancestors[node.node_id]
+                             or any(verified_inputs.get(target) != digest for target, digest in
+                                    evidence.get("acceptance_inputs", {}).items()))
+                if stale:
                     for dependent in affected_subgraph(graph, node.node_id):
                         if status[dependent] == "completed":
                             status[dependent] = "stale"
-                elif node.capability == "accept":
+            for node in graph.nodes.values():
+                if status[node.node_id] != "completed":
+                    continue
+                if node.capability == "accept":
                     passed_gates.add("accept")
                 elif node.kind == "review":
                     passed_gates.add(node.capability)
                     if node.capability == "review.l2":
-                        passed_gates.update(required_gates & {"review.l2.light", "review.l2.full"})
+                        passed_gates.update(required_gates & {"review.l2.light"})
+                        if not full_review_required or node.node_id in full_review_nodes:
+                            passed_gates.update(required_gates & {"review.l2.full"})
         for node_id, value in status.items():
             graph.nodes[node_id].status = value
+        passed_gates.difference_update(item["target"] for item in pending_checks)
         pending_gates = sorted(required_gates - passed_gates)
-        current_events = [event for index, event in enumerate(events)
-                          if index > invalidated.get(event.get("node_id"), -1)]
         intent_coverage = coverage(graph.intent, graph.nodes, status, current_events, passed_gates,
                                    passed_gate_nodes)
         intent_blockers = [f"{item['id']}: {item['reason']}" for item in intent_coverage
                            if not item["satisfied"]]
         intent_ok = not intent_blockers
-        ready = [node.node_id for node in dispatchable(graph,
-                 tuple(entry["node_id"] for entry in active_calls.values()), max_writers=2)
-                 if (node.kind != "verify" or not active_calls)
-                 and sum(event["type"] == "dispatch.started" and event.get("node_id") == node.node_id
-                         for event in current_events) < node.budget["max_attempts"]]
+        active_ids = tuple(entry["node_id"] for entry in active_calls.values())
+        active_writers = any(graph.nodes[node_id].write_scope or graph.nodes[node_id].external_scope
+                             for node_id in active_ids)
+        eligible = {node.node_id for node in graph.nodes.values()
+                    if (node.kind != "verify" or not (
+                        active_writers if graph.adaptive_verification else active_calls))
+                    and sum(event["type"] == "dispatch.started" and event.get("node_id") == node.node_id
+                            for event in current_events) < node.budget["max_attempts"]}
+        if pending_checks:
+            waiting = set()
+            for item in pending_checks:
+                node_id = item["node_id"]
+                authors = item.get("test_authors", ())
+                waiting.update(dependent for dependent in affected_subgraph(graph, node_id)
+                               if dependent != node_id and not any(
+                                   author in affected_subgraph(graph, dependent) for author in authors))
+            eligible.difference_update(waiting)
+        if graph.adaptive_verification:
+            for node in graph.nodes.values():
+                if node.capability == "accept" and (set(pending_gates) - {"accept"}
+                        or full_review_required and not full_review_nodes & ancestors[node.node_id]):
+                    eligible.discard(node.node_id)
+                if full_review_required and node.kind == "review" and node.capability == "review.l2":
+                    if active_writers or node.node_id not in full_review_nodes:
+                        eligible.discard(node.node_id)
         repair_feedback = {}
         rejected_calls = {event.get("call_id") for event in events
                           if event["type"] == "review.rejected"}
@@ -1178,7 +1452,9 @@ class V6HostBridge:
         } for event in events if event["type"] in {
             "external.write.denied", "external.write.blocked_by_host", "external.write.unverified"
         }}
-        ready = [node_id for node_id in ready if node_id not in external_stops]
+        eligible.difference_update(external_stops)
+        ready = [node.node_id for node in dispatchable(graph, active_ids,
+                                                       max_writers=2, eligible=eligible)]
         completions = {event["node_id"]: event for event in current_events
                        if event["type"] == "node.completed"}
         last_revision = max((index for index, event in enumerate(events)
@@ -1187,7 +1463,7 @@ class V6HostBridge:
                     if event["type"] in {"review.rejected", "loop2.escalated"}
                     or (event["type"] == "acceptance.checked" and not event["passed"])
                     or (event["type"] == "gate.check" and event["status"] in {"fail", "unavailable", "stale"})]
-        if graph.planned_verification and feedback:
+        if graph.planned_verification and not graph.adaptive_verification and feedback:
             ready = []
         nodes = [{"node_id": node.node_id, "status": status[node.node_id],
                   "card": self._card(node), "role": node.role, "kind": node.kind,
@@ -1243,6 +1519,17 @@ class V6HostBridge:
                   "slug": metadata.get("slug") or created.get("slug"),
                   "run_dir": str(run_dir),
                   "event_seq": len(events), "events_path": str(run_dir / "events.jsonl")}
+        interruption = next((event for event in reversed(events) if event["type"] == "run.interrupted"), None)
+        if interruption:
+            result["last_interruption"] = interruption
+        if graph.adaptive_verification:
+            completed_event = next((event for event in events
+                                    if event["type"] == "run.completed"), {})
+            result.update({"adaptive_verification": True, "pending_checks": pending_checks,
+                           "plan_path": str(run_dir / "plan.md"),
+                           "verification_scope": verification_scope,
+                           "verified_inputs": completed_event.get("verified_inputs") or
+                           {gate: verified_inputs[gate] for gate in sorted(passed_gates & verified_inputs.keys())}})
         plan_path = run_dir / "plan.json"
         plan_sha = _hash(plan_path.read_bytes()) if plan_path.is_file() else ""
         reviews = [event for event in events if event["type"] == "plan.reviewed"]
@@ -1304,14 +1591,20 @@ class V6HostBridge:
         if result["status"] in {"completed", "superseded"}:
             next_actions = []
         elif active_calls:
-            next_actions = [{"tool": "cy_state", "reason": "wait for active dispatch",
-                             "arguments": {"wait": True}}]
+            next_actions = ([{"tool": "subagent", "reason": "dispatch independent ready nodes",
+                              "node_ids": ready}] if ready and graph.adaptive_verification else [])
+            next_actions.append({"tool": "cy_state", "reason": "wait for active dispatch",
+                                 "arguments": {"wait": True}})
         elif external_stops and not ready:
             next_actions = [{"reason": "report the external write outcome without retrying",
                              "external_stops": external_stops}]
-        elif feedback and (graph.planned_verification or not ready):
+        elif feedback and (not ready or graph.planned_verification and not graph.adaptive_verification) and not any(
+                item["status"] == "pending" for item in pending_checks):
+            failed = [{"node_id": item["node_id"], "target": item["target"], "status": item["status"]}
+                      for item in pending_checks if item["status"] not in {"pass", "pending", "waiting_for_tests"}]
             next_actions = [{"tool": "subagent", "agent": "thirteenth", "reason": "replan the same run",
-                             "run_id": run_id, "plan_revision": graph.revision}]
+                             "run_id": run_id, "plan_revision": graph.revision,
+                             **({"failed_checks": failed} if failed else {})}]
         elif not review_current and graph.planned_verification:
             next_actions = [{"tool": "subagent", "agent": "thirteenth",
                              "reason": "plan validation is missing for this revision"}]
@@ -1320,18 +1613,140 @@ class V6HostBridge:
                              "node_ids": ready}]
         else:
             next_actions = []
+            if any(item["status"] == "pending" for item in pending_checks):
+                next_actions.append({"tool": "cy_state", "reason": "run pending fixed checks",
+                                     "arguments": {"wait": True}})
             if pending_gates and not graph.planned_verification:
                 next_actions.append({"tool": "cy_check", "reason": "verify pending gates",
                                      "gates": [gate for gate in pending_gates if gate in CHECK_TARGETS]})
-            if intent_blockers or pending_gates:
+            if (intent_blockers or pending_gates) and not next_actions:
                 next_actions.append({"tool": "subagent", "agent": "thirteenth",
                                      "reason": "repair unmet evidence in the same run",
-                                     "run_id": run_id, "plan_revision": graph.revision})
+                                     "run_id": run_id, "plan_revision": graph.revision,
+                                     **({"review_producers": sorted(scope_producers),
+                                         "review_nodes": sorted(full_review_nodes)}
+                                        if full_review_required else {})})
             if not next_actions:
                 next_actions.append({"tool": "subagent", "agent": "thirteenth",
                                      "reason": "run has no dispatchable nodes"})
+        if graph.adaptive_verification and result["status"] not in {"completed", "superseded", "running"}:
+            # A failed check is repaired by revising its producer; the kernel re-runs
+            # the check once the inputs change. Re-running identical inputs is only
+            # worth suggesting when the inputs moved during the check (stale).
+            if any(item["can_retry"] and item["status"] == "stale" for item in pending_checks):
+                next_actions.append({"tool": "cy_state",
+                                     "reason": "the inputs moved during a fixed check; re-run it",
+                                     "arguments": {"wait": True, "retry_checks": True}})
         result["next_actions"] = next_actions
         return result
+
+    @staticmethod
+    def _publish_plan(state: dict) -> dict:
+        """Refresh the human-readable projection at each settlement or revision."""
+        if not state.get("adaptive_verification"):
+            return state
+
+        def plain(text: object) -> str:
+            value = " ".join(str(text).split())
+            return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        def excerpt(text: object, limit: int = 240) -> str:
+            """Keep the tail of a tool diagnostic, flattened to one line."""
+            value = plain(text)
+            return value if len(value) <= limit else "…" + value[-limit + 1:]
+
+        goal = (state.get("intent") or {}).get("goal")
+        title = state.get("title") or goal or state["run_id"]
+        lines = [f"# {plain(title)}", "",
+                 f"Run `{state['run_id']}` · revision {state['plan_revision']} · {state['status']}"]
+        if goal and goal != title:
+            lines += ["", plain(goal)]
+        lines += ["", "## Tasks", ""]
+        for node in state["nodes"]:
+            line = (f"- **{plain(node['node_id'])}** · {node['role']} · {node['status']}"
+                    f" · {plain(node['objective'])}")
+            if node["depends_on"]:
+                line += " · depends on " + ", ".join(map(plain, node["depends_on"]))
+            lines.append(line)
+        lines += ["", "## Verification", "",
+                  "- Passed · " + (", ".join(map(plain, state["passed_gates"])) or "none"),
+                  "- Outstanding · " + (", ".join(map(plain, state["pending_gates"])) or "none")]
+        if scope := state.get("verification_scope"):
+            lines.append(f"- Actual diff · {scope['risk']} · {len(scope['changed_paths'])} paths"
+                         f" · {scope['changed_lines']} changed lines")
+        if interruption := state.get("last_interruption"):
+            lines.append(f"- Last interruption · {plain(interruption['stage'])}"
+                         f" · {excerpt(interruption['reason'])}")
+        if state.get("verified_inputs"):
+            lines.append("- Verified inputs · " + ", ".join(
+                f"{plain(gate)} {digest[:12]}"
+                for gate, digest in sorted(state["verified_inputs"].items())))
+        receipts = {(check.get("node_id"), check.get("gate")): check["receipt"]
+                    for check in (state.get("planning_context") or {}).get("checks", [])
+                    if check.get("receipt")}
+        shown = set()
+        for check in state["pending_checks"]:
+            key = (check["node_id"], check["target"])
+            shown.add(key)
+            detail = excerpt(check.get("diagnostic") or "")
+            receipt = receipts.get(key)
+            line = f"- {plain(check['node_id'])} · {check['target']} · {check['status']}"
+            if receipt:
+                line += f" · exit {receipt['exit']} · SHA-256 {receipt['sha256'][:12]}"
+            lines.append(line + (f" · {detail}" if detail else ""))
+        for (node_id, gate), receipt in receipts.items():
+            if (node_id, gate) in shown:
+                continue
+            lines.append(f"- {plain(node_id)} · {gate} · exit {receipt['exit']}"
+                         f" · SHA-256 {receipt['sha256'][:12]}")
+        findings = (state.get("review") or {}).get("findings", [])
+        if findings:
+            lines += ["", "## Plan findings", ""]
+            lines.extend(f"- {finding['severity']} · {plain(finding['code'])} · {plain(finding['message'])}"
+                         for finding in findings)
+        if state["next_actions"]:
+            lines += ["", "## Next actions", ""]
+            lines.extend(f"- {plain(action['reason'])}" for action in state["next_actions"])
+        lines += ["", f"Facts: `{state['events_path']}`"]
+        target = Path(state["plan_path"])
+        draft = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=target.parent,
+                                             prefix=".plan-", delete=False) as handle:
+                draft = Path(handle.name)
+                handle.write("\n".join(lines) + "\n")
+            draft.replace(target)
+        except OSError as exc:
+            state["plan_projection_error"] = str(exc)
+        finally:
+            if draft is not None:
+                draft.unlink(missing_ok=True)
+        return state
+
+    def published_state(self, run_id: str) -> dict:
+        """Read the run state and refresh its human-readable projection."""
+        return self._publish_plan(self.state(run_id))
+
+    @_serialized
+    def record_interruption(self, run_id: str, session_id: str | None, stage: str,
+                            reason: str, event_id: str | None = None) -> dict:
+        if stage not in {"model", "planning", "wait"} or not reason.strip():
+            raise HostBridgeError("invalid interruption")
+        state = self.state(run_id)
+        if state["status"] in {"completed", "superseded"}:
+            return state
+        events = self.events(run_id)
+        if event_id and any(event["type"] == "run.interrupted"
+                            and event.get("event_id") == event_id for event in events):
+            return state
+        active = next((entry for entry in state["active_dispatches"]
+                       if entry["child_session_id"] == session_id), None)
+        self._append(run_id, "run.interrupted", session_id=session_id,
+                     plan_revision=state["plan_revision"], stage=stage, reason=reason[:500],
+                     event_id=event_id, call_id=active["call_id"] if active else None,
+                     active_dispatches=state["active_dispatches"], ready_nodes=state["ready_nodes"],
+                     pending_checks=state.get("pending_checks", []))
+        return self._publish_plan(self.state(run_id))
 
     def ask(self, run_id: str, question: str,
             answers: list[str] | None = None, approved: bool = False) -> dict:
@@ -1419,6 +1834,7 @@ class V6HostBridge:
                 "updated_utc": events[-1].get("utc") if events else record.get("created_utc"),
                 "ready_nodes": state["ready_nodes"],
                 "next_actions": state.get("next_actions", []),
+                **({"last_interruption": state["last_interruption"]} if "last_interruption" in state else {}),
                 "superseded_by": state.get("superseded_by"),
             })
         items.sort(key=lambda item: (item["updated_utc"] or "", item["run_id"]), reverse=True)
@@ -1441,10 +1857,14 @@ class V6HostBridge:
         events = self.events(run_id)
         if any(event["type"] == "run.completed" for event in events):
             return
+        # Record the exact inputs the run completed against. Later workspace
+        # changes are not the run's verdict, but they must stay observable.
+        verified_inputs = state.get("verified_inputs")
         self._append(run_id, "run.completed", node_count=len(state["nodes"]),
                      dispatch_count=sum(event["type"] == "dispatch.started" for event in events),
                      human_interventions=sum(event["type"] in {"human.requested", "approval.granted", "external.write.requested"}
-                                             for event in events))
+                                             for event in events),
+                     **({"verified_inputs": verified_inputs} if verified_inputs else {}))
         graph = self._graph(run_id)
         created = next((event for event in events if event["type"] == "plan.created"), {})
         request_class = created.get("request_class") or request_class_of(graph.nodes.values())
@@ -1490,7 +1910,7 @@ class V6HostBridge:
         for node in graph.nodes.values():
             node.status = "pending"
         affected = self._revision_invalidations(old_graph, graph, operation, state)
-        if operation["op"] == "revise":
+        if operation["op"] == "revise" and not graph.adaptive_verification:
             failed_checks = {event["node_id"] for event in state["replan_feedback"]
                              if event["type"] == "gate.check" and event.get("node_id")}
             if failed_checks - set(affected):
@@ -1520,7 +1940,7 @@ class V6HostBridge:
         self._append(run_id, "plan.reviewed", reviewer="kernel", plan_revision=graph.revision,
                      plan_sha256=_hash(plan_data), approved=True, findings=review["findings"])
         self._maybe_complete(run_id)
-        return self.state(run_id)
+        return self._publish_plan(self.state(run_id))
 
     @staticmethod
     def _validate_revision_scope(old: PlanGraph, new: PlanGraph) -> None:
@@ -1598,6 +2018,9 @@ class V6HostBridge:
                 and not any(event["type"] == "dispatch.bound" and event.get("call_id") == entry["call_id"]
                             for event in self.events(run_id))
                 for entry in state["active_dispatches"]):
+            if graph.adaptive_verification:
+                return {"rejected": True, "deferred": "writer_binding",
+                        "reason": "active writer has no host permission binding"}
             reason = "active writer has no host permission binding"
         if reason:
             self._append(run_id, "plan.op.rejected", node_id=node_id, reason=reason)
@@ -1883,18 +2306,23 @@ class V6HostBridge:
                 raise HostBridgeError("ambiguous or missing returned subagent")
             call_id = matches[0]["call_id"]
         self._verify_token(run_id, call_id, token)
-        if not any(entry["call_id"] == call_id and entry["child_session_id"] == child_session_id
-                   for entry in state["active_dispatches"]):
-            raise HostBridgeError("no matching returned subagent")
-        returned = next((event for event in reversed(self.events(run_id))
+        all_events = self.events(run_id)
+        returned = next((event for event in reversed(all_events)
                          if event["type"] == "dispatch.returned" and event.get("call_id") == call_id), None)
-        if returned is None:
+        if returned is None or returned["child_session_id"] != child_session_id:
             raise HostBridgeError("subagent has not returned")
-        started = next(event for event in reversed(self.events(run_id))
+        if any(event["type"] in _DISPATCH_END_EVENTS and event.get("call_id") == call_id
+               for event in all_events):
+            return state
+        if not any(entry["call_id"] == call_id for entry in state["active_dispatches"]):
+            raise HostBridgeError("no matching returned subagent")
+        started = next(event for event in reversed(all_events)
                        if event["type"] == "dispatch.started" and event["call_id"] == call_id)
         graph = self._graph(run_id)
         node = graph.nodes[started["node_id"]]
-        all_events = self.events(run_id)
+        interrupted = next((event for event in reversed(all_events)
+                            if event["type"] == "run.interrupted" and event["stage"] == "model"
+                            and event.get("call_id") == call_id), None)
         start_index = next(index for index, event in enumerate(all_events)
                            if event["type"] == "dispatch.started" and event.get("call_id") == call_id)
         concurrent_writers = any(
@@ -1935,6 +2363,15 @@ class V6HostBridge:
         current_after = guard.snapshot()
         artifacts = {path: value.sha256 for path, value in current_after.entries.items()
                      if path in report.changed_paths and path not in report.rejected_paths and value.kind == "file"}
+        if graph.adaptive_verification and node.write_scope and not node.external_scope and not node.requires:
+            previous = next((event for event in reversed(all_events)
+                             if event["type"] in _DISPATCH_END_EVENTS
+                             and event.get("node_id") == node.node_id), {})
+            if previous.get("interrupted") and not previous["rejected_paths"]:
+                artifacts.update({path: sha for path, sha in previous["artifacts"].items()
+                                  if guard._allowed(path, is_dir=False)
+                                  and (file := current_after.entries.get(path))
+                                  and file.kind == "file" and file.sha256 == sha})
         if graph.access_mode == "danger-full-access":
             # Full access does not snapshot the workspace. Hash the declared
             # artifacts directly so a completed child still has real evidence.
@@ -2020,6 +2457,9 @@ class V6HostBridge:
                     evidence_failure = bound_check["diagnostic"] or bound_check["status"]
             elif not (acceptance and acceptance["passed"]):
                 evidence_failure = acceptance["findings"] if acceptance else "acceptance verdict is missing"
+            elif (graph.adaptive_verification and "verified_inputs" in acceptance
+                  and acceptance["verified_inputs"] != state["verified_inputs"]):
+                evidence_failure = "fixed verification inputs changed after the acceptance verdict"
         elif graph.planned_verification and node.kind == "review" and not review_reads:
             evidence_failure = "review needs an observed read of a current project file"
         elif node.capability == "diagnose" and node.check_target and not (
@@ -2041,7 +2481,7 @@ class V6HostBridge:
             status = "cancelled"
         elif external_failure:
             status = "blocked"
-        elif child_error:
+        elif child_error or interrupted:
             status = "failed"
         elif (unapproved_external or rejection or evidence_failure or report.rejected_paths
               or returned["tool_status"] == "error"):
@@ -2058,6 +2498,7 @@ class V6HostBridge:
             status = "completed"
         diagnostic = (rejection["diagnostic"] if rejection else
                       "external write stopped: " + external_failure if external_failure else
+                      interrupted["reason"] if interrupted else
                       evidence_failure if evidence_failure else
                       "child tool error" if child_error else
                       "external write without host approval: " + ", ".join(unapproved_external) if unapproved_external else
@@ -2068,21 +2509,9 @@ class V6HostBridge:
                       "no accepted artifact" if status == "blocked" else None)
         fingerprint = _hash(json.dumps({"status": status, "diagnostic": diagnostic,
                                         "paths": report.rejected_paths}, sort_keys=True).encode())
-        self._append(run_id, "node." + status, node_id=node.node_id, call_id=call_id,
-                     artifacts=artifacts, rejected_paths=list(report.rejected_paths),
-                     removed_paths=removed_paths,
-                     **({"outcome": "completed_without_change"} if status == "completed" and no_change else {}),
-                     **({"review_reads": review_reads} if review_reads else {}),
-                     diagnostic=diagnostic, failure_fingerprint=fingerprint if status in {"failed", "blocked"} else None,
-                     evidence=bound_check["receipt"] if bound_check else
-                     {"source": "kernel", "command": "check-file-content", "exit": 0,
-                      "utc": _utc(), "sha256": node.expected_content_sha256}
-                     if status == "completed" and node.expected_content_sha256 else
-                     {"source": "host", "command": "native.subagent",
-                               "exit": 0 if returned["tool_status"] == "completed" and not child_error else 1,
-                               "utc": _utc(), "sha256": returned["output_sha256"],
-                               "session_id": child_session_id})
-        if status == "completed" and artifacts and not no_change and graph.access_mode != "danger-full-access":
+        if ((status == "completed" and artifacts and not no_change or
+             graph.adaptive_verification and node.write_scope and report.changed_paths)
+                and graph.access_mode != "danger-full-access"):
             facts = diff_facts(baseline, current_after)
             risk, floor = risk_floor(facts)
             changed_paths, changed_lines = list(facts.paths), facts.changed_lines
@@ -2095,11 +2524,39 @@ class V6HostBridge:
                         and Path(external_write["target"]).suffix in {".md", ".txt"}
                         and external_lines is not None and external_lines <= 200):
                     risk, floor = Risk.DOCUMENT, frozenset({"scope_guard"})
-            self._append(run_id, "gate.required", node_id=node.node_id,
+            if graph.adaptive_verification:
+                if (node.capability == "doc.write" and facts.paths
+                        and all(Path(path).suffix == ".md" for path in facts.paths)):
+                    risk = Risk.DOCUMENT
+                floor = {"scope_guard"} | self._adaptive_gates(risk)
+            self._append(run_id, "gate.required", node_id=node.node_id, call_id=call_id,
                          risk=risk.name.lower(), gates=sorted(floor),
                          changed_paths=changed_paths, changed_lines=changed_lines,
                          diff=diff_preview(baseline, current_after, facts.paths)
                          if graph.planned_verification else "")
+            if graph.adaptive_verification:
+                self._record_verification_scope(run_id, current_after)
+        self._append(run_id, "node." + status, node_id=node.node_id, call_id=call_id,
+                     artifacts=artifacts, rejected_paths=list(report.rejected_paths),
+                     removed_paths=removed_paths,
+                     **({"outcome": "completed_without_change"} if status == "completed" and no_change else {}),
+                     **({"interrupted": True} if interrupted else {}),
+                     **({"review_reads": review_reads} if review_reads else {}),
+                     **({"review_inputs_sha256": self._check_inputs_digest("test")}
+                        if graph.adaptive_verification and status == "completed"
+                        and (node.kind == "review" or node.capability == "accept") else {}),
+                     **({"acceptance_inputs": acceptance["verified_inputs"]}
+                        if status == "completed" and acceptance and "verified_inputs" in acceptance else {}),
+                     diagnostic=diagnostic, failure_fingerprint=fingerprint if status in {"failed", "blocked"} else None,
+                     evidence=bound_check["receipt"] if bound_check else
+                     {"source": "kernel", "command": "check-file-content", "exit": 0,
+                      "utc": _utc(), "sha256": node.expected_content_sha256}
+                     if status == "completed" and node.expected_content_sha256 else
+                     {"source": "host", "command": "native.subagent",
+                               "exit": 0 if returned["tool_status"] == "completed"
+                               and not child_error and not interrupted else 1,
+                               "utc": _utc(), "sha256": returned["output_sha256"],
+                               "session_id": child_session_id})
         if rejection:
             producer_id = rejection["affected_node_id"]
             prior = [event for event in all_events if event["type"] == "review.rejected"
@@ -2138,4 +2595,4 @@ class V6HostBridge:
                              diagnostic=diagnostic, failure_fingerprint=fingerprint,
                              attempt=used + 1)
         self._maybe_complete(run_id)
-        return self.state(run_id)
+        return self._publish_plan(self.state(run_id))

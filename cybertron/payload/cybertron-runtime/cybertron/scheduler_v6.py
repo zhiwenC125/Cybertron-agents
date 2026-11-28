@@ -33,7 +33,8 @@ def scopes_overlap(left: tuple[str, ...], right: tuple[str, ...]) -> bool:
     return False
 
 
-def dispatchable(graph: PlanGraph, active_ids: tuple[str, ...], *, max_writers: int = 1) -> list[PlanNode]:
+def dispatchable(graph: PlanGraph, active_ids: tuple[str, ...], *, max_writers: int = 1,
+                 eligible: set[str] | None = None) -> list[PlanNode]:
     """Return ready nodes that fit the active locks and writer budget."""
     if max_writers < 1 or max_writers > 4:
         raise ValueError("max_writers must be between 1 and 4")
@@ -41,6 +42,8 @@ def dispatchable(graph: PlanGraph, active_ids: tuple[str, ...], *, max_writers: 
     writers = sum(bool(node.write_scope) for node in active)
     selected: list[PlanNode] = []
     for node in graph.ready_nodes():
+        if eligible is not None and node.node_id not in eligible:
+            continue
         if not node.write_scope:
             selected.append(node)
             continue

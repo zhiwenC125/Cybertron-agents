@@ -67,11 +67,21 @@ def diff_facts(before: Snapshot, after: Snapshot, *, device_operation: bool = Fa
         old_lines = old.content.decode("utf-8", errors="replace").splitlines() if old and old.kind == "file" else []
         new_lines = new.content.decode("utf-8", errors="replace").splitlines() if new and new.kind == "file" else []
         lines += sum(1 for line in difflib.ndiff(old_lines, new_lines) if line[:1] in {"+", "-"})
-    modules = tuple(sorted({PurePosixPath(path).parts[0] for path in paths if "/" in path}))
+    modules = set()
+    for path in paths:
+        if path.endswith(".md"):
+            continue
+        parts = PurePosixPath(path).parts
+        if parts[0] == "tests":
+            continue
+        if len(parts) > 2 and parts[0] in {"src", "lib", "app"}:
+            modules.add("/".join(parts[:2]))
+        elif len(parts) > 1:
+            modules.add(parts[0])
     public = any(path.startswith(("include/", "api/")) or path.endswith((".h", "interfaces.py", "schemas.py"))
                  for path in paths)
     firmware = any(path.startswith(("firmware/", "drivers/", "bsp/")) or path.endswith(".ioc") for path in paths)
-    return DiffFacts(paths, lines, modules, public, firmware, device_operation)
+    return DiffFacts(paths, lines, tuple(sorted(modules)), public, firmware, device_operation)
 
 
 def diff_preview(before: Snapshot, after: Snapshot, paths: tuple[str, ...]) -> str:

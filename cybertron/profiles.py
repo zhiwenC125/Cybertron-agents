@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .scope_guard import ScopeGuard
+
 
 class CheckRejected(ValueError):
     pass
@@ -28,6 +30,15 @@ CHECK_TARGETS = {
     "build": ("toolchain", "nexus-prime"),
     "test": ("test.write", "alchemist"),
     "sim": ("test.write", "alchemist"),
+}
+
+PROFILE_TOOLS = {
+    "python": {"test": ("python3",)},
+    "node": {"test": ("node",)},
+    "renode": {"sim": ("renode",)},
+    "cmake-c": {"lint": ("cmake", "clang-tidy"), "build": ("cmake",)},
+    "cmake-arm": {"lint": ("cmake", "clang-tidy", "arm-none-eabi-gcc"),
+                  "build": ("cmake", "arm-none-eabi-gcc")},
 }
 
 
@@ -80,16 +91,28 @@ def _sandbox_profile(scratch: Path) -> str:
     )
 
 
-def _copy_project(project: Path, destination: Path, *, preserve_build: bool = False) -> None:
+def _check_ignore(project: Path, target: str):
+    ignored = {".git", "node_modules", ".venv", "__pycache__"}
+    if target != "sim":
+        ignored.add("build")
+
     def ignore(directory: str, names: list[str]) -> set[str]:
-        blocked = {".git", "node_modules", ".venv", "__pycache__"}
-        if not preserve_build:
-            blocked.add("build")
-        if Path(directory) == project:
-            blocked.add(".cybertron")
+        blocked = ignored | {".cybertron"} if Path(directory) == project else ignored
         return blocked.intersection(names)
 
-    shutil.copytree(project, destination, symlinks=True, ignore=ignore)
+    return ignore
+
+
+def check_inputs_digest(project: Path, target: str) -> str:
+    ignore = _check_ignore(project, target)
+    snapshot = ScopeGuard(project, ()).snapshot(ignore=ignore)
+    visible = {name: (state.kind, state.mode, state.sha256)
+               for name, state in snapshot.entries.items()}
+    return hashlib.sha256(json.dumps(visible, sort_keys=True).encode()).hexdigest()
+
+
+def _copy_project(project: Path, destination: Path, target: str) -> None:
+    shutil.copytree(project, destination, symlinks=True, ignore=_check_ignore(project, target))
     for path in destination.rglob("*"):
         if path.is_symlink():
             raise CheckRejected(f"project contains a symlink: {path.relative_to(destination)}")
@@ -145,14 +168,7 @@ def check_profile(project: Path, target: str) -> str:
         profile = "renode"
     else:
         profile = detect_profile(project)
-    tools = {
-        "python": {"test": ("python3",)},
-        "node": {"test": ("node",)},
-        "renode": {"sim": ("renode",)},
-        "cmake-c": {"lint": ("cmake", "clang-tidy"), "build": ("cmake",)},
-        "cmake-arm": {"lint": ("cmake", "clang-tidy", "arm-none-eabi-gcc"),
-                      "build": ("cmake", "arm-none-eabi-gcc")},
-    }[profile].get(target)
+    tools = PROFILE_TOOLS[profile].get(target)
     if tools is None:
         if profile.startswith("cmake-") and target == "test":
             raise CheckRejected("CMake test target requires a declared test framework")
@@ -182,7 +198,8 @@ def run_check(project: Path, target: str) -> dict:
     with tempfile.TemporaryDirectory(prefix="cybertron-check-") as temporary:
         scratch = Path(temporary).resolve()
         copy = scratch / "project"
-        _copy_project(project, copy, preserve_build=(target == "sim"))
+        _copy_project(project, copy, target)
+        inputs_sha256 = check_inputs_digest(copy, target)
         receipts: list[CheckReceipt] = []
         if profile == "renode":
             if target != "sim":
@@ -194,9 +211,11 @@ def run_check(project: Path, target: str) -> dict:
                                   str(scratch / "renode-config.json"),
                                   "--console", "--disable-gui", "--plain", "sim.resc"],
                                  copy, scratch))
-            passed = receipts[-1].exit == 0 and expect in receipts[-1].output
+            output = receipts[-1].output
+            passed = (receipts[-1].exit == 0 and expect in output
+                      and "There was an error executing command" not in output)
             return {"profile": profile, "target": target,
-                    "status": "pass" if passed else "fail",
+                    "status": "pass" if passed else "fail", "inputs_sha256": inputs_sha256,
                     "receipts": [item.to_dict() for item in receipts]}
         if profile in {"cmake-c", "cmake-arm"}:
             if profile == "cmake-arm":
@@ -237,5 +256,5 @@ def run_check(project: Path, target: str) -> dict:
             count = re.search(r"(?:^|\n)(?:# )?tests? (\d+)", receipts[-1].output)
             passed = passed and count is not None and int(count.group(1)) > 0
         return {"profile": profile, "target": target,
-                "status": "pass" if passed else "fail",
+                "status": "pass" if passed else "fail", "inputs_sha256": inputs_sha256,
                 "receipts": [item.to_dict() for item in receipts]}

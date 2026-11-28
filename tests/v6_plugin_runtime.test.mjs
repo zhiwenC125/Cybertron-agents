@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { registerHooks } from 'node:module';
@@ -15,6 +16,11 @@ registerHooks({
 });
 
 const plugin = (await import('../cybertron/v6_plugin/cybertron.js')).default;
+
+// Nested sandboxes deny sandbox_apply, so probe instead of trusting the binary path.
+const sandboxAvailable = existsSync('/usr/bin/sandbox-exec') &&
+  spawnSync('/usr/bin/sandbox-exec', ['-p', '(version 1)(allow default)', '/usr/bin/true'],
+    { stdio: 'ignore' }).status === 0;
 
 test('plugin registers native hooks and rejects invalid dispatch visibly', async () => {
   const project = mkdtempSync(path.join(tmpdir(), 'cybertron-plugin-test-'));
@@ -40,7 +46,10 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
       hook: async (name, fn) => sessionHooks.set(name, fn),
       get: async ({ sessionID }) => sessionID === 'child-1'
         ? { agent: 'alpha-trion', parentID: 'parent',
-            permissions: sessionUpdates.at(-1)?.permissions }
+            permissions: sessionUpdates.at(-1)?.permissions.map(({ action, resource, effect }) =>
+              ({ effect, resource, action })) }
+        : sessionID === 'shell-child'
+          ? { agent: 'solus-prime', parentID: 'parent', permissions: sessionUpdates.at(-1)?.permissions }
         : sessionID === 'preplan-child'
           ? { agent: 'thirteenth', parentID: 'preplan-parent' }
           : { agent: 'prima' },
@@ -96,7 +105,7 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     input: { command: 'git status' } }), /no shell allow-list/);
   assert.deepEqual([...tools.keys()], ['cy_plan', 'cy_state', 'cy_runs', 'cy_resume',
     'cy_ask', 'cy_new_run', 'cy_escalate',
-    'cy_templates', 'cy_capabilities', 'cy_metrics', 'cy_check', 'cy_verify', 'cy_delete', 'cy_review_reject']);
+    'cy_templates', 'cy_capabilities', 'cy_metrics', 'cy_shell', 'cy_check', 'cy_verify', 'cy_delete', 'cy_review_reject']);
   assert.deepEqual(tools.get('cy_plan').input.properties.nodes.items.properties.kind.enum,
     ['task', 'review', 'verify']);
   assert.deepEqual(tools.get('cy_plan').input.properties.node.properties.kind.enum,
@@ -191,6 +200,7 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     acceptance: ['notes.md exists'], verifiers: ['scope_guard'],
   } }, { agent: 'thirteenth', sessionID: 'parent' })).content);
   assert.equal(plan.review_current, true);
+  assert.equal(plan.adaptive_verification, true);
   assert.equal(tools.has('cy_plan_review'), false);
   await assert.rejects(tools.get('cy_plan').execute({},
     { agent: 'prima', sessionID: 'parent' }), /Only thirteenth/);
@@ -245,6 +255,29 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
   ]);
   assert.equal(JSON.parse((await tools.get('cy_state').execute({},
     { agent: 'prima', sessionID: 'parent' })).content).status, 'running');
+
+  let releaseWait;
+  let resolveStarted;
+  const waitStarted = new Promise(resolve => { resolveStarted = resolve; });
+  ctx.session.wait = ({ sessionID }) => new Promise(resolve => {
+    releaseWait = resolve;
+    resolveStarted(sessionID);
+  });
+  const timeout = new AbortController();
+  const waiting = assert.rejects(tools.get('cy_state').execute({ wait: true },
+    { agent: 'prima', sessionID: 'parent', signal: timeout.signal }), /test wait timeout/);
+  assert.equal(await waitStarted, 'child-1');
+  timeout.abort(new DOMException('test wait timeout', 'TimeoutError'));
+  await waiting;
+  releaseWait();
+  ctx.session.wait = async () => undefined;
+  const checkpoint = JSON.parse((await tools.get('cy_state').execute({},
+    { agent: 'prima', sessionID: 'parent' })).content);
+  assert.equal(checkpoint.last_interruption.call_id, 'call-1');
+  assert.equal(checkpoint.last_interruption.reason, 'TimeoutError');
+  assert.equal(checkpoint.run_id, plan.run_id);
+  assert.equal(checkpoint.status, 'running');
+
   writeFileSync(path.join(project, 'notes.md'), 'done');
   const settled = JSON.parse((await tools.get('cy_state').execute({ wait: true },
     { agent: 'prima', sessionID: 'parent' })).content);
@@ -267,5 +300,81 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     tools: { read: {}, cy_check: {}, shell: {} }, system: [] };
   await sessionHooks.get('context')(review);
   assert.deepEqual(Object.keys(review.tools), ['read']);
-  assert.match(review.system[0].text, /separate bound verify nodes/);
+  assert.ok(review.system.some(item => /existing fixed-check receipts/.test(item.text)));
+
+  // A second run uses the same host hooks and needs only its implementation child.
+  writeFileSync(path.join(project, 'pyproject.toml'), '[project]\nname = "fixture"\n');
+  mkdirSync(path.join(project, 'tests'));
+  writeFileSync(path.join(project, 'tests', 'test_notes.py'),
+    'import unittest\nfrom pathlib import Path\nclass Notes(unittest.TestCase):\n'
+    + '    def test_contents(self): self.assertEqual(Path("notes.md").read_text(), "updated notes")\n');
+  const checked = JSON.parse((await tools.get('cy_plan').execute({ node: {
+    node_id: 'n2', kind: 'task', capability: 'doc.write', role: 'alpha-trion',
+    objective: 'Write notes.md and run the declared test',
+    write_scope: ['notes.md'], acceptance: ['notes.md exists'],
+    verifiers: ['scope_guard', 'test'], satisfies: ['recorded'],
+  }, intent: { goal: 'Verify notes', confirmed: false, done: [
+    { id: 'recorded', criterion: 'The fixed test passes', evidence: 'test' },
+  ] } }, { agent: 'thirteenth', sessionID: 'parent' })).content);
+  storage.delete('bound/child-1');
+  const checkedDispatch = { ...event, callID: 'check-implementation',
+    input: { ...event.input, description: checked.card } };
+  await toolHooks.get('execute.before')(checkedDispatch);
+  await toolHooks.get('execute.after')({ ...checkedDispatch, status: 'completed',
+    result: { metadata: { sessionID: 'child-1' } } });
+  await sessionHooks.get('context')({ agent: 'alpha-trion', sessionID: 'child-1',
+    tools: {}, system: [], model: { providerID: 'vendor', id: 'test' } });
+  writeFileSync(path.join(project, 'notes.md'), 'updated notes');
+  const result = JSON.parse((await tools.get('cy_state').execute({ wait: true },
+    { agent: 'prima', sessionID: 'parent' })).content);
+  const inlineReceipt = readFileSync(result.events_path, 'utf8').trim().split('\n')
+    .map(line => JSON.parse(line)).find(item => item.type === 'gate.check');
+  const checkPassed = inlineReceipt.status === 'pass';
+  assert.equal(result.status, checkPassed ? 'completed' : 'blocked');
+  assert.equal(result.nodes.length, 1);
+  assert.equal(result.intent_coverage[0].satisfied, checkPassed);
+  assert.equal(inlineReceipt.inline, true);
+  assert.equal(inlineReceipt.node_id, 'n2');
+  if (checkPassed) assert.equal(inlineReceipt.receipt.exit, 0);
+
+  await assert.rejects(tools.get('cy_shell').execute({ commands: [['make']] },
+    { agent: 'solus-prime', sessionID: 'shell-child' }), /verified project child/);
+  await assert.rejects(shell({ tool: 'shell', agent: 'solus-prime', sessionID: 'shell-child',
+    input: { command: 'make all' } }), /use cy_shell/);
+  if (sandboxAvailable) {
+    mkdirSync(path.join(project, 'src'));
+    writeFileSync(path.join(project, 'Makefile'), 'all:\n\tprintf ok > build/result.txt\n');
+    const shellPlan = JSON.parse((await tools.get('cy_plan').execute({ node: {
+      node_id: 'shell-code', kind: 'task', capability: 'code.write', role: 'solus-prime',
+      objective: 'Check the build in a scratch workspace',
+      write_scope: ['src/main.py'], acceptance: ['Make exits successfully'],
+      verifiers: ['scope_guard'],
+    } }, { agent: 'thirteenth', sessionID: 'parent' })).content);
+    const shellDispatch = { ...event, callID: 'shell-build',
+      input: { description: shellPlan.card, agentID: 'solus-prime' } };
+    await toolHooks.get('execute.before')(shellDispatch);
+    await toolHooks.get('execute.after')({ ...shellDispatch, status: 'completed',
+      result: { metadata: { sessionID: 'shell-child' } } });
+    const shellContext = { agent: 'solus-prime', sessionID: 'shell-child',
+      tools: { cy_shell: {}, shell: {}, bash: {} }, system: [] };
+    await sessionHooks.get('context')(shellContext);
+    assert.deepEqual(Object.keys(shellContext.tools), ['cy_shell']);
+    await assert.rejects(tools.get('cy_shell').execute({ commands: [['make']] },
+      { agent: 'alchemist', sessionID: 'shell-child' }), /node and role/);
+    approved = false;
+    await assert.rejects(tools.get('cy_shell').execute({ commands: [['make']] },
+      { agent: 'solus-prime', sessionID: 'shell-child' }), /human denied/);
+    approved = true;
+    const shellReceipt = JSON.parse((await tools.get('cy_shell').execute({ commands: [['make']] },
+      { agent: 'solus-prime', sessionID: 'shell-child', messageID: 'build', id: 'cmd' })).content);
+    assert.equal(approvals.at(-1).action, 'cy_shell');
+    assert.equal(shellReceipt.status, 'pass');
+    assert.equal(shellReceipt.receipts[0].exit, 0);
+    assert.equal(existsSync(path.join(project, 'build')), false);
+    const receiptEvent = readFileSync(shellPlan.events_path, 'utf8').trim().split('\n')
+      .map(line => JSON.parse(line)).find(entry => entry.type === 'shell.executed');
+    assert.equal(receiptEvent.call_id, 'shell-build');
+    assert.equal(receiptEvent.receipts[0].sha256, shellReceipt.receipts[0].sha256);
+    assert.equal(receiptEvent.source_intact, true);
+  }
 });

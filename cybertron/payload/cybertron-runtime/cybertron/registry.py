@@ -60,7 +60,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         system_prompt=(
             "你是先觉天，负责 Cybertron 运行编排。\n"
             "先用 cy_runs 或 cy_state 发现当前会话可接续的计划。新需求派 thirteenth 规划，交接时转述用户目标与约束，由 thirteenth 决定节点和必要验证。用 cy_state(wait=true) 等待交接。计划创建与修订只归 thirteenth。\n"
-            "按 cy_state 的 next_actions 处理。执行节点的 subagent description 只填原样节点卡，目标、范围和验收要求放在 prompt，再用 cy_state(wait=true) 等待结算。计划提交时内核已校验，可直接派发。\n"
+            "按 cy_state 的 next_actions 处理。执行节点的 subagent description 只填原样节点卡，目标、范围和验收要求放在 prompt。先派发就绪且互不依赖的节点，再用 cy_state(wait=true) 等待结算。检查失败后继续派发无关就绪节点。计划提交时内核已校验，可直接派发。\n"
             "局部故障按内核的有限重试处理。需要重规划时，把同一 run ID、revision、失败节点、诊断和已有回执交给 thirteenth，再等待更新。只有用户改变目标时才使用 cy_new_run。\n"
             "准确汇报已有回执。专项动作按 cy_escalate 和 cy_ask 获得明确授权。项目外单文件由 OpenCode 在实际写入时请求授权，拒绝后停止。目标无法确定或校验被拒绝时，停在原目标等待用户澄清。\n"
             "\n"
@@ -75,7 +75,7 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
             "━━━ {✓ 或 ⚠️} {角色} · {节点状态} ━━━\n"
             "结果：{已核对的产物、回执或失败原因}\n"
             "下一步：{账本给出的下一项动作}\n"
-            "下一步若需派单，结算横幅之后再输出下一位角色的派发横幅，然后调用工具。\n"
+            "每次派单前输出对应横幅。可在同一批次先派发多个互不依赖的就绪节点。\n"
             "\n"
             "收到现有计划时，报告 run、revision、目标、范围、就绪节点与验收标准。简单任务合并进首条执行派发横幅。明确的计划直接执行，横幅只是进度信息。\n"
             "━━━ 📋 计划已就绪 ━━━\n"
@@ -612,7 +612,8 @@ THIRTEEN_PRIMES_REGISTRY: List[PrimeAgentSpec] = [
         system_prompt=(
             "你是第十三天尊，负责意图明确、架构方案和版本化计划。只有歧义会改变目标、交付、风险或验收时使用 question。\n"
             "明确的需求直接用 cy_plan 提交，声明目标、验收条件、节点 satisfies、依赖和窄写入范围。对于只需交付精确内容的单文件任务，只提交一个写入节点，传入 expected_content 和一个产物验收项，由内核回读校验。用户说只写引号内的文字且未指定换行时，以引号内原文作为 expected_content。显式只读保持 read-only。\n"
-            "用 cy_capabilities 查看验证工具和角色。按任务、差异和风险选择需要的 verify 节点。测试由炼金术士提供真实回执；需要独立验收时，用依赖真实证据的 accept 节点交给震天尊。\n"
+            "用 cy_capabilities 查看验证工具和角色。项目内写入任务可在 verifiers 声明固定检查，例如 scope_guard 和 test，内核执行并记录回执。用户明确要求写入前确认验证可用时，先核对该前提。需要测试设计时交给炼金术士，需要独立检查或验收时使用 verify 或 accept 节点。\n"
+            "单个源文件的明确修复已有回归测试时，提交一个实现节点并绑定测试验收项。只有具体问题需要单独定位时才安排诊断。跨模块或高风险变更按整体证据安排独立审查和验收，常规测试仍由实现节点声明，内核回执直接交给审查和验收。只声明真实依赖，给互不依赖的节点保留并行机会。\n"
             "收到重规划请求时用 cy_state 读取同一 run 的版本、失败诊断、diff 和回执。用 cy_plan 的 revise 操作修订受影响节点，保留有效结果。\n"
             "计划提交后交由先觉天派发与结算。项目外单文件使用精确 external_scope。外发区等别名从用户提供的信息或当前项目说明解析。别名未知、目标不存在有效父目录或内核拒绝目标时，用原生问题向用户询问；禁止猜测路径、替换目标或以宿主授权代替用户选择目标。不受限访问需要专项授权。\n"
             "\n"
@@ -702,7 +703,20 @@ for _prime in THIRTEEN_PRIMES_REGISTRY:
 
 _CHECK_ROLES = frozenset({"quintus-prime", "micronus-prime", "nexus-prime", "alchemist"})
 _DELETE_ROLES = frozenset({"solus-prime", "nexus-prime"})
+FENCED_SHELL_COMMANDS = MappingProxyType({
+    "solus-prime": (("make",), ("cmake", "--build"), ("ruff", "check"), ("ruff", "format", "--check")),
+    "micronus-prime": (("ruff", "check"), ("ruff", "format", "--check"),
+                       ("python3", "-m", "ruff", "check"), ("mypy",), ("clang-tidy",), ("cppcheck",)),
+    "alchemist": (("python3", "-m", "unittest"), ("python3", "-m", "pytest"),
+                  ("pytest",), ("ctest",), ("cargo", "test"), ("node", "--test")),
+    "nexus-prime": (("make",), ("cmake", "-S"), ("cmake", "--build"),
+                    ("cmake", "--version"), ("cargo", "build")),
+})
 for _prime in THIRTEEN_PRIMES_REGISTRY:
+    if _prime.agent_id in FENCED_SHELL_COMMANDS:
+        _prime.permissions.append(PermissionRule("cy_shell", "*", PermissionEffect.ALLOW))
+        _prime.system_prompt += ("\n使用 cy_shell 在隔离项目副本中执行本角色允许的软件命令，参数以 argv 数组提交。"
+                                 "多步构建可在同一次调用中提交，产物留在本次隔离环境。正式门禁继续使用计划绑定的检查。")
     if _prime.agent_id in _CHECK_ROLES:
         _prime.permissions.append(PermissionRule("cy_check", "*", PermissionEffect.ALLOW))
     if _prime.agent_id in _DELETE_ROLES:
@@ -765,7 +779,7 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
                      "cy_state", "cy_plan", "cy_verify", "cy_ask", "cy_escalate", "cy_new_run", "cy_capabilities",
                      "cy_runs", "cy_resume",
                      "cy_ask_decision", "cy_full_access_decision", "question", "cy_templates", "cy_metrics",
-                     "cy_check", "cy_delete", "cy_review_reject", "feishu_mcp_healthcheck*",
+                     "cy_check", "cy_shell", "cy_delete", "cy_review_reject", "feishu_mcp_healthcheck*",
                      "feishu_wiki_delete*", "feishu_wiki_docx_v1_document_rawContent",
                      "feishu_wiki_wiki_v2_space_getNode"}
     for spec in specs:
@@ -787,6 +801,9 @@ def assert_catalog(roles: Mapping[str, PrimeRole] = PRIME_ROLES,
         check_permission = any(r.action == "cy_check" for r in allowed)
         if check_permission != (spec.agent_id in _CHECK_ROLES) or ("cy_check" in role.tool_classes) != check_permission:
             raise ValueError("cy_check role permission drift")
+        shell_permission = any(r.action == "cy_shell" for r in allowed)
+        if shell_permission != (spec.agent_id in FENCED_SHELL_COMMANDS) or ("cy_shell" in role.tool_classes) != shell_permission:
+            raise ValueError("cy_shell role permission drift")
         new_run_permission = any(r.action == "cy_new_run" for r in allowed)
         if new_run_permission != (spec.agent_id == "prima") or ("cy_new_run" in role.tool_classes) != new_run_permission:
             raise ValueError("cy_new_run permission must belong to prima only")

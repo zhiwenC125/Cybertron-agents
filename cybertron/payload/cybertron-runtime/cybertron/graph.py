@@ -129,7 +129,8 @@ class PlanGraph:
                  gates: Iterable[str] = (), human_requests: Iterable[str] = (),
                  attempts: Mapping[str, int] = None, complete: bool = False,
                  access_mode: str = DEFAULT_ACCESS_MODE,
-                 intent: Intent | None = None, planned_verification: bool = False):
+                 intent: Intent | None = None, planned_verification: bool = False,
+                 adaptive_verification: bool = False):
         assert_catalog()
         self.access_mode = normalize_access_mode(access_mode)
         items = list(nodes)
@@ -147,6 +148,7 @@ class PlanGraph:
             raise GraphRejected("intent must be an Intent")
         self.intent = intent
         self.planned_verification = planned_verification
+        self.adaptive_verification = adaptive_verification
         self.validate()
 
     def validate(self) -> None:
@@ -272,6 +274,8 @@ class PlanGraph:
             payload["intent"] = self.intent.to_dict()
         if self.planned_verification:
             payload["planned_verification"] = True
+        if self.adaptive_verification:
+            payload["adaptive_verification"] = True
         return payload
 
     @classmethod
@@ -286,6 +290,7 @@ class PlanGraph:
                        attempts=data.get("attempts", {}), complete=data.get("complete", False),
                        access_mode=data.get("access_mode", DEFAULT_ACCESS_MODE),
                        planned_verification=data.get("planned_verification", False),
+                       adaptive_verification=data.get("adaptive_verification", False),
                        intent=(Intent.from_dict(data["intent"])
                                if data.get("intent") is not None else None))
         except (KeyError, TypeError, ValueError) as exc:
@@ -418,7 +423,8 @@ class PlanGraph:
             PlanGraph(candidate.values(), revision=self.revision + 1,
                       gates=gates, human_requests=human_requests, attempts=attempts,
                       complete=complete, access_mode=self.access_mode,
-                      intent=self.intent, planned_verification=planned_verification)
+                      intent=self.intent, planned_verification=planned_verification,
+                      adaptive_verification=self.adaptive_verification)
         except (GraphRejected, KeyError, TypeError, ValueError, AttributeError) as exc:
             reason = str(exc) if isinstance(exc, GraphRejected) else "invalid operation payload"
             self.events.append({"type": "plan.op.rejected", "op_id": op_id, "reason": reason})

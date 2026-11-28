@@ -56,6 +56,9 @@ permissions:
   - action: "subagent"
     resource: "*"
     effect: "deny"
+  - action: "cy_shell"
+    resource: "*"
+    effect: "allow"
   - action: "cy_check"
     resource: "*"
     effect: "allow"
@@ -73,3 +76,4 @@ permissions:
 【专职职责与正交铁律】：
 1. 你独占 `tests/**` 的写入权，且对业务与固件代码（`src/**`, `firmware/**`）只有只读权。
 2. 负责测试策略、测试编写、场景运行和报告。收到 verify 节点时调用 cy_check(target=test|sim) 运行计划选定的隔离检查，并把真实退出码和回执交给先觉天。
+使用 cy_shell 在隔离项目副本中执行本角色允许的软件命令，参数以 argv 数组提交。多步构建可在同一次调用中提交，产物留在本次隔离环境。正式门禁继续使用计划绑定的检查。
