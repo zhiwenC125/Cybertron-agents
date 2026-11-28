@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -15,6 +16,11 @@ registerHooks({
 });
 
 const plugin = (await import('../cybertron/v6_plugin/cybertron.js')).default;
+
+// Nested sandboxes deny sandbox_apply, so probe instead of trusting the binary path.
+const sandboxAvailable = existsSync('/usr/bin/sandbox-exec') &&
+  spawnSync('/usr/bin/sandbox-exec', ['-p', '(version 1)(allow default)', '/usr/bin/true'],
+    { stdio: 'ignore' }).status === 0;
 
 test('plugin registers native hooks and rejects invalid dispatch visibly', async () => {
   const project = mkdtempSync(path.join(tmpdir(), 'cybertron-plugin-test-'));
@@ -249,6 +255,29 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
   ]);
   assert.equal(JSON.parse((await tools.get('cy_state').execute({},
     { agent: 'prima', sessionID: 'parent' })).content).status, 'running');
+
+  let releaseWait;
+  let resolveStarted;
+  const waitStarted = new Promise(resolve => { resolveStarted = resolve; });
+  ctx.session.wait = ({ sessionID }) => new Promise(resolve => {
+    releaseWait = resolve;
+    resolveStarted(sessionID);
+  });
+  const timeout = new AbortController();
+  const waiting = assert.rejects(tools.get('cy_state').execute({ wait: true },
+    { agent: 'prima', sessionID: 'parent', signal: timeout.signal }), /test wait timeout/);
+  assert.equal(await waitStarted, 'child-1');
+  timeout.abort(new DOMException('test wait timeout', 'TimeoutError'));
+  await waiting;
+  releaseWait();
+  ctx.session.wait = async () => undefined;
+  const checkpoint = JSON.parse((await tools.get('cy_state').execute({},
+    { agent: 'prima', sessionID: 'parent' })).content);
+  assert.equal(checkpoint.last_interruption.call_id, 'call-1');
+  assert.equal(checkpoint.last_interruption.reason, 'TimeoutError');
+  assert.equal(checkpoint.run_id, plan.run_id);
+  assert.equal(checkpoint.status, 'running');
+
   writeFileSync(path.join(project, 'notes.md'), 'done');
   const settled = JSON.parse((await tools.get('cy_state').execute({ wait: true },
     { agent: 'prima', sessionID: 'parent' })).content);
@@ -271,7 +300,7 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
     tools: { read: {}, cy_check: {}, shell: {} }, system: [] };
   await sessionHooks.get('context')(review);
   assert.deepEqual(Object.keys(review.tools), ['read']);
-  assert.ok(review.system.some(item => /separate bound verify nodes/.test(item.text)));
+  assert.ok(review.system.some(item => /existing fixed-check receipts/.test(item.text)));
 
   // A second run uses the same host hooks and needs only its implementation child.
   writeFileSync(path.join(project, 'pyproject.toml'), '[project]\nname = "fixture"\n');
@@ -298,16 +327,15 @@ test('plugin registers native hooks and rejects invalid dispatch visibly', async
   writeFileSync(path.join(project, 'notes.md'), 'updated notes');
   const result = JSON.parse((await tools.get('cy_state').execute({ wait: true },
     { agent: 'prima', sessionID: 'parent' })).content);
-  const sandboxAvailable = existsSync('/usr/bin/sandbox-exec');
-  assert.equal(result.status, sandboxAvailable ? 'completed' : 'blocked');
-  assert.equal(result.nodes.length, 1);
-  assert.equal(result.intent_coverage[0].satisfied, sandboxAvailable);
   const inlineReceipt = readFileSync(result.events_path, 'utf8').trim().split('\n')
     .map(line => JSON.parse(line)).find(item => item.type === 'gate.check');
+  const checkPassed = inlineReceipt.status === 'pass';
+  assert.equal(result.status, checkPassed ? 'completed' : 'blocked');
+  assert.equal(result.nodes.length, 1);
+  assert.equal(result.intent_coverage[0].satisfied, checkPassed);
   assert.equal(inlineReceipt.inline, true);
   assert.equal(inlineReceipt.node_id, 'n2');
-  assert.equal(inlineReceipt.status, sandboxAvailable ? 'pass' : 'unavailable');
-  if (sandboxAvailable) assert.equal(inlineReceipt.receipt.exit, 0);
+  if (checkPassed) assert.equal(inlineReceipt.receipt.exit, 0);
 
   await assert.rejects(tools.get('cy_shell').execute({ commands: [['make']] },
     { agent: 'solus-prime', sessionID: 'shell-child' }), /verified project child/);

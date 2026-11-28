@@ -17,7 +17,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cybertron-v6-host")
     parser.add_argument("operation", choices=("plan", "plan_op", "state", "runs", "review_plan", "ask",
                                              "before", "after", "bind", "permission", "external_write",
-                                             "review_reject", "finish",
+                                             "review_reject", "finish", "record_interruption",
                                              "check", "fenced_shell", "templates", "metrics",
                                              "grant_request", "grant_approve", "grant_deny",
                                              "grant_revoke", "grants", "intercept",
@@ -78,6 +78,9 @@ def main(argv: list[str] | None = None) -> int:
                                               data["child_session_id"], data["passed"], data["findings"])
         elif args.operation == "planning_handoff":
             result = bridge.planning_handoff(data["run_id"], data["parent_session_id"])
+        elif args.operation == "record_interruption":
+            result = bridge.record_interruption(data["run_id"], data["session_id"],
+                                                data["stage"], data["reason"], data.get("event_id"))
         elif args.operation == "review_read":
             bridge.observe_review_read(data["run_id"], data["call_id"], data["child_session_id"],
                                        data["path"], data["output_sha256"])
@@ -95,7 +98,10 @@ def main(argv: list[str] | None = None) -> int:
                 template = data["template"]
                 objective = template["objective"]
                 if template.get("type") == "bug_fix":
-                    graph = bug_fix_template(objective, tuple(template["write_scope"]))
+                    graph = bug_fix_template(
+                        objective, tuple(template["write_scope"]),
+                        lightweight=bool(data.get("adaptive_verification"))
+                        and access_mode in {None, "workspace-write"} and data.get("host", "opencode") == "opencode")
                     request_class = "bug-fix"
                 elif template.get("type") == "read_only_scan":
                     if template.get("write_scope"):
@@ -123,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
                                     planner_session_id=data.get("planner_session_id"))
         elif args.operation == "state":
             result = (bridge.verify_pending(data["run_id"], retry=bool(data.get("retry_checks")))
-                      if data.get("verify_pending") else bridge.state(data["run_id"]))
+                      if data.get("verify_pending") else bridge.published_state(data["run_id"]))
         elif args.operation == "review_plan":
             result = bridge.review_plan(data["run_id"])
         elif args.operation == "ask":

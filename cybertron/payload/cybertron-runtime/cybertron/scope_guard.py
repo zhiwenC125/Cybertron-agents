@@ -8,7 +8,7 @@ import shutil
 import stat
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Tuple
+from typing import Callable, Dict, Iterable, Tuple
 
 from .access import DEFAULT_ACCESS_MODE, HOST_STATE_DIRECTORIES, hard_denied, normalize_access_mode
 
@@ -105,7 +105,7 @@ class ScopeGuard:
                 return True
         return False
 
-    def snapshot(self) -> Snapshot:
+    def snapshot(self, *, ignore: Callable[[str, list[str]], set[str]] | None = None) -> Snapshot:
         # Read-only has no writes to verify, and full access is explicitly
         # user-authorized; do not walk an unbounded home directory or pretend
         # to constrain it. Declared artifacts are hashed by the host instead.
@@ -114,6 +114,10 @@ class ScopeGuard:
         entries: Dict[str, FileState] = {}
         for current, dirs, files in os.walk(self.workspace, topdown=True, followlinks=False):
             base = Path(current)
+            if ignore is not None:
+                ignored = ignore(current, dirs + files)
+                dirs[:] = [name for name in dirs if name not in ignored]
+                files = [name for name in files if name not in ignored]
             for name in list(dirs):
                 path = base / name
                 rel = path.relative_to(self.workspace).as_posix()
@@ -126,7 +130,7 @@ class ScopeGuard:
                     dirs.remove(name)
                 elif stat.S_ISDIR(info.st_mode):
                     entries[rel] = FileState("directory", mode=stat.S_IMODE(info.st_mode))
-                    if name in PRUNED_DIRS:
+                    if ignore is None and name in PRUNED_DIRS:
                         # Dependency and cache trees dominate large repositories.
                         # Keep the directory entry (deletion is still detected)
                         # without reading every vendored file.

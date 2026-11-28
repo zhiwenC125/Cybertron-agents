@@ -33,6 +33,97 @@ class HarnessLoopTests(unittest.TestCase):
         call, child, token = dispatch
         return self.bridge.finish(run_id, token, child, call_id=call)
 
+    def python_project(self):
+        (self.project / "pyproject.toml").write_text('[project]\nname = "example"\n')
+        (self.project / "src").mkdir()
+        (self.project / "tests").mkdir()
+
+    @unittest.skipUnless(shutil.which("sandbox-exec"), "requires macOS sandbox runner")
+    @unittest.skipIf(os.environ.get("CYBERTRON_SANDBOX") == "1", "nested sandbox-exec is unsupported")
+    def test_disjoint_writers_contribute_to_one_risk_floor_and_one_check(self):
+        self.python_project()
+        (self.project / "lib").mkdir()
+        left, right = self.project / "src/value.py", self.project / "lib/key.py"
+        left.write_text("VALUE = 1\n")
+        right.write_text("KEY = 1\n")
+        (self.project / "tests/test_values.py").write_text(
+            "import unittest\nfrom src.value import VALUE\nfrom lib.key import KEY\n"
+            "class Check(unittest.TestCase):\n"
+            "    def test_both(self): self.assertEqual((VALUE, KEY), (2, 2))\n"
+        )
+        value = node("value", "code.write", "solus-prime", write_scope=["src/value.py"])
+        key = node("key", "code.write", "solus-prime", write_scope=["lib/key.py"])
+        review = node("review", "review.l2", "liege-maximo", kind="review", depends_on=["value"])
+        accept = node("accept", "accept", "megatronus", kind="verify", depends_on=["review"])
+        state = self.bridge.plan([value, key, review, accept], "planner", adaptive_verification=True)
+        run_id = state["run_id"]
+        first = self.dispatch(run_id, "value")
+        running = self.bridge.state(run_id)
+        self.assertEqual(running["next_actions"][0]["node_ids"], ["key"])
+        second = self.dispatch(run_id, "key")
+        self.assertEqual(len(self.bridge.state(run_id)["active_dispatches"]), 2)
+        left.write_text("VALUE = 2\n")
+        right.write_text("KEY = 2\n")
+        self.finish(run_id, first)
+        self.finish(run_id, second)
+        state = self.bridge.verify_pending(run_id)
+        self.assertEqual(state["verification_scope"]["modules"], ["lib", "src"])
+        self.assertEqual(state["pending_gates"], ["accept", "review.l2.full"])
+        self.assertEqual(state["ready_nodes"], [])
+        self.assertEqual(self.bridge.metrics(run_id)["run"]["gate_checks"], 1)
+        state = self.bridge.plan_op(run_id, {"op": "revise", "op_id": "review-all", "plan_revision": 0,
+                                            "reason": "Review both changed modules",
+                                            "nodes": [dict(review, depends_on=["value", "key"])]})
+        self.assertEqual(state["ready_nodes"], ["review"])
+        inspected = self.dispatch(run_id, "review")
+        for path in (left, right):
+            self.bridge.observe_review_read(run_id, inspected[0], inspected[1], str(path), "a" * 64)
+        self.finish(run_id, inspected)
+        verified = self.dispatch(run_id, "accept")
+        self.bridge.verify_acceptance(run_id, verified[0], verified[1], True, "Both modules are covered.")
+        self.assertEqual(self.finish(run_id, verified)["status"], "completed")
+        self.assertEqual(self.bridge.metrics(run_id)["run"]["gate_checks"], 1)
+
+    @unittest.skipUnless(shutil.which("sandbox-exec"), "requires macOS sandbox runner")
+    @unittest.skipIf(os.environ.get("CYBERTRON_SANDBOX") == "1", "nested sandbox-exec is unsupported")
+    def test_same_inputs_reuse_real_checks_across_inline_and_bound_nodes(self):
+        self.python_project()
+        (self.project / "tests/test_notes.py").write_text(
+            "import unittest\nfrom pathlib import Path\nclass Check(unittest.TestCase):\n"
+            "    def test_notes(self): self.assertEqual(Path('notes.md').read_text(), 'done')\n"
+        )
+        write = node("write", "doc.write", "alpha-trion", write_scope=["notes.md"],
+                     verifiers=["scope_guard", "test"])
+        check = node("check", "test.write", "alchemist", kind="verify", check_target="test",
+                     depends_on=["write"])
+        run_id = self.bridge.plan([write, check], "planner", adaptive_verification=True)["run_id"]
+        dispatch = self.dispatch(run_id, "write")
+        (self.project / "notes.md").write_text("done")
+        self.finish(run_id, dispatch)
+        state = self.bridge.verify_pending(run_id)
+        self.assertEqual(state["ready_nodes"], ["check"])
+        dispatch = self.dispatch(run_id, "check")
+        reused = self.bridge.check(run_id, "test", dispatch[0], "check", dispatch[1])
+        self.assertTrue(reused["reused"])
+        self.assertEqual(reused["receipts"][0]["exit"], 0)
+        self.assertEqual(self.finish(run_id, dispatch)["status"], "completed")
+        self.assertEqual(self.bridge.metrics(run_id)["run"]["gate_checks"], 1)
+
+    def test_interrupted_model_node_can_resume_with_its_existing_change(self):
+        write = node("write", "doc.write", "alpha-trion", write_scope=["notes.md"])
+        run_id = self.bridge.plan(write, "planner", adaptive_verification=True)["run_id"]
+        first = self.dispatch(run_id, "write")
+        (self.project / "notes.md").write_text("Written before the model timed out.\n")
+        interrupted = self.bridge.record_interruption(run_id, first[1], "model", "model response timed out", "e-1")
+        self.assertEqual(interrupted["last_interruption"]["call_id"], first[0])
+        resumed = V6HostBridge(self.project)
+        state = resumed.finish(run_id, first[2], first[1], call_id=first[0])
+        self.assertEqual(state["ready_nodes"], ["write"])
+        self.assertEqual(state["repair_feedback"], {"write": "model response timed out"})
+        state = self.finish(run_id, self.dispatch(run_id, "write", 2))
+        self.assertEqual((state["status"], state["plan_revision"]), ("completed", 0))
+        self.assertEqual(state["last_interruption"]["plan_revision"], 0)
+
     def test_exact_content_settles_at_creation_without_dispatch(self):
         content = b"already delivered\n"
         (self.project / "notes.md").write_bytes(content)
@@ -78,8 +169,36 @@ class HarnessLoopTests(unittest.TestCase):
         state = self.bridge.verify_pending(run_id)
         self.assertEqual(state["status"], "blocked")
         self.assertEqual(state["pending_checks"][0]["status"], "unavailable")
+        self.assertFalse(state["pending_checks"][0]["can_retry"])
         self.assertNotIn("run.completed", {event["type"] for event in self.bridge.events(run_id)})
         self.assertIn("unavailable", Path(state["plan_path"]).read_text())
+        # A missing check cannot be fixed by re-running it, so the kernel asks for
+        # a revision instead of offering a retry that would fail identically.
+        self.assertEqual(state["next_actions"][0]["agent"], "thirteenth")
+        self.assertEqual(state["next_actions"][0]["failed_checks"],
+                         [{"node_id": "write", "target": "build", "status": "unavailable"}])
+        self.assertFalse(any(action.get("arguments", {}).get("retry_checks")
+                             for action in state["next_actions"]))
+
+    def test_explicit_gate_without_a_covering_node_is_rejected_in_adaptive_mode(self):
+        write = node("write", "doc.write", "alpha-trion", write_scope=["notes.md"])
+        with self.assertRaises(PlanValidationError) as context:
+            self.bridge.plan(write, "planner", adaptive_verification=True, gates=["test"])
+        self.assertEqual([finding["code"] for finding in context.exception.findings], ["gate.unbound"])
+
+    def test_published_state_refreshes_the_plan_projection(self):
+        write = node("write", "doc.write", "alpha-trion", write_scope=["notes.md"])
+        state = self.bridge.plan(write, "planner", adaptive_verification=True)
+        plan_file = Path(state["run_dir"]) / "plan.md"
+        self.assertTrue(plan_file.is_file())
+        plan_file.write_text("stale projection\n")
+        refreshed = self.bridge.published_state(state["run_id"])
+        text = plan_file.read_text()
+        self.assertEqual(refreshed["run_id"], state["run_id"])
+        self.assertIn("## Verification", text)
+        self.assertIn("## Next actions", text)
+        self.assertIn("Facts:", text)
+        self.assertNotEqual(text, "stale projection\n")
 
     @unittest.skipUnless(shutil.which("sandbox-exec"), "requires macOS sandbox runner")
     @unittest.skipIf(os.environ.get("CYBERTRON_SANDBOX") == "1",
@@ -107,13 +226,26 @@ class HarnessLoopTests(unittest.TestCase):
         state = self.bridge.verify_pending(run_id)
         self.assertEqual(state["ready_nodes"], ["scan"])
         self.assertEqual(state["pending_checks"][0]["status"], "fail")
-        self.assertTrue(state["pending_checks"][0]["can_retry"])
+        self.assertFalse(state["pending_checks"][0]["can_retry"])
         failed = next(e for e in self.bridge.events(run_id) if e["type"] == "gate.check")
         self.assertTrue(failed["inline"])
         self.assertEqual(failed["receipt"]["exit"], 1)
+        self.bridge.verify_pending(run_id, retry=True)
+        self.assertEqual(self.bridge.metrics(run_id)["run"]["gate_checks"], 1)
         self.finish(run_id, self.dispatch(run_id, "scan"))
-        self.bridge.verify_pending(run_id)
+        settled = self.bridge.verify_pending(run_id)
         self.assertEqual(len([e for e in self.bridge.events(run_id) if e["type"] == "gate.check"]), 1)
+        # The failed producer is repaired by a revision; re-running the identical
+        # check is not offered as an action.
+        self.assertEqual(settled["next_actions"][0]["agent"], "thirteenth")
+        self.assertEqual(settled["next_actions"][0]["failed_checks"],
+                         [{"node_id": "fix", "target": "test", "status": "fail"}])
+        self.assertFalse(any(action.get("arguments", {}).get("retry_checks")
+                             for action in settled["next_actions"]))
+        projection = Path(settled["plan_path"]).read_text()
+        self.assertIn("Outstanding · test", projection)
+        self.assertIn("exit 1", projection)
+        self.assertTrue(all(len(line) <= 400 for line in projection.splitlines()))
 
         revised = self.bridge.plan_op(run_id, {
             "op": "revise", "op_id": "correct", "plan_revision": 0, "reason": "Wrong value",
@@ -128,7 +260,13 @@ class HarnessLoopTests(unittest.TestCase):
         self.assertEqual(state["status"], "completed")
         receipts = [e["receipt"]["exit"] for e in self.bridge.events(run_id) if e["type"] == "gate.check"]
         self.assertEqual(receipts, [1, 0])
+        completed = self.bridge.published_state(run_id)
+        self.assertEqual(completed["status"], "completed")
+        self.assertIn("test", completed["verified_inputs"])
+        self.assertIn("Verified inputs", Path(completed["plan_path"]).read_text())
         path.write_text("VALUE = 4\n")
+        # Completion is a historical fact about the verified inputs; later
+        # workspace drift does not rewrite it.
         self.assertEqual(self.bridge.state(run_id)["status"], "completed")
 
     @unittest.skipUnless(shutil.which("sandbox-exec"), "requires macOS sandbox runner")

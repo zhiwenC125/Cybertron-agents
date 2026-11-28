@@ -17,14 +17,20 @@ def read_only_scan_template(objective: str) -> PlanGraph:
     )], access_mode="read-only")
 
 
-def bug_fix_template(objective: str, write_scope: tuple[str, ...]) -> PlanGraph:
-    """Seed a four-node bug investigation, fix, and independent review.
+def bug_fix_template(objective: str, write_scope: tuple[str, ...], *, lightweight: bool = False) -> PlanGraph:
+    """Seed a scoped bug fix for the selected verification mode.
 
     This is a planning hint, not a gate decision or an execution receipt.
     The caller still submits every change through the graph validator.
     """
     if not isinstance(objective, str) or not objective.strip():
         raise ValueError("bug objective is required")
+    if lightweight and len(write_scope) == 1 and not any(char in write_scope[0] for char in "*?["):
+        return PlanGraph([PlanNode(
+            "fix", "task", "code.write", "solus-prime", objective.strip(),
+            write_scope=write_scope, acceptance=("Correct the regression and pass the existing test",),
+            verifiers=("scope_guard", "test"),
+        )])
     nodes = [
         PlanNode("scan-static", "task", "scan.static", "onyx-prime",
                  f"Locate the cause of: {objective}",

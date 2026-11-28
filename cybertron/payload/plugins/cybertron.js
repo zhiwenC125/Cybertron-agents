@@ -109,7 +109,8 @@ const nodeInput = {
     satisfies: { type: 'array', items: { type: 'string' },
       description: 'Lowercase IDs of the acceptance criteria this node covers.' },
     requires: { type: 'array', items: { type: 'string' } },
-    check_target: { type: 'string', enum: ['lint', 'build', 'test', 'sim'] },
+    check_target: { type: 'string', enum: ['lint', 'build', 'test', 'sim'],
+      description: 'Only for a fixed verify node or diagnostic reproduction. Omit for implementation, inline checks, review and acceptance.' },
     expected_content: { type: 'string',
       description: 'Exact requested text of a single file. Include the requested trailing newline, if any.' },
   },
@@ -122,14 +123,68 @@ export default Plugin.define({
   async setup(ctx) {
     const project = ctx.location.project.canonical;
     const externalWrites = new Map();
+    const requests = new Map();
+    const interruptionEvents = new AbortController();
     const externalWriteKey = (session, call) => JSON.stringify([session, call]);
     const recordExternalWrite = (write, outcome, detail) =>
       bridge('external_write', project, { ...write.receipt, outcome, detail,
         changed_lines: write.changedLines });
+    const checkpoint = (run_id, session_id, stage, reason, event_id) =>
+      bridge('record_interruption', project, { run_id, session_id, stage, reason, event_id });
+    if (ctx.event?.subscribe) {
+      void (async () => {
+        for await (const event of ctx.event.subscribe({
+          types: ['session.execution.failed', 'session.execution.interrupted'],
+          signal: interruptionEvents.signal,
+        })) {
+          const { sessionID, reason, error } = event.data;
+          const binding = await ctx.storage.get(`child/${sessionID}`);
+          const runID = binding?.run_id || await ctx.storage.get(`run/${sessionID}`);
+          if (!runID) continue;
+          const cause = reason || (error?.status === 408 || error?.status === 504
+            || /timeout|timed out/i.test(error?.message || '') ? 'model response timed out'
+              : error?.type || 'model execution failed');
+          try {
+            await checkpoint(runID, sessionID, 'model', cause, event.id);
+          } catch (failure) {
+            console.warn(`Cybertron: could not record model interruption: ${failure.message}`);
+          }
+        }
+      })().catch(error => {
+        if (!interruptionEvents.signal.aborted)
+          console.warn(`Cybertron: model event stream ended: ${error.message}`);
+      });
+    }
+    const waitForChild = async (runID, waitingOn, stage, signal) => {
+      let abort;
+      try {
+        const waiting = Promise.race(waitingOn.map(async sessionID => {
+          await ctx.session.wait({ sessionID });
+          return sessionID;
+        }));
+        if (!signal) {
+          return await waiting;
+        } else {
+          const stopped = new Promise((_, reject) => {
+            abort = () => reject(signal.reason || new Error('wait interrupted'));
+            signal.addEventListener('abort', abort, { once: true });
+            if (signal.aborted) abort();
+          });
+          return await Promise.race([waiting, stopped]);
+        }
+      } catch (error) {
+        if (runID) await checkpoint(runID, waitingOn.length === 1 ? waitingOn[0] : null,
+          stage, error.name || 'wait interrupted');
+        throw error;
+      } finally {
+        if (abort) signal.removeEventListener('abort', abort);
+      }
+    };
     await ctx.session.hook('prompt', async event => {
       const selected = await ctx.session.get({ sessionID: event.sessionID });
       if (!selected.parentID) {
         const prompt = event.prompt?.text || '';
+        requests.set(event.sessionID, prompt);
         await ctx.storage.set(`full-access-requested/${event.sessionID}`, fullAccessRequested(prompt));
         if (noWriteRequested(prompt)) {
           await ctx.storage.set(`read-only/${event.sessionID}`, true);
@@ -171,8 +226,8 @@ export default Plugin.define({
         tool.execute = async (input, context) => {
           const result = await dispatch(input, context);
           if (context.agent !== 'prima' || !childSession(result)) return result;
-          return { ...result, content: 'Cybertron native child dispatched. Call cy_state(wait=true) '
-            + 'to wait and settle it, then continue with the returned next_actions.' };
+          return { ...result, content: 'Cybertron native child dispatched in the background. '
+            + 'Dispatch any other ready independent nodes before calling cy_state(wait=true) to settle.' };
         };
       });
       editor.add({
@@ -190,7 +245,7 @@ export default Plugin.define({
           write_scope: { type: 'array', items: { type: 'string' } },
           test_scope: { type: 'array', items: { type: 'string' } },
           skip: { type: 'array', items: { type: 'string' } },
-          request_class: { type: 'string' },
+          request_class: { type: 'string', description: 'Optional metadata. Omit unless a registered request class is known, for example bug-fix.' },
           new_run: { type: 'boolean' },
           change_reason: { type: 'string' },
           seed_from_run_id: { type: 'string' },
@@ -312,7 +367,7 @@ export default Plugin.define({
         },
       });
       editor.add({
-        name: 'cy_state', description: 'Read the v6 run. With wait=true, settle native children and run pending fixed checks. After resolving the cause of a failed check, use wait=true and retry_checks=true for a bounded retry.',
+        name: 'cy_state', description: 'Read the run, ready cards, and recorded evidence. With wait=true, settle native children and run pending fixed checks. Fix failed inputs before checking again. The kernel reuses receipts for identical inputs.',
         input: { type: 'object', properties: {
           wait: { type: 'boolean' },
           retry_checks: { type: 'boolean' },
@@ -333,7 +388,7 @@ export default Plugin.define({
               if (!input.wait)
                 return { content: JSON.stringify({ status: 'planning',
                   next_actions: [{ tool: 'cy_state', arguments: { wait: true } }] }) };
-              await ctx.session.wait({ sessionID: planner });
+              await waitForChild(run_id, [planner], 'planning', context.signal);
               await ctx.storage.remove(`planning-child/${context.sessionID}`);
               await ctx.storage.remove(`planning-request/${context.sessionID}`);
               run_id = await ctx.storage.get(`run/${context.sessionID}`);
@@ -343,26 +398,35 @@ export default Plugin.define({
             next_actions: [{ tool: 'subagent', agent: 'thirteenth', reason: 'plan the request' }] }) };
           let state = await bridge('state', project, { run_id }, context.signal);
           await ctx.storage.set(`access/${context.sessionID}`, state.access_mode);
+          const verifyPending = current => {
+            const activeWriter = current.nodes.some(node => node.status === 'running' &&
+              (node.write_scope.length || node.external_scope.length));
+            if (!current.pending_checks?.length || activeWriter) return current;
+            return bridge('state', project, {
+              run_id, verify_pending: true, retry_checks: input.retry_checks === true,
+            });
+          };
           if (input.wait && (state.status === 'running' ||
               (state.active_dispatches || []).length > 0)) {
-            for (const active of state.active_dispatches || []) {
-              if (!active.child_session_id) continue;
-              await ctx.session.wait({ sessionID: active.child_session_id });
+            while (state.active_dispatches?.length) {
+              const waiting = state.active_dispatches.filter(active => active.child_session_id);
+              if (!waiting.length) break;
+              const sessionID = await waitForChild(run_id,
+                waiting.map(active => active.child_session_id), 'wait', context.signal);
+              const active = waiting.find(entry => entry.child_session_id === sessionID);
               const dispatch = await ctx.storage.get(`dispatch/${active.call_id}`);
               if (!dispatch) throw new Error('Missing bound native dispatch receipt');
               const child_error = Boolean(await ctx.storage.get(
                 `tool_error/${active.child_session_id}`));
               state = await bridge('finish', project,
                 { run_id, token: dispatch.token, call_id: active.call_id,
-                  child_session_id: active.child_session_id, child_error }, context.signal);
+                  child_session_id: active.child_session_id, child_error });
               await ctx.storage.remove(`tool_error/${active.child_session_id}`);
+              if (state.active_dispatches.length) state = await verifyPending(state);
+              if (state.ready_nodes?.length) break;
             }
           }
-          if (input.wait && state.pending_checks?.length && !state.active_dispatches?.length) {
-            state = await bridge('state', project, {
-              run_id, verify_pending: true, retry_checks: input.retry_checks === true,
-            }, context.signal);
-          }
+          if (input.wait) state = await verifyPending(state);
           return { content: JSON.stringify(state) };
         },
       });
@@ -562,7 +626,8 @@ export default Plugin.define({
             node_id: binding.node_id, child_session_id: context.sessionID,
           }, context.signal);
           return { content: JSON.stringify({ target: result.target, status: result.status,
-            receipts: result.receipts, diagnostic: result.diagnostic }) };
+            receipts: result.receipts, diagnostic: result.diagnostic,
+            reused: result.reused, check_id: result.check_id }) };
         },
       });
       editor.add({
@@ -774,8 +839,15 @@ export default Plugin.define({
           (await bridge('state', project, { run_id }, event.signal)).access_mode !== 'read-only')
         throw new Error('A writing run cannot dispatch during a read-only turn');
       const { nodeID, role, callID, card } = nativeDispatch(event);
-      const result = await bridge('before', project,
-        { run_id, node_id: nodeID, role, card, call_id: callID });
+      const args = { run_id, node_id: nodeID, role, card, call_id: callID };
+      let result = await bridge('before', project, args);
+      // The previous background child binds its scope before its first model call.
+      // A parallel writer waits for that binding, not for its peer to finish.
+      const deadline = Date.now() + 5000;
+      while (result.deferred === 'writer_binding' && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        result = await bridge('before', project, args);
+      }
       if (result.rejected) {
         if (result.needs_grant) {
           throw new Error(`Cybertron: grant required for ${result.node_id}: ${result.needs_grant.join(', ')}; call cy_escalate, then cy_ask for human approval`);
@@ -957,9 +1029,12 @@ export default Plugin.define({
         if (session.parentID && !handoff) throw new Error('Planner has no active handoff from prima');
         for (const tool of ['cy_ask', 'cy_runs', 'cy_resume', 'cy_escalate', 'cy_new_run',
           'cy_metrics', 'cy_check', 'cy_shell', 'cy_verify', 'cy_review_reject', 'subagent']) delete event.tools[tool];
+        const original = session.parentID && requests.get(session.parentID);
         event.system.push({ type: 'text', text: handoff?.run_id
           ? `Cybertron replanning: call cy_state for run ${handoff.run_id} revision ${handoff.plan_revision}. Use cy_plan with operation {op: "revise", op_id, plan_revision, reason, nodes, retry_nodes}. Supply only changed/new nodes. Keep the goal, acceptance criteria, and authorized scopes. Preserve unrelated receipts. Retry failed checks after fixing their inputs.`
-          : 'Cybertron planning: submit clear requests directly. Ask a native question only for a consequential ambiguity. For one exact Markdown document use alpha-trion, kind task, capability doc.write, verifiers ["scope_guard"], expected_content, and one artifact criterion bound by the node satisfies array. For business source use solus-prime and code.write. In workspace-write, put routine fixed checks on the producing task, for example verifiers ["scope_guard", "test"], and bind the test criterion through satisfies. Use a separate verify node when an independent verification role is needed or in other access modes. Submit narrow scopes. Prima takes over in this session.' });
+          : 'Cybertron planning: submit clear requests directly. Ask a native question only for a consequential ambiguity. For one exact Markdown document use alpha-trion, kind task, capability doc.write, verifiers ["scope_guard"], expected_content, and one artifact criterion bound by satisfies. For a clear one-file fix with existing regression tests, use template {type:"bug_fix", objective, write_scope:[exact file]} and satisfies {fix:[artifact and test criterion IDs]}. It produces one solus-prime task and runs the fixed test in the kernel. Omit review, accept, and diagnose for that case unless the user explicitly requests an independent judgment or has a concrete diagnostic need. Use forbidden_paths to protect tests from edits; a forbidden test.write capability would also forbid running the fixed test. For known cross-module or high-risk changes, plan disjoint implementations with only actual dependencies, a review.l2 node covering every affected producer, and an accept node depending on that reviewer. Attach routine tests to the implementations with verifiers ["scope_guard", "test"] and bind test criteria there. The kernel executes the test once for shared inputs and supplies its receipt to both judgment roles. Omit fixed verify nodes for routine tests. Supply kind on every explicit node. Submit narrow scopes. Prima takes over in this session.' });
+        if (original && !handoff?.run_id) event.system.push({ type: 'text', text:
+          'Original user request, which takes precedence over assumptions in the handoff: ' + JSON.stringify(original) });
         return;
       }
       if (event.agent !== 'prima') {
@@ -1019,7 +1094,13 @@ export default Plugin.define({
             event.system.push({ type: 'text', text: `This node requires cy_check with target "${binding.check_target}". Run that tool once now and return its real receipt to Prima.` });
           } else if (binding.planned_verification && binding.kind === 'review') {
             for (const tool of ['cy_check', 'shell', 'bash']) delete event.tools[tool];
-            event.system.push({ type: 'text', text: 'Review this node using the supplied diff and permitted read-only tools. Read the relevant project files, then report findings. Formal executable checks belong to separate bound verify nodes.' });
+            event.system.push({ type: 'text', text: 'Review the supplied diff and existing fixed-check receipts. Read the relevant project files with permitted read-only tools, then report findings.' });
+            const state = await bridge('state', project, { run_id: binding.run_id });
+            event.system.push({ type: 'text', text: JSON.stringify({
+              scope: state.verification_scope, diffs: state.planning_context.diffs,
+              checks: state.planning_context.checks.map(({ node_id, gate, status, receipt }) =>
+                ({ node_id, gate, status, receipt })),
+            }) });
           } else if (binding.kind === 'verify' && event.agent === 'megatronus') {
             const state = await bridge('state', project, { run_id: binding.run_id });
             const receipts = state.planning_context.checks.map(check => ({
@@ -1030,7 +1111,9 @@ export default Plugin.define({
               + 'then call cy_verify with passed and findings. The kernel already verified the binding and hashes. '
               + 'Use the received evidence, without searching ledger files. '
               + JSON.stringify({ run_id: state.run_id, revision: state.plan_revision,
-                criteria: state.intent_coverage, gates: state.passed_gates, receipts }) });
+                criteria: state.intent_coverage, gates: state.passed_gates, receipts,
+                reviews: state.planning_context.receipts.filter(result => result.review_reads)
+                  .map(({ node_id, review_reads, evidence }) => ({ node_id, review_reads, evidence })) }) });
           }
         }
         delete event.tools.cy_state;
@@ -1072,7 +1155,8 @@ export default Plugin.define({
       delete event.tools.cy_check;
       delete event.tools.cy_shell;
       event.system.push({ type: 'text', text:
-        'Cybertron dispatcher: call cy_state first to discover a same-session plan. In another session, use cy_runs and cy_resume if the user wants to continue a persisted run. For a new request dispatch thirteenth. Call cy_state(wait=true) after every native dispatch even if the tool says it is running in the background. Follow next_actions and use the exact kernel card. Pass verify targets to their registered roles and give megatronus the acceptance criteria and the existing receipts. When next_actions names thirteenth, hand over the existing run ID, revision, failure diagnostics and receipts, then wait for the revised plan. Keep working until the ledger completes, a human decision is required, or the ledger identifies a blocker you cannot resolve.' });
+        'Cybertron dispatcher: call cy_state first to discover a same-session plan. In another session, use cy_runs and cy_resume if the user wants to continue a persisted run. For a new request send the original user request to thirteenth. A clear one-file fix with existing tests should have one implementation node and a kernel-run test. Let the plan and actual risk determine additional review or acceptance. Follow next_actions and use each exact kernel card. Dispatch all ready independent nodes in the background before waiting with cy_state(wait=true). After a failed check keep dispatching unrelated ready nodes. When next_actions names thirteenth, give it the existing run ID, revision and failure evidence for a local revision. Pass existing kernel evidence to review and acceptance. Continue until the ledger completes, the user must decide, or the ledger identifies an unresolved blocker.' });
     });
+    return () => interruptionEvents.abort();
   },
 });
