@@ -1,0 +1,120 @@
+{
+  "version": "0.10.0",
+  "tag": "v0.10.0",
+  "commit": "d7a9aa3bb8f521eb0188010f7eb52789c84e61de",
+  "publish_workflow": "https://github.com/zhiwenC125/Cybertron-agents/actions/runs/46134129890",
+  "verification_workflow": "https://github.com/zhiwenC125/Cybertron-agents/actions/runs/46133877363",
+  "release_pull_request": "https://github.com/zhiwenC125/Cybertron-agents/pull/23",
+  "channels": {
+    "github": {
+      "url": "https://github.com/zhiwenC125/Cybertron-agents/releases/tag/v0.10.0",
+      "published_at": "2026-11-28T10:18:17Z",
+      "archive_sha256": {
+        "cybertron-agents-0.10.0.tgz": "fe9326224357bd5ccffb825b9f241b9c81e06e85faf6b367718af4baae150ece",
+        "cybertron_agents-0.10.0-py3-none-any.whl": "af7c96d23c124652505cc833aaffa91acc21f247ea3ce27edcbff94159e8be69",
+        "cybertron_agents-0.10.0.tar.gz": "f08baca66de029f9a6e79c8e172dad418b1eb801f40fc2e9e2d3714dde66e9b1",
+        "install.sh": "6c5b578e5e52ff8f908382ce6683271bcc470d27ba54da9d4a2288e71a6f073c"
+      }
+    },
+    "npm": {
+      "url": "https://www.npmjs.com/package/cybertron-agents/v/0.10.0",
+      "metadata_url": "https://registry.npmjs.org/cybertron-agents/0.10.0",
+      "is_latest": true,
+      "archive_sha256": {
+        "cybertron-agents-0.10.0.tgz": "fe9326224357bd5ccffb825b9f241b9c81e06e85faf6b367718af4baae150ece"
+      }
+    },
+    "pypi": {
+      "url": "https://pypi.org/project/cybertron-agents/0.10.0/",
+      "metadata_url": "https://pypi.org/pypi/cybertron-agents/0.10.0/json",
+      "archive_sha256": {
+        "cybertron_agents-0.10.0-py3-none-any.whl": "af7c96d23c124652505cc833aaffa91acc21f247ea3ce27edcbff94159e8be69",
+        "cybertron_agents-0.10.0.tar.gz": "f08baca66de029f9a6e79c8e172dad418b1eb801f40fc2e9e2d3714dde66e9b1"
+      }
+    }
+  },
+  "verified_install_versions": {
+    "npm": "0.10.0",
+    "pypi": "cybertron-agents 0.10.0",
+    "shell_default_ref": "v0.10.0",
+    "shell_doctor_exit": 0
+  },
+  "local_acceptance": {
+    "python_tests": 343,
+    "node_tests": 13,
+    "isolated_qa": true,
+    "engine_verified": true,
+    "package_verification": true,
+    "installation_smoke_tests": [
+      {
+        "channel": "npm",
+        "version": "0.10.0",
+        "roles": 13,
+        "opencode_config_exit": 0,
+        "opencode_agents_exit": 0,
+        "plugin_sha256": "5bcbc289e7cf689386d27477ab9bcfc5aff3a918d203ccd2e59a42a63bf63435"
+      },
+      {
+        "channel": "pypi",
+        "version": "0.10.0",
+        "roles": 13,
+        "opencode_config_exit": 0,
+        "opencode_agents_exit": 0,
+        "plugin_sha256": "5bcbc289e7cf689386d27477ab9bcfc5aff3a918d203ccd2e59a42a63bf63435"
+      },
+      {
+        "channel": "shell",
+        "version": "0.10.0",
+        "roles": 13,
+        "opencode_config_exit": 0,
+        "opencode_agents_exit": 0,
+        "plugin_sha256": "5bcbc289e7cf689386d27477ab9bcfc5aff3a918d203ccd2e59a42a63bf63435"
+      }
+    ]
+  },
+  "temporary_project_scenarios": {
+    "single_file": {
+      "host": "OpenCode v2.3.0",
+      "planning_dispatches": 1,
+      "execution_dispatches": 1,
+      "actual_fixed_checks": 1,
+      "revisions": 0,
+      "test_exit": 0,
+      "settlement": "completed"
+    },
+    "cross_module": {
+      "host": "OpenCode v2.3.0",
+      "planning_dispatches": 1,
+      "execution_dispatches": 4,
+      "concurrent_implementation_nodes": 2,
+      "actual_fixed_checks": 1,
+      "revisions": 0,
+      "accepted": true,
+      "settlement": "completed"
+    },
+    "selective_repair": {
+      "host": "host bridge with real sandbox commands",
+      "execution_dispatches": 4,
+      "actual_fixed_checks": 3,
+      "revisions": 1,
+      "check_outcomes": [
+        {
+          "target": "sim",
+          "status": "fail"
+        },
+        {
+          "target": "test",
+          "status": "pass"
+        },
+        {
+          "target": "sim",
+          "status": "pass"
+        }
+      ],
+      "reused_targets": [
+        "test"
+      ],
+      "settlement": "completed"
+    }
+  }
+}

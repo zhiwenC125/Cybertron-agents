@@ -11,7 +11,7 @@
 
 ## 发布与历史
 
-- **0.10.0** [发布说明](releases/v0.10.0.md)
+- **0.10.0** [发布说明](releases/v0.10.0.md) · [结构化发布回执](testing/cybertron-0.10.0-release-validation.json)
 - **0.9.0** [发布说明](releases/v0.9.0.md) · [结构化验收回执](testing/harness-loop-release-validation.json)
 - 既有发布说明见 [releases/](releases/)，旧版迁移说明见 [0.7 → 0.8](migrations/0.7-to-0.8.md)。
 - 早期架构方案和验收由 [历史里程碑](stages/v6-progress.md) 索引。每份记录以当时的版本和验收范围为准。
