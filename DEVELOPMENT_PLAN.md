@@ -1,12 +1,12 @@
 # Cybertron 开发状态
 
-当前公开版本为 **0.9.0**，主开发分支为 `main`，`release/0.9.0` 对应发布提交。[发布说明](docs/releases/v0.9.0.md) · [文档目录](docs/README.md)
+当前版本为 **0.10.0**，主开发分支为 `main`，`release/0.10.0` 对应发布提交。[发布说明](docs/releases/v0.10.0.md) · [文档目录](docs/README.md)
 
 ## 已交付
 
 | 范围 | 当前状态与证据 |
 | --- | --- |
-| OpenCode 日常软件任务 | Prima 默认入口、Thirteenth 直接规划、同一 run 修订、按任务验证，均有隔离项目验收。[实现记录](docs/plans/cybertron-lightweight-harness-loop.md) · [结构化回执](docs/testing/harness-loop-release-validation.json) |
+| OpenCode 日常软件任务 | Prima 默认入口、固定检查复用、任务级风险、独立节点并行和同一 run 局部修复均有隔离项目验收。[实现记录](docs/plans/cybertron-lightweight-harness-loop.md) · [结构化回执](docs/testing/harness-loop-release-validation.json) |
 | 角色权限与质量门禁 | 角色注册表、宿主权限、隔离 QA 和来源校验已接入。隔离配置适用于 macOS `sandbox-exec`。[权限说明](design/role-capability-matrix.md) · [阶段 5](docs/stages/05-quality-gates.md) |
 | 安装与模型配置 | npm、PyPI 和 GitHub Release 已提供安装入口。模型编队支持全局、项目覆盖和回滚。[安装与升级](docs/packaging-and-installation.md) |
 | 飞书 | 自建应用在专用测试空间完成网关读写。按 Wiki 空间授权启用。[用户指南](docs/feishu-setup.md) · [历史回执](docs/stages/06-feishu-acceptance.json) |

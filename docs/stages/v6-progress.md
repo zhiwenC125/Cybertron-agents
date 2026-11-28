@@ -1,6 +1,6 @@
 # 历史里程碑与验收
 
-这些记录对应各阶段实际执行的版本与环境。当前 OpenCode 路径及其验收见 [0.9.0 实现记录](../plans/cybertron-lightweight-harness-loop.md) 和 [结构化发布回执](../testing/harness-loop-release-validation.json)。
+这些记录对应各阶段实际执行的版本与环境。当前 OpenCode 路径见 [0.10.0 发布说明](../releases/v0.10.0.md) 和 [自然语言验收](../testing/opencode-acceptance.md)。[0.9.0 实现记录](../plans/cybertron-lightweight-harness-loop.md) 和 [0.9.0 发布回执](../testing/harness-loop-release-validation.json) 保留上一版的验收事实。
 
 ## v6 动态任务图
 
