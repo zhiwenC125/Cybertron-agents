@@ -94,9 +94,17 @@ class Fence(unittest.TestCase):
     def test_timeout_stops_the_batch_and_returns_a_receipt(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory).resolve()
-            (project / "Makefile").write_text("all:\n\t/bin/sleep 15\n")
-            result = run_fenced_shell(project, "solus-prime", [["make"], ["make"]],
-                                      timeout_seconds=1)
+            (project / "test_timeout.py").write_text(
+                "import time\nimport unittest\n\n"
+                "class TimeoutFixture(unittest.TestCase):\n"
+                "    def test_wait(self):\n"
+                "        time.sleep(15)\n"
+            )
+            command = ["python3", "-m", "unittest", "discover"]
+            result = run_fenced_shell(project, "alchemist", [command, command],
+                                      timeout_seconds=2)
             self.assertEqual(result["status"], "fail")
             self.assertEqual(len(result["receipts"]), 1)
-            self.assertEqual(result["receipts"][0]["outcome"], "timeout")
+            receipt = result["receipts"][0]
+            self.assertEqual(receipt["outcome"], "timeout", receipt["output"])
+            self.assertEqual(receipt["exit"], 124)
